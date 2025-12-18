@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>阅读速度测试</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: "Microsoft YaHei", sans-serif;
+      line-height: 1.7;
+      background-color: #f9f9f9;
+      color: #333;
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+      padding-bottom: 80px; /* 为底部按钮留空间 */
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #2c3e50;
+    }
+    .section {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    button {
+      background: #3498db;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover {
+      background: #2980b9;
+    }
+    button:disabled {
+      background: #bdc3c7;
+      cursor: not-allowed;
+    }
+    #result {
+      margin-top: 15px;
+      font-weight: bold;
+      color: #27ae60;
+      font-size: 18px;
+    }
+    #passage {
+      display: none;
+      margin-top: 20px;
+      padding: 20px;
+      background: #fdf6e3;
+      border-left: 4px solid #f39c12;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 18px;
+      line-height: 1.8;
+    }
+    #instructions {
+      color: #7f8c8d;
+      font-size: 14px;
+      margin-top: 10px;
+    }
+
+    /* 固定底部按钮 */
+    #endBtnFixed {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      padding: 14px 30px;
+      font-size: 18px;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>📖 阅读速度测试</h1>
+
+  <div class="section">
+    <h2>1. 上传文本文件（TXT 格式）</h2>
+    <input type="file" id="fileInput" accept=".txt" />
+    <p id="fileInfo"></p>
+    <p id="instructions">支持几十万字的小说文件，内容仅在您浏览器中处理，不会上传到任何服务器。</p>
+  </div>
+
+  <div class="section">
+    <h2>2. 开始测试</h2>
+    <button id="startBtn" disabled>开始阅读</button>
+    <div id="result"></div>
+    <div id="passage"></div>
+  </div>
+
+  <!-- 固定在底部的结束按钮 -->
+  <button id="endBtnFixed" disabled>结束阅读</button>
+
+<script>
+  // 全局变量
+  let fullText = '';
+  let selectedPassage = '';
+  let startTime = null;
+
+  const fileInput = document.getElementById('fileInput');
+  const fileInfo = document.getElementById('fileInfo');
+  const startBtn = document.getElementById('startBtn');
+  const endBtnFixed = document.getElementById('endBtnFixed');
+  const passageEl = document.getElementById('passage');
+  const resultEl = document.getElementById('result');
+
+  // ✅ 混合计数：中文字符 + 英文单词 + 连续数字
+  function countReadingUnits(text) {
+    let total = 0;
+
+    // 英文单词（连续字母）
+    const englishWords = text.match(/[a-zA-Z]+/g);
+    total += englishWords ? englishWords.length : 0;
+
+    // 连续数字（如 2025, 3.14 → 注意：3.14 会被拆成 3 和 14，若需保留小数可改正则）
+    const numbers = text.match(/\d+/g);
+    total += numbers ? numbers.length : 0;
+
+    // 中文字符
+    const chineseChars = text.match(/[\u4e00-\u9fff]/g);
+    total += chineseChars ? chineseChars.length : 0;
+
+    return total;
+  }
+
+  // 读取文件
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function () {
+      fullText = reader.result;
+      const totalUnits = countReadingUnits(fullText);
+      fileInfo.textContent = `已加载：${file.name}（约 ${totalUnits.toLocaleString()} 阅读单元）`;
+      startBtn.disabled = false;
+      resetTest();
+    };
+    reader.onerror = () => alert('文件读取失败，请重试。');
+    reader.readAsText(file, 'UTF-8');
+  });
+
+  // 重置状态
+  function resetTest() {
+    passageEl.style.display = 'none';
+    passageEl.textContent = '';
+    resultEl.textContent = '';
+    endBtnFixed.style.display = 'none';
+    endBtnFixed.disabled = true;
+  }
+
+  // 智能抽取段落（使用新计数函数）
+  function extractRandomPassage(text) {
+    const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+    if (paragraphs.length === 0) {
+      const lines = text.split('\n').filter(l => l.trim().length > 0);
+      if (lines.length === 0) return text.substring(0, 500);
+      return lines.join('\n');
+    }
+
+    let startIndex = Math.floor(Math.random() * paragraphs.length);
+    let current = '';
+    let i = startIndex;
+    const MIN_UNITS = 300;  // 最小阅读单元数
+    const MAX_UNITS = 800;  // 最大阅读单元数
+
+    while (countReadingUnits(current) < MIN_UNITS && i < paragraphs.length) {
+      current += paragraphs[i] + '\n\n';
+      i++;
+    }
+
+    if (countReadingUnits(current) < MIN_UNITS) {
+      current = paragraphs.slice(0, Math.min(3, paragraphs.length)).join('\n\n');
+    }
+
+    // 智能截断（基于原文位置）
+    if (countReadingUnits(current) > MAX_UNITS) {
+      let cutIndex = 0;
+      let temp = '';
+      const sentenceEnds = ['。', '？', '！', '.', '?', '!'];
+
+      // 逐字符构建，直到接近 MAX_UNITS
+      for (let j = 0; j < current.length; j++) {
+        temp += current[j];
+        if (countReadingUnits(temp) >= MAX_UNITS) {
+          cutIndex = j;
+          // 尝试找到最近的句尾
+          let found = false;
+          for (let k = j; k < Math.min(j + 150, current.length); k++) {
+            if (sentenceEnds.includes(current[k])) {
+              cutIndex = k + 1;
+              found = true;
+              break;
+            }
+          }
+          if (!found) cutIndex = j;
+          break;
+        }
+      }
+      current = current.substring(0, cutIndex);
+    }
+
+    return current.trim();
+  }
+
+  // 开始测试
+  startBtn.addEventListener('click', () => {
+    if (!fullText) return;
+
+    selectedPassage = extractRandomPassage(fullText);
+    const unitCount = countReadingUnits(selectedPassage);
+    if (unitCount < 50) {
+      alert('未能提取有效文本，请换一个文件。');
+      return;
+    }
+
+    passageEl.textContent = selectedPassage;
+    passageEl.style.display = 'block';
+
+    startTime = performance.now();
+
+    endBtnFixed.style.display = 'block';
+    endBtnFixed.disabled = false;
+    startBtn.disabled = true;
+  });
+
+  // 结束测试
+  endBtnFixed.addEventListener('click', () => {
+    if (startTime === null) return;
+
+    const endTime = performance.now();
+    const elapsedMs = endTime - startTime;
+    const elapsedMin = elapsedMs / 60000;
+
+    const unitCount = countReadingUnits(selectedPassage);
+    const speed = Math.round(unitCount / elapsedMin);
+
+    resultEl.innerHTML = `
+      阅读单元数：<strong>${unitCount}</strong>（汉字+英文单词+数字）<br>
+      用时：<strong>${(elapsedMs / 1000).toFixed(2)}</strong> 秒<br>
+      阅读速度：<strong>${speed}</strong> 单元/分钟
+    `;
+
+    endBtnFixed.style.display = 'none';
+    startBtn.disabled = false;
+    startTime = null;
+
+    resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+</script>
+</body>
+</html>
