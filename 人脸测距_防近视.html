@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, user-scalable=no">
+  <title>人脸测距（仅限 Chrome/Edge）</title>
+  <style>
+    body { margin:0; background:#000; color:white; overflow:hidden; }
+    #video {
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      transform: scaleX(-1);
+    }
+    #info {
+      position: absolute;
+      top: 20px;
+      width: 100%;
+      text-align: center;
+      font-size: 20px;
+      background: rgba(0,0,0,0.5);
+      padding: 8px;
+    }
+    #warning {
+      position: absolute;
+      top: 60px;
+      width: 100%;
+      text-align: center;
+      font-size: 24px;
+      background: rgba(255, 0, 0, 0.7);
+      padding: 10px;
+      display: none;
+      z-index: 10;
+    }
+    #settings {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(0,0,0,0.7);
+      padding: 15px;
+      border-radius: 10px;
+      z-index: 20;
+      max-width: 300px;
+    }
+    .setting-item {
+      margin-bottom: 10px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+    }
+    input, select {
+      width: 100%;
+      padding: 5px;
+      background: #333;
+      color: white;
+      border: 1px solid #555;
+      border-radius: 3px;
+    }
+    button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 8px 15px;
+      border-radius: 3px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    button:hover {
+      background: #45a049;
+    }
+  </style>
+</head>
+<body>
+  <video id="video" autoplay muted playsinline></video>
+  <div id="info">加载中...</div>
+  <div id="warning">⚠️ 请远离屏幕！距离过近易导致近视</div>
+  
+  <div id="settings">
+    <h3>设置</h3>
+    <div class="setting-item">
+      <label for="alertType">提醒类型:</label>
+      <select id="alertType">
+        <option value="voice">语音提醒</option>
+        <option value="beep">蜂鸣声提醒</option>
+      </select>
+    </div>
+    <div class="setting-item" id="voiceSetting">
+      <label for="voiceText">语音内容:</label>
+      <input type="text" id="voiceText" value="请远离屏幕，距离过近易导致近视">
+    </div>
+    <div class="setting-item" id="beepSetting" style="display:none;">
+      <label for="maxBeepDistance">蜂鸣声最大距离 (米):</label>
+      <input type="number" id="maxBeepDistance" value="0.5" step="0.1" min="0.1" max="2">
+    </div>
+    <button id="saveSettings">保存设置</button>
+  </div>
+
+  <script src="https://unpkg.com/@mediapipe/face_mesh/face_mesh.js"></script>
+  <script>
+    const video = document.getElementById('video');
+    const info = document.getElementById('info');
+    const warning = document.getElementById('warning');
+    const settingsPanel = document.getElementById('settings');
+    const alertTypeSelect = document.getElementById('alertType');
+    const voiceText = document.getElementById('voiceText');
+    const maxBeepDistanceInput = document.getElementById('maxBeepDistance');
+    const saveButton = document.getElementById('saveSettings');
+    const voiceSetting = document.getElementById('voiceSetting');
+    const beepSetting = document.getElementById('beepSetting');
+
+    const REAL_EYE_DIST_MM = 65;
+    const FOCAL_LENGTH = 800; // 像素
+
+    // 默认设置
+    let settings = {
+      alertType: 'voice',
+      voiceText: '请远离屏幕，距离过近易导致近视',
+      maxBeepDistance: 0.5
+    };
+
+    // 音频上下文
+    let audioContext = null;
+    let beepInterval = null;
+
+    // 切换设置面板显示
+    settingsPanel.addEventListener('click', function(e) {
+      e.stopPropagation();
+    });
+    
+    document.addEventListener('click', function(e) {
+      if (!settingsPanel.contains(e.target)) {
+        settingsPanel.style.display = 'none';
+      }
+    });
+
+    // 设置面板切换
+    alertTypeSelect.addEventListener('change', function() {
+      if (this.value === 'voice') {
+        voiceSetting.style.display = 'block';
+        beepSetting.style.display = 'none';
+      } else {
+        voiceSetting.style.display = 'none';
+        beepSetting.style.display = 'block';
+      }
+    });
+
+    // 保存设置
+    saveButton.addEventListener('click', function() {
+      settings.alertType = alertTypeSelect.value;
+      settings.voiceText = voiceText.value;
+      settings.maxBeepDistance = parseFloat(maxBeepDistanceInput.value);
+      
+      // 保存到本地存储
+      localStorage.setItem('faceDistanceSettings', JSON.stringify(settings));
+      
+      // 隐藏设置面板
+      settingsPanel.style.display = 'none';
+      
+      // 更新界面显示
+      updateSettingsDisplay();
+    });
+
+    // 从本地存储加载设置
+    function loadSettings() {
+      const saved = localStorage.getItem('faceDistanceSettings');
+      if (saved) {
+        settings = JSON.parse(saved);
+        alertTypeSelect.value = settings.alertType;
+        voiceText.value = settings.voiceText;
+        maxBeepDistanceInput.value = settings.maxBeepDistance;
+        
+        // 根据设置更新界面
+        if (settings.alertType === 'voice') {
+          voiceSetting.style.display = 'block';
+          beepSetting.style.display = 'none';
+        } else {
+          voiceSetting.style.display = 'none';
+          beepSetting.style.display = 'block';
+        }
+      }
+    }
+
+    // 更新设置显示
+    function updateSettingsDisplay() {
+      alertTypeSelect.value = settings.alertType;
+      voiceText.value = settings.voiceText;
+      maxBeepDistanceInput.value = settings.maxBeepDistance;
+      
+      if (settings.alertType === 'voice') {
+        voiceSetting.style.display = 'block';
+        beepSetting.style.display = 'none';
+      } else {
+        voiceSetting.style.display = 'none';
+        beepSetting.style.display = 'block';
+      }
+    }
+
+    // 语音提醒函数
+    function speakWarning(text) {
+      if ('speechSynthesis' in window) {
+        // 取消之前的语音
+        speechSynthesis.cancel();
+        
+        const msg = new SpeechSynthesisUtterance(text);
+        msg.lang = 'zh-CN';
+        msg.rate = 1.0;
+        msg.pitch = 1.0;
+        msg.volume = 1.0;
+        
+        // 尝试找到中文语音
+        const voices = speechSynthesis.getVoices();
+        for (let i = 0; i < voices.length; i++) {
+          if (voices[i].lang.includes('zh')) {
+            msg.voice = voices[i];
+            break;
+          }
+        }
+        
+        speechSynthesis.speak(msg);
+      }
+    }
+
+    // 蜂鸣声提醒函数
+    function createBeep(frequency, duration) {
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.type = 'sine';
+      oscillator.frequency.value = frequency;
+      gainNode.gain.value = 0.3;
+      
+      oscillator.start();
+      oscillator.stop(audioContext.currentTime + duration / 1000);
+    }
+
+    // 距离相关的蜂鸣声
+    function playDistanceBeep(distance) {
+      // 根据距离计算蜂鸣频率和间隔
+      const maxDist = settings.maxBeepDistance;
+      const ratio = Math.min(1, distance / maxDist); // 0到1的比例
+      const freq = 400 + (600 * (1 - ratio)); // 距离越近频率越高
+      const interval = 100 + (1000 * ratio); // 距离越近间隔越短
+      
+      createBeep(freq, 100);
+      
+      if (beepInterval) {
+        clearInterval(beepInterval);
+      }
+      
+      beepInterval = setInterval(() => {
+        createBeep(freq, 100);
+      }, interval);
+    }
+
+    // 停止蜂鸣声
+    function stopBeep() {
+      if (beepInterval) {
+        clearInterval(beepInterval);
+        beepInterval = null;
+      }
+    }
+
+    let faceMesh = new FaceMesh({
+      locateFile: (file) => `https://unpkg.com/@mediapipe/face_mesh/${file}`
+    });
+    faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true });
+    faceMesh.onResults((results) => {
+      if (results.multiFaceLandmarks.length === 0) {
+        info.textContent = '未检测到人脸';
+        warning.style.display = 'none';
+        if (settings.alertType === 'beep') {
+          stopBeep();
+        }
+        return;
+      }
+      const lm = results.multiFaceLandmarks[0];
+      const left = lm[33], right = lm[263];
+      const pxDist = Math.hypot(
+        (right.x - left.x) * video.videoWidth,
+        (right.y - left.y) * video.videoHeight
+      );
+      if (pxDist > 10) {
+        const distM = (REAL_EYE_DIST_MM * FOCAL_LENGTH) / (pxDist * 1000);
+        info.innerHTML = `距离: <b>${distM.toFixed(2)} 米</b>`;
+        
+        // 检查距离是否小于设置的最大距离
+        if (distM < settings.maxBeepDistance) {
+          warning.style.display = 'block';
+          
+          if (settings.alertType === 'voice') {
+            // 语音提醒，每3秒提醒一次
+            if (!window.warningInterval) {
+              window.warningInterval = setInterval(() => {
+                speakWarning(settings.voiceText);
+              }, 3000);
+            }
+          } else {
+            // 蜂鸣声提醒
+            playDistanceBeep(distM);
+          }
+        } else {
+          warning.style.display = 'none';
+          if (window.warningInterval) {
+            clearInterval(window.warningInterval);
+            window.warningInterval = null;
+          }
+          if (settings.alertType === 'beep') {
+            stopBeep();
+          }
+        }
+      } else {
+        info.textContent = '请调整位置';
+        warning.style.display = 'none';
+        if (settings.alertType === 'beep') {
+          stopBeep();
+        }
+      }
+    });
+
+    // 启动摄像头
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
+      .then(stream => {
+        video.srcObject = stream;
+        info.textContent = '摄像头已启动...';
+      })
+      .catch(err => {
+        info.innerHTML = `❌ 摄像头错误: ${err.message}`;
+        console.error(err);
+      });
+
+    // 开始处理帧
+    video.addEventListener('loadeddata', () => {
+      setInterval(() => {
+        if (video.readyState >= 2) faceMesh.send({ image: video });
+      }, 100);
+    });
+    
+    // 页面加载完成后初始化
+    window.addEventListener('load', () => {
+      loadSettings();
+      updateSettingsDisplay();
+      
+      // 点击信息区域打开设置面板
+      info.addEventListener('click', (e) => {
+        e.stopPropagation();
+        settingsPanel.style.display = settingsPanel.style.display === 'block' ? 'none' : 'block';
+      });
+    });
+    
+    // 页面卸载时清理资源
+    window.addEventListener('beforeunload', () => {
+      if (window.warningInterval) {
+        clearInterval(window.warningInterval);
+      }
+      if (beepInterval) {
+        clearInterval(beepInterval);
+      }
+      if (audioContext) {
+        audioContext.close();
+      }
+    });
+  </script>
+</body>
+</html>
