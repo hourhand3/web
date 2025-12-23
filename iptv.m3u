@@ -1,4 +1,4 @@
 #EXTM3U x-tvg-url="https://live.fanmingming.cn/e.xml" catchup="append" catchup-source="?playseek=${(b)yyyyMMddHHmmss}-${(e)yyyyMMddHHmmss}"#EXTINF:-1 tvg-name="CCTV1" tvg-logo="https://live.fanmingming.cn/tv/CCTV1.png" group-title="央视频道",CCTV-1综合
-http://61.51.81.78:5003/cctv1.m3u8?token=7375646fbc6028300930f29ad64aa6e496ab0a0a&z=1f4e
+https://ali-m-l.cztv.com/channels/lantian/channel007/1080p.m3u8
 #EXTINF:-1 tvg-name="CCTV2" tvg-logo="https://live.fanmingming.cn/tv/CCTV2.png" group-title="央视频道",CCTV-2财经
-http://58.244.99.123:5003/cctv2.m3u8?token=7375646f1b237250656b45d2cf6fe798bcafb52c&z=1f4e
+https://ali-m-l.cztv.com/channels/lantian/channel007/1080p.m3u8
