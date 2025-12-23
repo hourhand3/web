@@ -1,12 +1,18 @@
 #EXTM3U
+#EXTINF:-1 ,CCTV1
+http://58.244.98.8:5003/cctv1.m3u8?token=7375646f6b485f3d0e45880c69072118e108810c&z=1f4e
 #EXTINF:-1 ,CCTV2
-http://36.32.174.67:60080/newlive/live/hls/2/live.m3u8
+http://58.244.99.123:5003/cctv2.m3u8?token=7375646f1b237250656b45d2cf6fe798bcafb52c&z=1f4e
 #EXTINF:-1 ,CCTV3
-http://1.31.14.70:54321/hls/6/index.m3u8
+http://58.244.99.123:5003/cctv3.m3u8?token=7375646f44b68c10d3ca142a2c5df2a9b702e444&z=1f4e
 #EXTINF:-1 ,CCTV4
-http://sh.lnott.top:880/dx04.m3u8
+http://61.51.81.78:5003/cctv4.m3u8?token=7375646f82c63ca2a20504fe0512ceb8a43129fd&z=1151
+#EXTINF:-1 ,CCTV5
+http://27.193.108.200:85/tsfile/live/0002_6.m3u8?key=txiptv
 #EXTINF:-1 ,CCTV6
-http://221.226.51.220:50081/newlive/live/hls/6/live.m3u8
+http://61.51.81.78:5003/cctv6.m3u8?token=7375646fc96d9309420632c8d72e0cb8ea64f766&z=1151
+#EXTINF:-1 ,CCTV6
+http://58.244.99.123:5003/cctv6.m3u8?token=7375646f74979d7de4f4246155fe79b1ecc360ba&z=1f4e
 #EXTINF:-1 ,CCTV7
 http://1.31.14.70:54321/hls/9/index.m3u8
 #EXTINF:-1 ,CCTV10
