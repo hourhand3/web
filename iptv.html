@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>电视直播</title>
+    <link href="https://vjs.zencdn.net/7.20.3/video-js.css" rel="stylesheet" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            position: relative;
+        }
+        #playlist-container {
+            width: 13%;
+            height: calc(100vh - 40px);
+            overflow-y: auto;
+            float: left;
+            padding-right: 20px;
+            box-sizing: border-box;
+        }
+        .playlist-item {
+            cursor: pointer;
+            padding: 10px;
+            border-bottom: 1px solid #ccc;
+        }
+        .playlist-item:hover {
+            background-color: #f0f0f0;
+        }
+        #player-container {
+            position: fixed;
+            right: 20px;
+            top: 20px;
+            width: 100%;
+            max-width: 85%;
+            height: calc(100vh - 40px);
+            box-sizing: border-box;
+        }
+        #my-video {
+            width: 100%;
+            height: 100%;
+        }
+        #custom-url-input {
+            width: 100%;
+            padding: 6px;
+            margin-top: 10px;
+            box-sizing: border-box;
+        }
+        #load-custom-btn {
+            margin-top: 5px;
+            padding: 6px 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        #load-custom-btn:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div id="playlist-container">
+        <h1>电视台</h1>
+        <input type="text" id="custom-url-input" placeholder="输入 M3U 播放列表地址" />
+        <button id="load-custom-btn">加载播放列表</button>
+        <div id="playlist"></div>
+    </div>
+    <div id="player-container">
+        <video id="my-video" class="video-js vjs-default-skin" controls preload="auto">
+            <p class="vjs-no-js">
+                To view this video please enable JavaScript, and consider upgrading to a web browser that
+                <a href="https://videojs.com/html5-video-support/" target="_blank">supports HTML5 video</a>
+            </p>
+        </video>
+    </div>
+
+    <script src="https://vjs.zencdn.net/7.20.3/video.min.js"></script>
+    <script src="https://unpkg.com/@videojs/http-streaming@latest/dist/videojs-http-streaming.min.js"></script>
+    <script>
+        async function fetchPlaylist(url) {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch playlist: ${response.statusText}`);
+            }
+            const text = await response.text();
+            return parseM3U(text);
+        }
+
+        function parseM3U(m3uText) {
+            const lines = m3uText.split('\n');
+            const playlist = [];
+            let currentTitle = '';
+
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].startsWith('#EXTINF:')) {
+                    currentTitle = lines[i].split(',')[1] || '未知频道';
+                } else if (lines[i].trim().length > 0 && !lines[i].startsWith('#')) {
+                    playlist.push({ title: currentTitle, url: lines[i].trim() });
+                }
+            }
+
+            return playlist;
+        }
+
+        function displayPlaylist(playlist) {
+            const playlistContainer = document.getElementById('playlist');
+            playlistContainer.innerHTML = ''; // 清空旧列表
+            playlist.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'playlist-item';
+                div.textContent = item.title;
+                div.addEventListener('click', () => playVideo(item.url));
+                playlistContainer.appendChild(div);
+            });
+        }
+
+        function playVideo(url) {
+            console.log('Playing video:', url);
+            const player = videojs('my-video');
+            player.src({ type: 'application/x-mpegURL', src: url });
+            player.play().then(() => {
+                console.log('Playback started successfully');
+            }).catch(error => {
+                console.error('Error starting playback:', error);
+            });
+        }
+
+        window.onload = async () => {
+            const defaultUrl = 'https://hourhand3.github.io/web/iptv.m3u';
+            try {
+                const playlist = await fetchPlaylist(defaultUrl);
+                displayPlaylist(playlist);
+            } catch (error) {
+                console.error('Error fetching or parsing default playlist:', error);
+            }
+
+            // 绑定自定义加载按钮事件
+            document.getElementById('load-custom-btn').addEventListener('click', async () => {
+                const input = document.getElementById('custom-url-input');
+                const url = input.value.trim();
+                if (!url) {
+                    alert('请输入有效的 M3U 地址');
+                    return;
+                }
+                try {
+                    const playlist = await fetchPlaylist(url);
+                    displayPlaylist(playlist);
+                } catch (error) {
+                    console.error('Error loading custom playlist:', error);
+                    alert('加载失败，请检查地址是否有效');
+                }
+            });
+        };
+    </script>
+</body>
+</html>
