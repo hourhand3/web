@@ -67,7 +67,7 @@ function init() {
 // 加载诗词和成语数据
 function loadData() {
     // 加载诗词数据
-    fetch('shi.json')
+    fetch('./shi.json')
         .then(response => response.json())
         .then(data => {
             poetryData = data;
@@ -78,7 +78,7 @@ function loadData() {
         });
     
     // 加载成语数据
-    fetch('idiom.json')
+    fetch('./idiom.json')
         .then(response => response.json())
         .then(data => {
             idiomData = data;
