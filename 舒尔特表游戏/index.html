@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>舒尔特表游戏</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- 导航栏 -->
+    <header>
+        <h1>舒尔特表游戏</h1>
+        <div class="header-controls">
+            <button id="settings-btn" class="btn">设置</button>
+            <button id="fullscreen-btn" class="btn">全屏</button>
+            <button id="help-btn" class="btn">帮助</button>
+        </div>
+    </header>
+
+    <!-- 主容器 -->
+    <main>
+        <!-- 游戏设置面板 -->
+        <div id="settings-panel" class="panel">
+            <h2>游戏设置</h2>
+            <div class="setting-group">
+                <label for="game-mode">游戏模式：</label>
+                <select id="game-mode">
+                    <option value="number">数字模式</option>
+                    <option value="poetry">诗词模式</option>
+                    <option value="idiom">成语模式</option>
+                </select>
+            </div>
+            <div class="setting-group">
+                <label for="grid-size">表格大小：</label>
+                <select id="grid-size">
+                    <option value="3">3x3</option>
+                    <option value="4">4x4</option>
+                    <option value="5">5x5</option>
+                    <option value="6">6x6</option>
+                    <option value="7">7x7</option>
+                    <option value="8">8x8</option>
+                    <option value="9">9x9</option>
+                    <option value="10">10x10</option>
+                </select>
+            </div>
+            <div class="setting-group" id="start-number-group">
+                <label for="start-number">起始数字：</label>
+                <input type="number" id="start-number" min="1" value="1">
+            </div>
+            <div class="setting-group" id="number-type-group">
+                <label for="number-type">数字类型：</label>
+                <select id="number-type">
+                    <option value="pure">纯数字</option>
+                    <option value="alphanumeric">数字+字母</option>
+                </select>
+            </div>
+            <div class="setting-actions">
+                <button id="start-game-btn" class="btn btn-primary">开始游戏</button>
+                <button id="cancel-settings-btn" class="btn">取消</button>
+            </div>
+        </div>
+
+        <!-- 游戏主区域 -->
+        <div id="game-area">
+            <!-- 游戏状态 -->
+            <div class="game-status">
+                <div class="timer">
+                    <span class="label">时间：</span>
+                    <span id="timer" class="value">00:00.00</span>
+                </div>
+                <div class="target">
+                    <span class="label">目标：</span>
+                    <span id="target" class="value">1</span>
+                </div>
+                <div class="range">
+                    <span class="label">范围：</span>
+                    <span id="range" class="value">1-9</span>
+                </div>
+            </div>
+
+            <!-- 游戏表格 -->
+            <div id="game-grid" class="game-grid"></div>
+
+            <!-- 游戏控制 -->
+            <div class="game-controls">
+                <button id="restart-btn" class="btn btn-primary">重新开始</button>
+                <button id="pause-btn" class="btn">暂停</button>
+            </div>
+        </div>
+
+        <!-- 侧边栏 -->
+        <aside>
+            <!-- 诗词/成语显示 -->
+            <div id="content-display" class="sidebar-section">
+                <h3>内容显示</h3>
+                <div id="content-text" class="content-text">
+                    游戏开始后将显示诗词或成语
+                </div>
+            </div>
+
+            <!-- 排行榜 -->
+            <div id="leaderboard" class="sidebar-section">
+                <h3>排行榜</h3>
+                <div class="leaderboard-tabs">
+                    <button class="tab-btn active" data-tab="number">数字模式</button>
+                    <button class="tab-btn" data-tab="poetry">诗词模式</button>
+                    <button class="tab-btn" data-tab="idiom">成语模式</button>
+                </div>
+                <div class="leaderboard-content">
+                    <div id="number-leaderboard" class="tab-content active">
+                        <ul class="leaderboard-list">
+                            <!-- 数字模式排行榜 -->
+                        </ul>
+                    </div>
+                    <div id="poetry-leaderboard" class="tab-content">
+                        <ul class="leaderboard-list">
+                            <!-- 诗词模式排行榜 -->
+                        </ul>
+                    </div>
+                    <div id="idiom-leaderboard" class="tab-content">
+                        <ul class="leaderboard-list">
+                            <!-- 成语模式排行榜 -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- 游戏结束模态框 -->
+    <div id="game-over-modal" class="modal">
+        <div class="modal-content">
+            <h2>游戏结束！</h2>
+            <div class="result">
+                <p>用时：<span id="final-time" class="time">00:00.00</span></p>
+                <p>模式：<span id="final-mode" class="mode">数字模式</span></p>
+                <p>难度：<span id="final-difficulty" class="difficulty">3x3</span></p>
+            </div>
+            <div class="modal-actions">
+                <button id="play-again-btn" class="btn btn-primary">再玩一次</button>
+                <button id="close-modal-btn" class="btn">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 帮助模态框 -->
+    <div id="help-modal" class="modal">
+        <div class="modal-content">
+            <h2>游戏帮助</h2>
+            <div class="help-content">
+                <h3>数字模式</h3>
+                <p>按顺序点击表格中的数字，从起始数字开始，依次递增。</p>
+                
+                <h3>诗词模式</h3>
+                <p>按顺序点击表格中来自诗词的汉字，按照诗词的正确顺序。</p>
+                
+                <h3>成语模式</h3>
+                <p>按顺序点击表格中来自成语的汉字，按照成语的正确顺序。</p>
+                
+                <h3>排行榜</h3>
+                <p>游戏会记录您的最佳成绩，显示在排行榜中。</p>
+            </div>
+            <button id="close-help-btn" class="btn btn-primary">关闭</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
