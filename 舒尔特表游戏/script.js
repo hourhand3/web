@@ -473,7 +473,7 @@ function handleCellClick(event) {
         // 数字模式
         if (numberType === 'pure') {
             // 纯数字
-            if (parseInt(value) === currentTarget) {
+            if (parseInt(value) === currentTarget + startNumber - 1) {
                 markCellCorrect(cell);
                 currentTarget++;
                 updateGameStatus();
