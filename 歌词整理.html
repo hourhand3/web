@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>歌词整理工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        .main-content {
+            display: flex;
+            gap: 20px;
+            padding: 30px;
+        }
+        
+        .panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .panel-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .panel-title::before {
+            content: '';
+            width: 4px;
+            height: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 2px;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 500px;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 14px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            resize: none;
+            transition: border-color 0.3s;
+            line-height: 1.6;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: 600;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .btn-process {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-process:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-copy {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+        }
+        
+        .btn-copy:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(17, 153, 142, 0.4);
+        }
+        
+        .btn-clear {
+            background: #f5f5f5;
+            color: #666;
+        }
+        
+        .btn-clear:hover {
+            background: #e0e0e0;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+            font-size: 12px;
+            border-top: 1px solid #eee;
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+            }
+            
+            textarea {
+                height: 300px;
+            }
+        }
+        
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            opacity: 0;
+            transition: all 0.3s ease;
+            z-index: 1000;
+            pointer-events: none;
+        }
+        
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+        
+        .settings {
+            padding: 0 30px 20px;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .setting-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+        
+        .setting-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        
+        .setting-item label {
+            cursor: pointer;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎵 歌词整理工具</h1>
+            <p>自动检测剪贴板 · 去除时间戳 · 英文首字母大写 · 自动复制</p>
+        </div>
+        
+        <div class="settings">
+            <div class="setting-item">
+                <input type="checkbox" id="autoPaste" checked>
+                <label for="autoPaste">自动粘贴剪贴板内容</label>
+            </div>
+            <div class="setting-item">
+                <input type="checkbox" id="autoCopy" checked>
+                <label for="autoCopy">自动复制整理结果</label>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div class="panel">
+                <div class="panel-title">原始歌词</div>
+                <textarea id="inputText" placeholder="请在此粘贴包含时间戳的歌词...&#10;&#10;提示：开启自动粘贴后，打开此页面会自动读取剪贴板内容"></textarea>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-title">整理后歌词</div>
+                <textarea id="outputText" readonly placeholder="整理后的歌词将显示在这里..."></textarea>
+            </div>
+        </div>
+        
+        <div class="main-content" style="padding-top: 0;">
+            <div class="button-group">
+                <button class="btn-clear" onclick="clearText()">🗑️ 清空</button>
+                <button class="btn-process" onclick="processLyrics()">✨ 整理歌词</button>
+                <button class="btn-copy" onclick="copyText()">📋 一键复制</button>
+            </div>
+        </div>
+        
+        <div class="footer">
+            适用于汽水小助手滚动歌词制作
+        </div>
+    </div>
+    
+    <div class="toast" id="toast">✅ 已自动复制到剪贴板</div>
+    
+    <script>
+        let lastClipboardText = '';
+        let isProcessing = false;
+        let lastCheckTime = 0;
+        const CHECK_INTERVAL = 1000;
+        
+        function isLyricContent(text) {
+            if (!text || text.trim().length === 0) return false;
+            
+            const timePattern = /\[\d{1,2}:\d{2}\.\d{2,3}\]|\[\d+,\d+\]|<\d+(,\d+){1,2}>|\[\d{1,2}:\d{2}\]/;
+            if (timePattern.test(text)) return true;
+            
+            return false;
+        }
+        
+        async function checkClipboard() {
+            if (!document.getElementById('autoPaste').checked || isProcessing) return;
+            
+            const now = Date.now();
+            if (now - lastCheckTime < CHECK_INTERVAL) return;
+            lastCheckTime = now;
+            
+            try {
+                const clipboardText = await navigator.clipboard.readText();
+                
+                if (clipboardText && clipboardText !== lastClipboardText) {
+                    if (isLyricContent(clipboardText)) {
+                        lastClipboardText = clipboardText;
+                        document.getElementById('inputText').value = clipboardText;
+                        processLyrics();
+                        
+                        if (document.getElementById('autoCopy').checked) {
+                            setTimeout(() => {
+                                autoCopyResult();
+                            }, 100);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.log('无法读取剪贴板:', err);
+            }
+        }
+        
+        function processLyrics() {
+            isProcessing = true;
+            const inputText = document.getElementById('inputText').value;
+            let cleanedText = inputText;
+            
+            const timePattern = /\[\d{1,2}:\d{2}\.\d{2,3}\]|\[\d+,\d+\]|<\d+(,\d+){1,2}>/g;
+            cleanedText = cleanedText.replace(timePattern, '');
+            
+            cleanedText = cleanedText.replace(/[ \t]+/g, ' ');
+            cleanedText = cleanedText.split('\n').map(line => line.trim()).join('\n');
+            
+            cleanedText = capitalizeSentences(cleanedText);
+            
+            cleanedText = capitalizeI(cleanedText);
+            
+            document.getElementById('outputText').value = cleanedText;
+            
+            setTimeout(() => {
+                isProcessing = false;
+            }, 100);
+        }
+        
+        function capitalizeSentences(text) {
+            const hasEnglish = /[a-zA-Z]/.test(text);
+            if (!hasEnglish) return text;
+            
+            let result = '';
+            let isStartOfSentence = true;
+            
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                
+                if (/[a-zA-Z]/.test(char)) {
+                    if (isStartOfSentence) {
+                        result += char.toUpperCase();
+                        isStartOfSentence = false;
+                    } else {
+                        result += char.toLowerCase();
+                    }
+                } else {
+                    result += char;
+                    if (char === '.' || char === '?' || char === '!' || char === '。' || char === '？' || char === '！') {
+                        isStartOfSentence = true;
+                    }
+                }
+            }
+            
+            return result;
+        }
+        
+        function capitalizeI(text) {
+            return text.replace(/\bi\b/g, 'I').replace(/\bi('|’)(m|ll|ve|d|am)\b/gi, 'I$1$2');
+        }
+        
+        async function autoCopyResult() {
+            const outputText = document.getElementById('outputText');
+            if (!outputText.value) return;
+            
+            try {
+                await navigator.clipboard.writeText(outputText.value);
+                showToast('✅ 已自动复制到剪贴板');
+            } catch (err) {
+                console.log('自动复制失败:', err);
+            }
+        }
+        
+        function copyText() {
+            const outputText = document.getElementById('outputText');
+            if (!outputText.value) {
+                showToast('⚠️ 请先整理歌词');
+                return;
+            }
+            
+            navigator.clipboard.writeText(outputText.value).then(() => {
+                showToast('✅ 已复制到剪贴板');
+            }).catch(err => {
+                outputText.select();
+                document.execCommand('copy');
+                showToast('✅ 已复制到剪贴板');
+            });
+        }
+        
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+        
+        function clearText() {
+            document.getElementById('inputText').value = '';
+            document.getElementById('outputText').value = '';
+            lastClipboardText = '';
+        }
+        
+        document.getElementById('inputText').addEventListener('input', function() {
+            if (this.value) {
+                processLyrics();
+            } else {
+                document.getElementById('outputText').value = '';
+            }
+        });
+        
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                checkClipboard();
+            }
+        });
+        
+        window.addEventListener('pageshow', function() {
+            checkClipboard();
+        });
+        
+        window.addEventListener('focus', function() {
+            checkClipboard();
+        });
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(checkClipboard, 500);
+        });
+        
+
+    </script>
+</body>
+</html>
