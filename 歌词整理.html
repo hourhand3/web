@@ -419,6 +419,20 @@
             checkClipboard();
         });
         
+        document.addEventListener('keydown', function(e) {
+            const target = e.target;
+            if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+                return;
+            }
+            
+            const conflictKeys = ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12',
+                                'Ctrl', 'Alt', 'Shift', 'Meta', 'Tab', 'Escape', 'Enter', 'Backspace', 'Delete'];
+            
+            if (!conflictKeys.includes(e.key) && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                checkClipboard();
+            }
+        });
+        
         document.addEventListener('DOMContentLoaded', function() {
             setTimeout(checkClipboard, 500);
         });
