@@ -30,18 +30,47 @@
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 30px;
-            text-align: center;
+            padding: 20px 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .header-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .header-info {
+            flex: 1;
+            min-width: 300px;
         }
         
         .header h1 {
-            font-size: 28px;
-            margin-bottom: 10px;
+            font-size: 24px;
+            margin: 0;
         }
         
         .header p {
             opacity: 0.9;
             font-size: 14px;
+            margin: 5px 0 0 0;
+        }
+        
+        .header-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .header-buttons button {
+            padding: 10px 20px;
+            font-size: 14px;
+            flex: 1;
+            min-width: 100px;
         }
         
         .main-content {
@@ -206,26 +235,36 @@
         
         .setting-item label {
             cursor: pointer;
-            font-size: 14px;
-            color: #666;
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🎵 歌词整理工具</h1>
-            <p>自动检测剪贴板 · 去除时间戳 · 英文首字母大写 · 自动复制</p>
-        </div>
-        
-        <div class="settings">
-            <div class="setting-item">
-                <input type="checkbox" id="autoPaste" checked>
-                <label for="autoPaste">自动粘贴剪贴板内容</label>
+            <div class="header-top">
+                <div class="header-info">
+                    <h1>🎵 歌词整理工具</h1>
+                    <p>自动检测剪贴板 · 去除时间戳 · 英文首字母大写 · 自动复制</p>
+                </div>
+                <div class="header-buttons">
+                    <button class="btn-clear" onclick="clearText()">🗑️ 清空</button>
+                    <button class="btn-process" onclick="processLyrics()">✨ 整理歌词</button>
+                    <button class="btn-copy" onclick="copyText()">📋 一键复制</button>
+                </div>
             </div>
-            <div class="setting-item">
-                <input type="checkbox" id="autoCopy" checked>
-                <label for="autoCopy">自动复制整理结果</label>
+            
+            <div class="settings">
+                <div class="setting-item">
+                    <input type="checkbox" id="autoPaste" checked>
+                    <label for="autoPaste">自动粘贴剪贴板内容</label>
+                </div>
+                <div class="setting-item">
+                    <input type="checkbox" id="autoCopy" checked>
+                    <label for="autoCopy">自动复制整理结果</label>
+                </div>
             </div>
         </div>
         
@@ -238,14 +277,6 @@
             <div class="panel">
                 <div class="panel-title">整理后歌词</div>
                 <textarea id="outputText" readonly placeholder="整理后的歌词将显示在这里..."></textarea>
-            </div>
-        </div>
-        
-        <div class="main-content" style="padding-top: 0;">
-            <div class="button-group">
-                <button class="btn-clear" onclick="clearText()">🗑️ 清空</button>
-                <button class="btn-process" onclick="processLyrics()">✨ 整理歌词</button>
-                <button class="btn-copy" onclick="copyText()">📋 一键复制</button>
             </div>
         </div>
         
