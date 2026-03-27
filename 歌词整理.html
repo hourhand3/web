@@ -345,6 +345,12 @@
             
             cleanedText = capitalizeI(cleanedText);
             
+            const lines = cleanedText.split('\n');
+            for (let i = 0; i < lines.length; i++) {
+                lines[i] = capitalizeLineStart(lines[i]);
+            }
+            cleanedText = lines.join('\n');
+            
             document.getElementById('outputText').value = cleanedText;
             
             setTimeout(() => {
@@ -382,6 +388,18 @@
         
         function capitalizeI(text) {
             return text.replace(/\bi\b/g, 'I').replace(/\bi('|’)(m|ll|ve|d|am)\b/gi, 'I$1$2');
+        }
+        
+        function capitalizeLineStart(line) {
+            const trimmedLine = line.trimStart();
+            if (trimmedLine.length === 0) return line;
+            
+            const firstChar = trimmedLine.charAt(0);
+            if (/[a-zA-Z]/.test(firstChar)) {
+                const leadingSpaces = line.substring(0, line.indexOf(trimmedLine));
+                return leadingSpaces + firstChar.toUpperCase() + trimmedLine.substring(1);
+            }
+            return line;
         }
         
         async function autoCopyResult() {
