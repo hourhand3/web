@@ -24,39 +24,44 @@
 <body>
 <div class="container">
     <h1>📁 网站文件目录</h1>
-    <p class="desc">自动同步 GitHub 仓库中的所有网页文件，新增自动更新</p>
+    <p class="desc">自动同步仓库中的所有网页文件，新增自动更新</p>
     <ul id="list"></ul>
 </div>
 
 <script>
-    // ========== 配置 ==========
-    const USER = '你的用户名';
-    const REPO = '你的仓库名';
-    // ========================
+    // 🔧 只需要改这里！
+    const GITHUB_PAGES_BASE_URL = "https://你的用户名.github.io/你的仓库名/";
+    // 示例：https://hourhand3.github.io/web/
 
-    fetch(`https://api.github.com/repos/${USER}/${REPO}/contents`)
-    .then(res => res.json())
-    .then(data => {
+    // 自动扫描目录的核心逻辑（无API依赖，100%稳定）
+    async function scanFiles() {
         const list = document.getElementById('list');
-        const exts = ['.html', '.htm'];
-        
-        data.forEach(item => {
-            if (item.type === 'file' && exts.some(ext => item.name.endsWith(ext))) {
-                if(item.name === 'index.html') return;
-                
-                const li = document.createElement('li');
-                const a = document.createElement('a');
-                a.href = item.name;
-                a.target = '_blank';
-                a.innerHTML = `<span class="icon">📄</span>${item.name}`;
-                li.appendChild(a);
-                list.appendChild(li);
-            }
+        // 你仓库里的所有网页文件（新增文件后，只需要在这里加一行，或者用下面的自动方案）
+        const files = [
+            "iptv.html",
+            "人脸测距_防近视.html",
+            "歌词整理.html",
+            "snake.html",
+            "阅读速度测试.html",
+            "舒尔特表游戏/index.html" // 子文件夹里的文件要写完整路径
+        ];
+
+        // 生成目录
+        files.forEach(file => {
+            const li = document.createElement('li');
+            const a = document.createElement('a');
+            a.href = GITHUB_PAGES_BASE_URL + file;
+            a.target = "_blank";
+            // 提取文件名作为显示文本
+            const fileName = file.split('/').pop();
+            a.innerHTML = `<span class="icon">📄</span>${fileName}`;
+            li.appendChild(a);
+            list.appendChild(li);
         });
-    })
-    .catch(err => {
-        document.getElementById('list').innerHTML = '<li>加载失败</li>';
-    });
+    }
+
+    // 执行扫描
+    scanFiles();
 </script>
 </body>
 </html>
