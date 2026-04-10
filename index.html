@@ -2,13 +2,16 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>项目文档目录</title>
+    <title>网站文件目录</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
+        * {margin: 0; padding: 0; box-sizing: border-box;}
         body {font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 2rem; background: #f6f8fa;}
         .container {max-width: 800px; margin: 0 auto; background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);}
-        h1 {color: #1a202c; margin-top: 0;}
-        .desc {color: #666; margin-bottom: 1.5rem;}
+        h1 {color: #1a202c; margin-top: 0; font-size: 2.5rem; display: flex; align-items: center; gap: 0.8rem;}
+        .desc {color: #666; margin-bottom: 2rem; font-size: 1.2rem;}
+        .category {margin: 1.5rem 0;}
+        .category-title {color: #2c3e50; font-size: 1.3rem; margin-bottom: 0.8rem; padding-left: 0.5rem; border-left: 4px solid #3498db;}
         ul {list-style: none; padding: 0;}
         li {margin: 0.6rem 0;}
         a {
@@ -18,50 +21,82 @@
             transition: all 0.2s;
         }
         a:hover {background: #e8f0fe; padding-left: 1.4rem;}
-        .icon {margin-right: 10px; font-size: 16px;}
+        .icon {margin-right: 10px; font-size: 18px;}
+        .folder-icon {color: #f39c12;}
+        .file-icon {color: #3498db;}
     </style>
 </head>
 <body>
 <div class="container">
     <h1>📁 网站文件目录</h1>
     <p class="desc">自动同步仓库中的所有网页文件，新增自动更新</p>
-    <ul id="list"></ul>
+
+    <!-- 根目录文件分类 -->
+    <div class="category">
+        <h2 class="category-title">📄 根目录工具</h2>
+        <ul id="rootFiles"></ul>
+    </div>
+
+    <!-- 子文件夹分类 -->
+    <div class="category">
+        <h2 class="category-title">📂 子文件夹项目</h2>
+        <ul id="subFolderFiles"></ul>
+    </div>
 </div>
 
 <script>
     // 🔧 只需要改这里！
-    const GITHUB_PAGES_BASE_URL = "https://你的用户名.github.io/你的仓库名/";
-    // 示例：https://hourhand3.github.io/web/
+    const GITHUB_PAGES_BASE_URL = "https://hourhand3.github.io/web/"; // 你的GitHub Pages地址
 
-    // 自动扫描目录的核心逻辑（无API依赖，100%稳定）
-    async function scanFiles() {
-        const list = document.getElementById('list');
-        // 你仓库里的所有网页文件（新增文件后，只需要在这里加一行，或者用下面的自动方案）
-        const files = [
-            "iptv.html",
-            "人脸测距_防近视.html",
-            "歌词整理.html",
-            "snake.html",
-            "阅读速度测试.html",
-            "舒尔特表游戏/index.html" // 子文件夹里的文件要写完整路径
-        ];
+    // 1. 根目录的HTML文件（直接放在web文件夹下的）
+    const rootFiles = [
+        { path: "iptv.html", name: "IPTV电视" },
+        { path: "人脸测距_防近视.html", name: "人脸测距防近视" },
+        { path: "歌词整理.html", name: "歌词整理工具" },
+        { path: "snake.html", name: "贪吃蛇游戏" },
+        { path: "阅读速度测试.html", name: "阅读速度测试" }
+    ];
 
-        // 生成目录
-        files.forEach(file => {
+    // 2. 子文件夹里的HTML文件（按文件夹分类，新增直接加一行）
+    const subFolderFiles = [
+        { path: "舒尔特表游戏/index.html", name: "舒尔特表游戏", folder: "舒尔特表游戏" }
+        // 以后新增子文件夹，直接在这里加一行：
+        // { path: "新文件夹/index.html", name: "新工具", folder: "新文件夹" }
+    ];
+
+    // 生成根目录文件列表
+    function renderRootFiles() {
+        const list = document.getElementById('rootFiles');
+        rootFiles.forEach(file => {
             const li = document.createElement('li');
             const a = document.createElement('a');
-            a.href = GITHUB_PAGES_BASE_URL + file;
+            a.href = GITHUB_PAGES_BASE_URL + file.path;
             a.target = "_blank";
-            // 提取文件名作为显示文本
-            const fileName = file.split('/').pop();
-            a.innerHTML = `<span class="icon">📄</span>${fileName}`;
+            a.innerHTML = `<span class="icon file-icon">📄</span>${file.name}`;
             li.appendChild(a);
             list.appendChild(li);
         });
     }
 
-    // 执行扫描
-    scanFiles();
+    // 生成子文件夹文件列表
+    function renderSubFolderFiles() {
+        const list = document.getElementById('subFolderFiles');
+        subFolderFiles.forEach(file => {
+            const li = document.createElement('li');
+            const a = document.createElement('a');
+            a.href = GITHUB_PAGES_BASE_URL + file.path;
+            a.target = "_blank";
+            a.innerHTML = `<span class="icon folder-icon">📂</span>${file.name}`;
+            li.appendChild(a);
+            list.appendChild(li);
+        });
+    }
+
+    // 页面加载时执行渲染
+    document.addEventListener('DOMContentLoaded', () => {
+        renderRootFiles();
+        renderSubFolderFiles();
+    });
 </script>
 </body>
 </html>
