@@ -1,12 +1,13 @@
 class FaceDetector {
   constructor(options = {}) {
+    const isMobile = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
     this.options = {
       maxNumFaces: 1,
       refineLandmarks: false,
       minDetectionConfidence: 0.3,
       minTrackingConfidence: 0.3,
-      sendTimeoutMs: 2500,
-      initTimeoutMs: 30000,
+      sendTimeoutMs: isMobile ? 5000 : 2500,
+      initTimeoutMs: isMobile ? 60000 : 30000,
       roiOptions: {
         useForehead: true,
         useCheeks: true,
@@ -27,7 +28,8 @@ class FaceDetector {
     this._stats = {
       sendCount: 0, recvCount: 0, successCount: 0,
       timeoutCount: 0, failCount: 0,
-      lastSendAt: 0, lastRecvAt: 0, lastError: null
+      lastSendAt: 0, lastRecvAt: 0, lastError: null,
+      modelFilesRequested: 0, modelFilesLoaded: 0
     };
     this._initDone = false;
     this._forceCanvasSend = false;
@@ -41,7 +43,13 @@ class FaceDetector {
   get lastLandmarks() { return this._lastLandmarks; }
   get lastROIs() { return this._lastROIs; }
   get isFaceDetected() { return this._faceDetected; }
-  get stats() { return { ...this._stats }; }
+  get stats() {
+    return {
+      ...this._stats,
+      modelFilesRequested: this._modelFilesRequested || 0,
+      modelFilesLoaded: this._modelFilesLoaded || 0
+    };
+  }
 
   _currentCdnBase() {
     if (typeof window !== 'undefined' && typeof window.__getFaceMeshBase === 'function') {
@@ -115,10 +123,16 @@ class FaceDetector {
       window.addEventListener('unhandledrejection', scriptFailHandler, true);
     }
 
+    this._modelFilesRequested = 0;
+    this._modelFilesLoaded = 0;
     this.faceMesh = new FaceMesh({
       locateFile: (file) => {
+        self._modelFilesRequested++;
         const base = self._currentCdnBase();
         const url = `${base}/${file}`;
+        const img = new Image();
+        img.onload = img.onerror = img.onabort = () => { self._modelFilesLoaded++; };
+        img.src = url;
         return url;
       }
     });
@@ -141,7 +155,7 @@ class FaceDetector {
       if (!this._initDone) onceHandler();
       this._onResults(results);
     });
-    firstResultTimer = setTimeout(() => { if (firstResultResolve) firstResultResolve(false); }, 5000);
+    firstResultTimer = setTimeout(() => { if (firstResultResolve) firstResultResolve(false); }, this.options.initTimeoutMs - 2000);
 
     const warmCanvas = document.createElement('canvas');
     warmCanvas.width = 64; warmCanvas.height = 64;

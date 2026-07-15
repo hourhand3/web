@@ -169,8 +169,27 @@ class RPPGApp {
           message: '当前环境不支持摄像头访问（非安全上下文或浏览器不兼容）。请使用 https:// 或 localhost 访问，并使用最新版 Chrome / Safari / Edge 浏览器'
         });
       }
-      this.visualizer.updateStatus('loading', '正在启动摄像头...', '请在弹出的权限请求中点击「允许」');
-      await this.camera.start();
+      if (typeof FaceMesh === 'undefined') {
+        throw Object.assign(new Error('FaceMesh 脚本未加载'), {
+          code: 'CDN_LOAD_FAIL',
+          message: 'FaceMesh 脚本未加载（CDN 被拦截或网络异常）'
+        });
+      }
+      this.visualizer.updateStatus('loading', '正在加载人脸检测模型...', '正在初始化 MediaPipe，请稍候（首次可能需要 5-30s）');
+      try {
+        await this.face.init();
+      } catch (initErr) {
+        const code = initErr && initErr.code;
+        const inner = initErr && initErr.inner;
+        const innerCode = inner && inner.code;
+        if (code === 'CDN_LOAD_FAIL' || innerCode === 'CDN_LOAD_FAIL' || (initErr && String(initErr.message || initErr).indexOf('FaceMesh') >= 0)) {
+          throw Object.assign(new Error('FaceMesh CDN 加载失败'), {
+            code: 'CDN_LOAD_FAIL',
+            message: 'FaceMesh 脚本未加载（CDN 被拦截或网络异常）。请检查网络，确保可以访问 cdn.jsdelivr.net 或 unpkg.com，或开启代理后刷新页面'
+          });
+        }
+        throw initErr;
+      }
       this._running = true;
       this._stabilizeFrames = 0;
       this._samplingReady = false;
@@ -181,27 +200,8 @@ class RPPGApp {
       this._faceDeadlineWarned = false;
       this._faceReinitInProgress = false;
       this.visualizer.setButtonsState({ started: true });
-      this.visualizer.updateStatus('loading', '正在加载人脸检测模型...', '正在初始化 MediaPipe，请稍候（首次可能需要 5-30s）');
-      if (typeof FaceMesh === 'undefined') {
-        throw Object.assign(new Error('FaceMesh 脚本未加载'), {
-          code: 'CDN_LOAD_FAIL',
-          message: 'FaceMesh 脚本未加载（CDN 被拦截或网络异常）'
-        });
-      }
-      try {
-        await this.face.init();
-      } catch (initErr) {
-        const code = initErr && initErr.code;
-        const inner = initErr && initErr.inner;
-        const innerCode = inner && inner.code;
-        if (code === 'CDN_LOAD_FAIL' || innerCode === 'CDN_LOAD_FAIL' || (initErr && String(initErr.message || initErr).indexOf('FaceMesh') >= 0)) {
-          throw Object.assign(new Error('FaceMesh CDN 加载失败'), {
-            code: 'CDN_LOAD_FAIL',
-            message: 'FaceMesh 脚本未加载（CDN 被拦截或网络异常）。请检查网络，确保可以访问 cdn.jsdelivr.net，或开启代理后刷新页面'
-          });
-        }
-        throw initErr;
-      }
+      this.visualizer.updateStatus('loading', '正在启动摄像头...', '请在弹出的权限请求中点击「允许」');
+      await this.camera.start();
       this.visualizer.updateStatus('detecting', '正在检测人脸', '请将面部正对摄像头，保持静止');
       await this._enumerateCameras();
     } catch (err) {
@@ -326,7 +326,11 @@ class RPPGApp {
           extra.push('模型初始化中');
           if (stats.lastError && (stats.lastError.indexOf('CDN') >= 0 || stats.lastError.indexOf('切换到') >= 0)) extra.push(stats.lastError);
         }
-        const debug = `检测请求 ${stats.sendCount} · 回调 ${stats.recvCount}${extra.length ? ' · ' + extra.join(' · ') : ''} · ${video.videoWidth}×${video.videoHeight}${elapsed ? ' · 用时 ' + elapsed + 's' : ''}`;
+        let modelInfo = '';
+        if (stats.modelFilesRequested > 0) {
+          modelInfo = ` · 模型文件 ${stats.modelFilesLoaded}/${stats.modelFilesRequested}`;
+        }
+        const debug = `检测请求 ${stats.sendCount} · 回调 ${stats.recvCount}${extra.length ? ' · ' + extra.join(' · ') : ''}${modelInfo} · ${video.videoWidth}×${video.videoHeight}${elapsed ? ' · 用时 ' + elapsed + 's' : ''}`;
         const corrupted = this.face._initDone && stats.sendCount >= 4 && stats.recvCount === 0;
         const deadline = !this._faceDeadlineWarned && !initNotDone && !corrupted && (
           (stats.sendCount >= 4 && stats.recvCount === 0 && elapsed >= 4) ||
