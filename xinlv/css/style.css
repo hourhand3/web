@@ -187,6 +187,7 @@ body {
 }
 
 .status-overlay.hidden {
+  display: none !important;
   opacity: 0;
   pointer-events: none;
 }

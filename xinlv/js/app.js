@@ -371,10 +371,8 @@ class RPPGApp {
     }
     this.visualizer.drawROIs(rois);
 
-    if (!this._samplingReady) {
-      this._samplingReady = true;
-      this.visualizer.updateStatus('hide');
-    }
+    this._samplingReady = true;
+    this.visualizer.updateStatus('hide');
 
     const rgb = this._sampleAverageRGB(video, rois);
     if (rgb) {
