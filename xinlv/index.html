@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>rPPG 心率检测 · 非接触式测量</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+        <span>rPPG 心率检测</span>
+      </div>
+      <div class="header-right">
+        <button id="btn-switch-camera" class="icon-btn" title="切换摄像头" style="display:none">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+          <span>切换</span>
+        </button>
+        <button id="btn-settings" class="icon-btn" title="设置">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <section class="video-section">
+        <div class="video-wrapper">
+          <video id="video" playsinline autoplay muted webkit-playsinline></video>
+          <canvas id="face-canvas"></canvas>
+          <canvas id="roi-canvas"></canvas>
+
+          <div id="status-overlay" class="status-overlay">
+            <div id="status-icon" class="status-icon">
+              <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+              </svg>
+            </div>
+            <div id="status-text">点击「开始检测」启动摄像头</div>
+            <div id="status-subtext" class="status-subtext"></div>
+          </div>
+        </div>
+
+        <div class="roi-legend">
+          <div class="legend-item"><span class="dot forehead"></span>前额 ROI</div>
+          <div class="legend-item"><span class="dot left-cheek"></span>左脸颊</div>
+          <div class="legend-item"><span class="dot right-cheek"></span>右脸颊</div>
+        </div>
+      </section>
+
+      <section class="metrics-section">
+        <div class="bpm-card metric-card">
+          <div class="metric-label">心率 (BPM)</div>
+          <div class="bpm-value">
+            <span id="bpm-value">--</span>
+            <span class="bpm-unit">BPM</span>
+          </div>
+          <div class="metric-footer">
+            <div class="bpm-range">正常范围: <span>60 - 100</span></div>
+            <div id="bpm-confidence" class="confidence-badge">信号: --</div>
+          </div>
+        </div>
+
+        <div class="waveform-card metric-card">
+          <div class="card-header">
+            <div class="metric-label">PPG 波形</div>
+            <div class="waveform-legend">
+              <span class="legend-line green"></span> 原始
+              <span class="legend-line blue"></span> 滤波
+            </div>
+          </div>
+          <canvas id="waveform-canvas" height="140"></canvas>
+        </div>
+
+        <div class="info-grid">
+          <div class="info-card">
+            <div class="info-label">FPS</div>
+            <div id="fps-value" class="info-value">--</div>
+          </div>
+          <div class="info-card">
+            <div class="info-label">采样窗口</div>
+            <div id="window-value" class="info-value">0s</div>
+          </div>
+          <div class="info-card">
+            <div class="info-label">稳定度</div>
+            <div id="stability-value" class="info-value">--%</div>
+          </div>
+          <div class="info-card">
+            <div class="info-label">摄像头</div>
+            <div id="camera-label" class="info-value small">未连接</div>
+          </div>
+        </div>
+
+        <div class="control-panel">
+          <button id="btn-start" class="primary-btn">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            开始检测
+          </button>
+          <button id="btn-stop" class="secondary-btn" disabled>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="6" y="6" width="12" height="12"/>
+            </svg>
+            停止
+          </button>
+          <button id="btn-reset" class="ghost-btn">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10"/>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+            </svg>
+            重置
+          </button>
+        </div>
+
+        <div class="tips-card">
+          <div class="tips-title">💡 测量提示</div>
+          <ul class="tips-list">
+            <li>保持面部正对摄像头，距离 30-50cm</li>
+            <li>环境光线均匀明亮，避免逆光和强光直射</li>
+            <li>测量时保持静止，不要说话或晃动头部</li>
+            <li>建议连续测量 30 秒以上获得准确结果</li>
+          </ul>
+        </div>
+      </section>
+    </main>
+
+    <div id="settings-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>检测设置</h3>
+          <button class="modal-close" id="btn-close-settings">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="setting-group">
+            <label>rPPG 算法</label>
+            <select id="setting-algorithm">
+              <option value="pos" selected>POS (推荐)</option>
+              <option value="green">绿色通道</option>
+              <option value="chrom">CHROM</option>
+            </select>
+          </div>
+          <div class="setting-group">
+            <label>采样窗口大小</label>
+            <select id="setting-windowsize">
+              <option value="150">短 (5秒 @30fps)</option>
+              <option value="300" selected>标准 (10秒 @30fps)</option>
+              <option value="600">长 (20秒 @30fps)</option>
+            </select>
+          </div>
+          <div class="setting-group">
+            <label>ROI 区域</label>
+            <div class="checkbox-group">
+              <label class="checkbox"><input type="checkbox" id="roi-forehead" checked> 前额</label>
+              <label class="checkbox"><input type="checkbox" id="roi-cheeks" checked> 双颊</label>
+            </div>
+          </div>
+          <div class="setting-group">
+            <label>显示调试信息</label>
+            <label class="switch">
+              <input type="checkbox" id="setting-debug">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      function showCdnError(label, url) {
+        var bar = document.createElement('div');
+        bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#b91c1c;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:14px;padding:12px 16px;line-height:1.5;box-shadow:0 4px 12px rgba(0,0,0,.25);';
+        bar.innerHTML = '<strong style="margin-right:6px;">⚠️ ' + label + ' 加载失败：</strong>' +
+          '无法从 CDN 加载 ' + url + '，请检查网络是否能访问 cdn.jsdelivr.net，或开启代理后 <a href="#" onclick="location.reload();return false;" style="color:#fde68a;text-decoration:underline;margin:0 4px;">刷新页面</a>。' +
+          '<button onclick="this.parentNode.remove()" style="float:right;background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:4px;padding:2px 10px;cursor:pointer;">×</button>';
+        (document.body || document.documentElement).appendChild(bar);
+      }
+      window.__cdnErr = showCdnError;
+    })();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous" onerror="window.__cdnErr('camera_utils.js', this.src)"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous" onerror="window.__cdnErr('face_mesh.js', this.src)"></script>
+  <script src="js/camera.js"></script>
+  <script src="js/faceDetector.js"></script>
+  <script src="js/rppgProcessor.js"></script>
+  <script src="js/visualizer.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
