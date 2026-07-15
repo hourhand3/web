@@ -180,23 +180,160 @@
 
   <script>
     (function () {
+      if (window.__rppgBootStarted) return;
+      window.__rppgBootStarted = true;
+      var barTimer = null;
+      var _fmReady = false;
       function showCdnError(label, url) {
-        var bar = document.createElement('div');
-        bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#b91c1c;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:14px;padding:12px 16px;line-height:1.5;box-shadow:0 4px 12px rgba(0,0,0,.25);';
-        bar.innerHTML = '<strong style="margin-right:6px;">⚠️ ' + label + ' 加载失败：</strong>' +
-          '无法从 CDN 加载 ' + url + '，请检查网络是否能访问 cdn.jsdelivr.net，或开启代理后 <a href="#" onclick="location.reload();return false;" style="color:#fde68a;text-decoration:underline;margin:0 4px;">刷新页面</a>。' +
-          '<button onclick="this.parentNode.remove()" style="float:right;background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:4px;padding:2px 10px;cursor:pointer;">×</button>';
-        (document.body || document.documentElement).appendChild(bar);
+        if (_fmReady) return;
+        var msg = (label ? ('<strong style="margin-right:6px;">⚠️ ' + label + ' 加载失败：</strong>') : '') +
+          '无法从 CDN 加载 ' + (url || '') + '，正在自动切换备用 CDN 重试...';
+        var bar = document.getElementById('__cdnErrBar');
+        if (!bar) {
+          bar = document.createElement('div');
+          bar.id = '__cdnErrBar';
+          bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#b91c1c;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:14px;padding:12px 16px;line-height:1.5;box-shadow:0 4px 12px rgba(0,0,0,.25);';
+          bar.innerHTML = msg + '<button onclick="this.parentNode.remove()" style="float:right;background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:4px;padding:2px 10px;cursor:pointer;">×</button>';
+          (document.body || document.documentElement).appendChild(bar);
+        } else {
+          bar.innerHTML = msg + '<button onclick="this.parentNode.remove()" style="float:right;background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:4px;padding:2px 10px;cursor:pointer;">×</button>';
+        }
+        if (barTimer) clearTimeout(barTimer);
+        barTimer = setTimeout(function () {
+          if (_fmReady) {
+            if (bar && bar.parentNode) bar.parentNode.removeChild(bar);
+          } else {
+            var b = document.getElementById('__cdnErrBar');
+            if (b) b.innerHTML = '<strong style="margin-right:6px;">⚠️ 检测模型加载失败：</strong>所有备用 CDN 均无法访问，请检查网络或开启代理后 <a href="#" onclick="location.reload();return false;" style="color:#fde68a;text-decoration:underline;margin:0 4px;">刷新页面</a>。<button onclick="this.parentNode.remove()" style="float:right;background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:4px;padding:2px 10px;cursor:pointer;">×</button>';
+          }
+        }, 15000);
+      }
+      function hasFaceMesh() {
+        _fmReady = !!(window.FaceMesh && typeof window.FaceMesh === 'function');
+        return _fmReady;
+      }
+      window.__faceMeshVersions = ['0.4.1633559619', '0.4.1657299874', '0.4.1629159166', '0.4.1628005669'];
+      window.__cdnHosts = [
+        'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@',
+        'https://unpkg.com/@mediapipe/face_mesh@'
+      ];
+      window.__cdnCombos = [];
+      for (var hi = 0; hi < window.__cdnHosts.length; hi++) {
+        for (var vi = 0; vi < window.__faceMeshVersions.length; vi++) {
+          window.__cdnCombos.push(window.__cdnHosts[hi] + window.__faceMeshVersions[vi] + '/face_mesh.min.js');
+        }
+      }
+      window.__cdnIdx = 0;
+      window.__activeFaceMeshBase = (window.__cdnCombos[0] || '').substring(0, (window.__cdnCombos[0] || '').lastIndexOf('/'));
+      window.__cdnScriptLoading = null;
+      function getActiveFaceMeshBase() {
+        return window.__activeFaceMeshBase;
+      }
+      window.__getFaceMeshBase = getActiveFaceMeshBase;
+      function lockActiveBase(src) {
+        var b = (src || '').substring(0, (src || '').lastIndexOf('/'));
+        if (b) window.__activeFaceMeshBase = b;
+      }
+      function injectScript(label) {
+        if (hasFaceMesh()) return;
+        if (window.__cdnScriptLoading) return;
+        if (window.__cdnIdx >= window.__cdnCombos.length) {
+          showCdnError(label, '（全部 ' + window.__cdnCombos.length + ' 个 CDN 均加载失败，请开启代理或检查网络后 <a href="#" onclick="location.reload();return false;" style="color:#fde68a;text-decoration:underline;">刷新页面</a>）');
+          return;
+        }
+        var curIdx = window.__cdnIdx;
+        var src = window.__cdnCombos[curIdx];
+        window.__cdnIdx = curIdx + 1;
+        console.log('[CDN] 尝试加载 #' + (curIdx + 1) + '/' + window.__cdnCombos.length + ':', src);
+        lockActiveBase(src);
+        var s = document.createElement('script');
+        s.src = src;
+        s.crossOrigin = 'anonymous';
+        s.async = false;
+        s.defer = false;
+        window.__cdnScriptLoading = s;
+        var done = false;
+        var checkThenNext = function () {
+          if (done) return;
+          setTimeout(function () {
+            if (hasFaceMesh()) { window.__cdnScriptLoading = null; return; }
+            if (done) return;
+            done = true;
+            showCdnError('', src + '（超时或内容无效）');
+            window.__cdnScriptLoading = null;
+            setTimeout(function () { injectScript(label); }, 250);
+          }, 8000);
+        };
+        s.onload = function () {
+          if (hasFaceMesh()) { lockActiveBase(src); done = true; window.__cdnScriptLoading = null; console.log('[CDN] FaceMesh 加载成功，Base:', getActiveFaceMeshBase()); return; }
+          checkThenNext();
+        };
+        s.onerror = function () {
+          if (done) return;
+          done = true;
+          showCdnError('', src);
+          window.__cdnScriptLoading = null;
+          setTimeout(function () { injectScript(label); }, 250);
+        };
+        (document.head || document.getElementsByTagName('head')[0] || document.documentElement).appendChild(s);
+        checkThenNext();
       }
       window.__cdnErr = showCdnError;
+      setTimeout(function () { injectScript('face_mesh.js'); }, 0);
+      window.__appReady = new Promise(function (resolve, reject) {
+        var start = Date.now();
+        var lastInfo = '';
+        var wait = function () {
+          if (hasFaceMesh()) { resolve(); return; }
+          var elapsed = Math.round((Date.now() - start) / 1000);
+          var info = '正在加载 MediaPipe FaceMesh（CDN 尝试 ' + (window.__cdnIdx || 0) + '/' + window.__cdnCombos.length + '，已等 ' + elapsed + ' 秒）。如长时间无响应请开启代理或检查网络。';
+          if (info !== lastInfo) {
+            var st = document.getElementById('status-text');
+            var sst = document.getElementById('status-subtext');
+            if (st && !st.dataset.userSet) st.innerHTML = '<span style="color:#fbbf24;">⏳ 模型加载中</span>';
+            if (sst) sst.textContent = info;
+            lastInfo = info;
+          }
+          if (Date.now() - start > 120000) {
+            reject(new Error('FaceMesh CDN 加载超时（全部 CDN）'));
+            showCdnError('FaceMesh', '（全部 CDN 均超时，请开启代理后刷新）');
+          } else {
+            setTimeout(wait, 500);
+          }
+        };
+        setTimeout(wait, 300);
+      }).then(function () {
+        if (window.__appJsLoadStarted) return Promise.resolve();
+        window.__appJsLoadStarted = true;
+        var loadList = [
+          'js/camera.js',
+          'js/faceDetector.js',
+          'js/rppgProcessor.js',
+          'js/visualizer.js',
+          'js/app.js'
+        ];
+        return new Promise(function (resolve, reject) {
+          var i = 0;
+          var next = function () {
+            if (i >= loadList.length) { resolve(); return; }
+            var s = document.createElement('script');
+            s.src = loadList[i] + '?v=' + Date.now();
+            s.async = false;
+            s.onerror = function () { reject(new Error('加载失败：' + loadList[i])); };
+            s.onload = function () { i++; next(); };
+            (document.head || document.documentElement).appendChild(s);
+          };
+          next();
+        });
+      }).then(function () {
+        if (window.__rppgApp) return;
+        if (typeof RPPGApp !== 'function') throw new Error('RPPGApp 未定义');
+        window.__rppgApp = new RPPGApp();
+      }).catch(function (err) {
+        console.error('APP BOOT FAILED:', err);
+        showCdnError('APP BOOT', err && err.message ? err.message : String(err));
+      });
     })();
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous" onerror="window.__cdnErr('camera_utils.js', this.src)"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous" onerror="window.__cdnErr('face_mesh.js', this.src)"></script>
-  <script src="js/camera.js"></script>
-  <script src="js/faceDetector.js"></script>
-  <script src="js/rppgProcessor.js"></script>
-  <script src="js/visualizer.js"></script>
-  <script src="js/app.js"></script>
 </body>
 </html>

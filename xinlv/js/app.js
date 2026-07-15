@@ -181,7 +181,7 @@ class RPPGApp {
       this._faceDeadlineWarned = false;
       this._faceReinitInProgress = false;
       this.visualizer.setButtonsState({ started: true });
-      this.visualizer.updateStatus('loading', '正在加载人脸检测模型...', '正在初始化 MediaPipe，请稍候');
+      this.visualizer.updateStatus('loading', '正在加载人脸检测模型...', '正在初始化 MediaPipe，请稍候（首次可能需要 5-30s）');
       if (typeof FaceMesh === 'undefined') {
         throw Object.assign(new Error('FaceMesh 脚本未加载'), {
           code: 'CDN_LOAD_FAIL',
@@ -194,7 +194,7 @@ class RPPGApp {
         const code = initErr && initErr.code;
         const inner = initErr && initErr.inner;
         const innerCode = inner && inner.code;
-        if (code === 'CDN_LOAD_FAIL' || innerCode === 'CDN_LOAD_FAIL' || (initErr && String(initErr.message || initErr).indexOf('FaceMesh 脚本未加载') >= 0)) {
+        if (code === 'CDN_LOAD_FAIL' || innerCode === 'CDN_LOAD_FAIL' || (initErr && String(initErr.message || initErr).indexOf('FaceMesh') >= 0)) {
           throw Object.assign(new Error('FaceMesh CDN 加载失败'), {
             code: 'CDN_LOAD_FAIL',
             message: 'FaceMesh 脚本未加载（CDN 被拦截或网络异常）。请检查网络，确保可以访问 cdn.jsdelivr.net，或开启代理后刷新页面'
@@ -279,8 +279,7 @@ class RPPGApp {
         if (this.face.faceMesh === null) {
           const initInProgress = this.face._initPromise && !this.face._initDone;
           if (initInProgress) {
-            const stats = this.face.stats;
-            const extra = stats.lastError ? ' · 最近错误：' + stats.lastError : '';
+            const extra = this.face._stats.lastError ? ' · 最近：' + this.face._stats.lastError : '';
             this.visualizer.updateStatus('loading', '正在加载人脸检测模型...', 'WASM / 模型下载中，请稍候（首次加载可能需要 5-20s）' + extra);
           } else if (!this._faceReinitInProgress) {
             this._faceReinitInProgress = true;
@@ -317,25 +316,50 @@ class RPPGApp {
       } else if (!this._samplingReady) {
         const elapsed = this._firstFaceSendAt ? Math.round((now - this._firstFaceSendAt) / 1000) : 0;
         const extra = [];
-        if (stats.successCount) extra.push('成功 ' + stats.successCount);
-        if (stats.timeoutCount) extra.push('超时 ' + stats.timeoutCount);
-        if (stats.failCount) extra.push('失败 ' + stats.failCount);
-        if (stats.lastError) extra.push(stats.lastError);
+        const initNotDone = !this.face._initDone;
+        if (this.face._initDone) {
+          if (stats.successCount) extra.push('成功 ' + stats.successCount);
+          if (stats.timeoutCount) extra.push('超时 ' + stats.timeoutCount);
+          if (stats.failCount) extra.push('失败 ' + stats.failCount);
+          if (stats.lastError) extra.push(stats.lastError);
+        } else {
+          extra.push('模型初始化中');
+          if (stats.lastError && (stats.lastError.indexOf('CDN') >= 0 || stats.lastError.indexOf('切换到') >= 0)) extra.push(stats.lastError);
+        }
         const debug = `检测请求 ${stats.sendCount} · 回调 ${stats.recvCount}${extra.length ? ' · ' + extra.join(' · ') : ''} · ${video.videoWidth}×${video.videoHeight}${elapsed ? ' · 用时 ' + elapsed + 's' : ''}`;
-        const deadline = !this._faceDeadlineWarned && (
-          (stats.sendCount >= 3 && stats.recvCount === 0 && elapsed >= 3) ||
-          (stats.timeoutCount >= 2)
+        const corrupted = this.face._initDone && stats.sendCount >= 4 && stats.recvCount === 0;
+        const deadline = !this._faceDeadlineWarned && !initNotDone && !corrupted && (
+          (stats.sendCount >= 4 && stats.recvCount === 0 && elapsed >= 4) ||
+          (stats.timeoutCount >= 6)
         );
-        if (deadline) {
+        if (corrupted && !this._faceReinitInProgress) {
+          this._faceReinitInProgress = true;
+          this.face._initPromise = null;
+          try { if (this.face.faceMesh && typeof this.face.faceMesh.close === 'function') this.face.faceMesh.close(); } catch (_) {}
+          this.face.faceMesh = null;
+          this.visualizer.updateStatus('error', '检测模型残缺，正在自动切换 CDN/版本恢复...', debug);
+          this.face.init().then(() => {
+            this._faceDeadlineWarned = false;
+            this._faceReinitInProgress = false;
+            this.visualizer.updateStatus('detecting', '检测引擎已恢复，正在重新检测人脸', '请将面部正对摄像头');
+          }).catch((e) => {
+            this._faceReinitInProgress = false;
+            console.error(e);
+            this.visualizer.updateStatus('error', '检测引擎恢复失败', this._friendlyError(e) + ' · 请刷新页面或检查网络');
+          });
+        } else if (deadline) {
           this._faceDeadlineWarned = true;
           const tips = [];
           if (stats.lastError) tips.push(stats.lastError);
           if (typeof FaceMesh === 'undefined') tips.push('FaceMesh 未加载');
-          if (stats.timeoutCount >= 3) tips.push('WASM/CDN 下载过慢');
           tips.push('请按 F12 打开控制台查看错误 · 或刷新页面重试');
           this.visualizer.updateStatus('error', '人脸检测无响应', tips.join(' · '));
         } else if (!this._faceDeadlineWarned) {
-          this.visualizer.updateStatus('detecting', '正在检测人脸', debug);
+          if (initNotDone || corrupted) {
+            this.visualizer.updateStatus('loading', '正在加载人脸检测模型...', debug);
+          } else {
+            this.visualizer.updateStatus('detecting', '正在检测人脸', debug);
+          }
         }
       }
       return;
@@ -435,7 +459,7 @@ class RPPGApp {
       return msg + ' · 请检查网络，确保可以访问 cdn.jsdelivr.net，或开启代理后刷新页面';
     }
     if (code === 'INIT_FAIL' || low.indexOf('初始化失败') >= 0 || low.indexOf('初始化超时') >= 0) {
-      return msg + ' · 检测模型加载失败，请刷新页面重试（WASM 可能下载较慢）';
+      return msg + ' · 检测模型加载失败，请刷新页面重试（WASM 可能下载较慢，首次加载可能需要 5-30 秒）';
     }
     if (name === 'NotAllowedError' || name === 'PermissionDeniedError' || low.indexOf('permission') >= 0 || low.indexOf('denied') >= 0 || low.indexOf('notallowed') >= 0) {
       return '摄像头权限被拒绝，请在浏览器地址栏左侧的「锁/权限」图标中允许此页面访问摄像头，然后刷新页面';
@@ -455,7 +479,3 @@ class RPPGApp {
     return msg + (name && name !== 'Error' ? '（' + name + '）' : '') || (err && String(err)) || '未知错误';
   }
 }
-
-document.addEventListener('DOMContentLoaded', () => {
-  window.__rppgApp = new RPPGApp();
-});

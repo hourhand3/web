@@ -36,35 +36,86 @@ class CameraManager {
       await this.stop();
       const finalConstraints = this._buildConstraints(constraints);
       this.stream = await navigator.mediaDevices.getUserMedia(finalConstraints);
-      this.video.srcObject = this.stream;
-
-      await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('视频加载超时')), 8000);
-        this.video.onloadedmetadata = () => {
-          clearTimeout(timeout);
-          this.video.play().then(resolve).catch(reject);
-        };
-        this.video.onerror = () => {
-          clearTimeout(timeout);
-          reject(new Error('视频元素错误'));
-        };
-      });
-
-      const track = this.stream.getVideoTracks()[0];
-      if (track) {
-        const settings = track.getSettings();
-        this.currentDeviceId = settings.deviceId || null;
-        if (settings.facingMode) {
-          this.currentFacingMode = settings.facingMode;
-        }
-      }
-
-      this._startFrameLoop();
-      return this.stream;
+      return await this._attachStream(this.stream);
     } catch (err) {
       await this.stop();
       throw err;
     }
+  }
+
+  async _attachStream(stream) {
+    const video = this.video;
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      let timer = null;
+      let heartBeatTimer = null;
+      const done = (ok, val) => {
+        if (settled) return;
+        settled = true;
+        if (timer) { clearTimeout(timer); timer = null; }
+        if (heartBeatTimer) { clearInterval(heartBeatTimer); heartBeatTimer = null; }
+        video.onloadedmetadata = null;
+        video.oncanplay = null;
+        video.onerror = null;
+        if (ok) resolve(val);
+        else reject(val);
+      };
+      timer = setTimeout(() => {
+        if (video.videoWidth > 0) {
+          done(true, stream);
+        } else {
+          done(false, new Error('视频加载超时（请检查摄像头是否被占用，或刷新页面重试）'));
+        }
+      }, 8000);
+      heartBeatTimer = setInterval(() => {
+        if (settled) return;
+        if (video.readyState >= 2 && video.videoWidth > 0) {
+          Promise.resolve()
+            .then(() => video.play && video.play().catch(() => {}))
+            .then(() => done(true, stream));
+        }
+      }, 500);
+      video.onloadedmetadata = () => {
+        if (settled) return;
+        Promise.resolve()
+          .then(() => (video.play ? video.play() : Promise.resolve()))
+          .then(() => done(true, stream))
+          .catch((playErr) => {
+            if (video.videoWidth > 0) { done(true, stream); }
+            else done(false, playErr || new Error('无法播放视频流'));
+          });
+      };
+      video.oncanplay = () => {
+        if (settled) return;
+        Promise.resolve()
+          .then(() => video.play && video.play().catch(() => {}))
+          .then(() => done(true, stream));
+      };
+      video.onerror = () => done(false, new Error('视频元素错误'));
+      try {
+        video.srcObject = stream;
+        if (typeof video.load === 'function') {
+          try { video.load(); } catch (_) {}
+        }
+        if (video.readyState >= 1 && video.videoWidth > 0) {
+          Promise.resolve()
+            .then(() => video.play && video.play().catch(() => {}))
+            .then(() => done(true, stream));
+        }
+      } catch (e) {
+        done(false, e);
+      }
+    }).then((stream) => {
+      this.stream = stream;
+      const track = this.stream && this.stream.getVideoTracks ? this.stream.getVideoTracks()[0] : null;
+      if (track) {
+        const settings = track.getSettings();
+        this.currentDeviceId = settings.deviceId || null;
+        if (settings.facingMode) this.currentFacingMode = settings.facingMode;
+      }
+      this._startFrameLoop();
+      return this.stream;
+    });
   }
 
   async stop() {

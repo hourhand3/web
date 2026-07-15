@@ -6,7 +6,7 @@ class FaceDetector {
       minDetectionConfidence: 0.3,
       minTrackingConfidence: 0.3,
       sendTimeoutMs: 2500,
-      initTimeoutMs: 20000,
+      initTimeoutMs: 30000,
       roiOptions: {
         useForehead: true,
         useCheeks: true,
@@ -16,22 +16,26 @@ class FaceDetector {
       ...options
     };
     this.faceMesh = null;
-    this.camera = null;
     this._onResultsCallbacks = [];
     this._lastLandmarks = null;
     this._lastROIs = null;
     this._faceDetected = false;
     this._initPromise = null;
     this._processingFrame = false;
-    this._pendingSendPromise = null;
     this._bufCanvas = document.createElement('canvas');
-    this._bufCtx = this._bufCanvas.getContext('2d', { willReadFrequently: false });
+    this._bufCtx = this._bufCanvas.getContext('2d', { willReadFrequently: true });
     this._stats = {
       sendCount: 0, recvCount: 0, successCount: 0,
       timeoutCount: 0, failCount: 0,
       lastSendAt: 0, lastRecvAt: 0, lastError: null
     };
     this._initDone = false;
+    this._forceCanvasSend = false;
+    this._cdnBaseOverride = null;
+    if (typeof window !== 'undefined' && typeof window.__getFaceMeshBase === 'function') {
+      try { this._cdnBaseOverride = window.__getFaceMeshBase(); } catch (_) {}
+    }
+    this._cdnTried = 0;
   }
 
   get lastLandmarks() { return this._lastLandmarks; }
@@ -39,9 +43,38 @@ class FaceDetector {
   get isFaceDetected() { return this._faceDetected; }
   get stats() { return { ...this._stats }; }
 
+  _currentCdnBase() {
+    if (typeof window !== 'undefined' && typeof window.__getFaceMeshBase === 'function') {
+      try {
+        const b = window.__getFaceMeshBase();
+        if (b) { this._cdnBaseOverride = b; return b; }
+      } catch (_) {}
+    }
+    if (this._cdnBaseOverride) return this._cdnBaseOverride;
+    return 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619';
+  }
+
   async init() {
     if (this._initPromise) return this._initPromise;
-    this._initPromise = this._doInit();
+    this._initPromise = this._doInit().catch(async (e) => {
+      try { if (this.faceMesh && typeof this.faceMesh.close === 'function') this.faceMesh.close(); } catch (_) {}
+      this.faceMesh = null;
+      this._initPromise = null;
+      this._initDone = false;
+      this._forceCanvasSend = false;
+      this._cdnTried++;
+      const maxTry = 4;
+      if (this._cdnTried < maxTry) {
+        this._cdnBaseOverride = null;
+        this._stats.lastError = `第 ${this._cdnTried} 次初始化失败，切换 CDN 配置重试...`;
+        return this.init();
+      }
+      const nerr = new Error('FaceMesh 初始化失败：' + ((e && e.message) || String(e)));
+      nerr.code = (e && e.code) || 'INIT_FAIL';
+      nerr.inner = e;
+      this._stats.lastError = (e && e.message) || String(e);
+      throw nerr;
+    });
     return this._initPromise;
   }
 
@@ -51,16 +84,52 @@ class FaceDetector {
       err.code = 'CDN_LOAD_FAIL';
       throw err;
     }
+    const cdnBase = this._currentCdnBase();
+    this._stats.lastError = `正在加载 FaceMesh 模型...（CDN: ${cdnBase.substring(0, 60)}...）`;
+
+    const self = this;
+    let cdnScriptLoadError = null;
+    const scriptFailHandler = (ev) => {
+      try {
+        let src = null;
+        let msgFrag = null;
+        if (ev && ev.target && (ev.target.src || (ev.target.href && ev.target.getAttribute('src')))) {
+          src = ev.target.src || ev.target.getAttribute('src');
+        }
+        if (ev && ev.message && typeof ev.message === 'string') {
+          msgFrag = ev.message;
+        } else if (ev && ev.reason && ev.reason.message) {
+          msgFrag = ev.reason.message;
+        }
+        const srcMatch = typeof src === 'string' && (src.indexOf('/face_mesh') >= 0 || src.indexOf('mediapipe') >= 0);
+        const msgMatch = typeof msgFrag === 'string' && (msgFrag.indexOf('face_mesh') >= 0 || msgFrag.indexOf('SyntaxError') >= 0 || msgFrag.indexOf('reserved word') >= 0 || msgFrag.indexOf('Cannot read') >= 0);
+        if (srcMatch || msgMatch) {
+          const desc = (src || msgFrag || '未知错误');
+          cdnScriptLoadError = new Error('脚本加载/解析失败：' + desc);
+          if (typeof console !== 'undefined' && console.warn) console.warn('[FaceMesh] CDN fail:', desc);
+        }
+      } catch (_) {}
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('error', scriptFailHandler, true);
+      window.addEventListener('unhandledrejection', scriptFailHandler, true);
+    }
+
     this.faceMesh = new FaceMesh({
-      locateFile: (file) =>
-        `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+      locateFile: (file) => {
+        const base = self._currentCdnBase();
+        const url = `${base}/${file}`;
+        return url;
+      }
     });
+
     this.faceMesh.setOptions({
       maxNumFaces: this.options.maxNumFaces,
       refineLandmarks: this.options.refineLandmarks,
       minDetectionConfidence: this.options.minDetectionConfidence,
       minTrackingConfidence: this.options.minTrackingConfidence
     });
+
     let firstResultResolve = null;
     let firstResultTimer = null;
     const firstResultPromise = new Promise((resolve) => { firstResultResolve = resolve; });
@@ -78,27 +147,71 @@ class FaceDetector {
     warmCanvas.width = 64; warmCanvas.height = 64;
     const warmCtx = warmCanvas.getContext('2d');
     warmCtx.fillStyle = '#8866aa'; warmCtx.fillRect(0, 0, 64, 64);
+
+    const initTimeoutP = new Promise((_, reject) => {
+      setTimeout(() => {
+        if (cdnScriptLoadError) {
+          const ferr = new Error('CDN 资源加载失败：' + (cdnScriptLoadError.message || cdnScriptLoadError));
+          ferr.code = 'CDN_FALLBACK_NEEDED';
+          reject(ferr);
+        } else {
+          reject(new Error('FaceMesh 初始化超时（WASM 下载失败）'));
+        }
+      }, this.options.initTimeoutMs);
+    });
+
+    const initP = (async () => {
+      if (cdnScriptLoadError) {
+        const ferr = new Error('CDN 资源加载失败：' + (cdnScriptLoadError.message || cdnScriptLoadError));
+        ferr.code = 'CDN_FALLBACK_NEEDED';
+        throw ferr;
+      }
+      try {
+        const warmImgData = warmCtx.getImageData(0, 0, 64, 64);
+        const warmSendP = this.faceMesh.send({ image: warmImgData });
+        const warmTimeoutP = new Promise((_, rj) => {
+          setTimeout(() => rj(new Error('warmup timeout')), 4000);
+        });
+        await Promise.race([warmSendP, warmTimeoutP]);
+      } catch (e) {
+        if (cdnScriptLoadError) {
+          const ferr = new Error('CDN 资源加载失败：' + (cdnScriptLoadError.message || cdnScriptLoadError));
+          ferr.code = 'CDN_FALLBACK_NEEDED';
+          throw ferr;
+        }
+      }
+      if (cdnScriptLoadError) {
+        const ferr = new Error('CDN 资源加载失败：' + (cdnScriptLoadError.message || cdnScriptLoadError));
+        ferr.code = 'CDN_FALLBACK_NEEDED';
+        throw ferr;
+      }
+      await firstResultPromise;
+      await new Promise(resolve => setTimeout(resolve, 150));
+      if (cdnScriptLoadError) {
+        const ferr = new Error('CDN 资源加载失败：' + (cdnScriptLoadError.message || cdnScriptLoadError));
+        ferr.code = 'CDN_FALLBACK_NEEDED';
+        throw ferr;
+      }
+      this._initDone = true;
+      return true;
+    })();
+
     try {
-      const initTimeout = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('FaceMesh 初始化超时（WASM 下载失败）')), this.options.initTimeoutMs);
-      });
-      const initSteps = Promise.resolve().then(async () => {
-        try { await this.faceMesh.send({ image: warmCanvas }); } catch (e) {}
-        await firstResultPromise;
-        await new Promise(resolve => setTimeout(resolve, 150));
-        return true;
-      });
-      await Promise.race([initTimeout, initSteps]);
+      await Promise.race([initTimeoutP, initP]);
     } catch (e) {
       const msg = (e && e.message) || String(e);
-      const nerr = new Error('FaceMesh 初始化失败：' + msg);
-      nerr.code = 'INIT_FAIL';
+      const nerr = new Error(msg);
+      nerr.code = (e && e.code) || 'INIT_FAIL';
       nerr.inner = e;
       this._stats.lastError = msg;
       throw nerr;
     } finally {
       this._initDone = true;
       if (firstResultTimer) clearTimeout(firstResultTimer);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('error', scriptFailHandler, true);
+        window.removeEventListener('unhandledrejection', scriptFailHandler, true);
+      }
     }
   }
 
@@ -115,13 +228,13 @@ class FaceDetector {
   async send(imageSource) {
     if (!this.faceMesh || this._processingFrame) return;
     this._processingFrame = true;
-    let timedOut = false;
+    let sendInput = null;
+    let inputType = null;
     try {
-      let input = imageSource;
       if (imageSource && imageSource.tagName === 'VIDEO') {
         const v = imageSource;
         if (v.videoWidth > 0 && v.videoHeight > 0) {
-          const scale = Math.min(1, 640 / Math.max(v.videoWidth, v.videoHeight));
+          const scale = Math.min(1, 480 / Math.max(v.videoWidth, v.videoHeight));
           const w = Math.max(1, Math.floor(v.videoWidth * scale));
           const h = Math.max(1, Math.floor(v.videoHeight * scale));
           if (this._bufCanvas.width !== w || this._bufCanvas.height !== h) {
@@ -129,19 +242,41 @@ class FaceDetector {
             this._bufCanvas.height = h;
           }
           this._bufCtx.drawImage(v, 0, 0, w, h);
-          input = this._bufCanvas;
+          sendInput = this._bufCtx.getImageData(0, 0, w, h);
+          inputType = 'imagedata';
         } else {
           this._processingFrame = false;
           return;
         }
+      } else if (imageSource && imageSource.tagName === 'CANVAS') {
+        const c = imageSource;
+        const w = c.width, h = c.height;
+        const ctx = c.getContext('2d');
+        if (ctx) {
+          sendInput = ctx.getImageData(0, 0, w, h);
+          inputType = 'imagedata';
+        } else {
+          this._processingFrame = false;
+          return;
+        }
+      } else if (imageSource instanceof ImageData) {
+        sendInput = imageSource;
+        inputType = 'imagedata';
+      } else {
+        this._processingFrame = false;
+        return;
+      }
+      if (!sendInput) {
+        this._processingFrame = false;
+        return;
       }
       this._stats.sendCount++;
       this._stats.lastSendAt = performance.now();
-      const sendTask = this.faceMesh.send({ image: input });
+      const sendTask = this.faceMesh.send({ image: sendInput });
       const timeoutMs = this.options.sendTimeoutMs || 2500;
       const timeoutTask = new Promise((_, reject) => {
         setTimeout(() => {
-          const terr = new Error('FaceMesh 处理超时（> ' + timeoutMs + 'ms）');
+          const terr = new Error('FaceMesh 处理超时（> ' + timeoutMs + 'ms）[' + inputType + ']');
           terr.code = 'SEND_TIMEOUT';
           reject(terr);
         }, timeoutMs);
@@ -152,16 +287,17 @@ class FaceDetector {
       const msg = (e && e.message) || String(e);
       this._stats.lastError = msg;
       if (code === 'SEND_TIMEOUT') {
-        timedOut = true;
         this._stats.timeoutCount++;
-        console.warn('[FaceMesh] send timeout. T=', this._stats.timeoutCount);
-        if (typeof this.faceMesh === 'object' && this.faceMesh && typeof this.faceMesh.close === 'function' && this._stats.timeoutCount >= 3) {
+        if (this._initDone && this._stats.timeoutCount >= 3 && this._forceCanvasSend !== true) {
+          this._forceCanvasSend = true;
+          this._stats.lastError = msg + ' · 切换 Canvas 路径重试';
+        }
+        if (this._initDone && typeof this.faceMesh === 'object' && this.faceMesh && typeof this.faceMesh.close === 'function' && this._stats.timeoutCount >= 12) {
           try { this.faceMesh.close(); } catch (_) {}
           this.faceMesh = null;
         }
       } else {
         this._stats.failCount++;
-        console.warn('[FaceMesh] send error:', e);
       }
     } finally {
       this._processingFrame = false;
@@ -204,6 +340,7 @@ class FaceDetector {
   }
 
   _foreheadROI(lm, scale) {
+    if (!lm[10] || !lm[338] || !lm[297] || !lm[332] || !lm[284]) return null;
     const p10 = lm[10], p338 = lm[338], p297 = lm[297];
     const p332 = lm[332], p284 = lm[284];
     const cx = (p338.x + p297.x) / 2;
@@ -218,19 +355,26 @@ class FaceDetector {
   }
 
   _cheekROI(lm, side, scale) {
-    let anchor, outer, inner;
+    let faceEdge, cheekCenter, underEye, noseSide, mouthCorner;
     if (side === 'left') {
-      anchor = lm[234]; outer = lm[227]; inner = lm[454];
+      faceEdge = lm[234];
+      cheekCenter = lm[205];
+      underEye = lm[233];
+      noseSide = lm[50];
+      mouthCorner = lm[61];
     } else {
-      anchor = lm[454]; outer = lm[447]; inner = lm[234];
+      faceEdge = lm[454];
+      cheekCenter = lm[425];
+      underEye = lm[450];
+      noseSide = lm[280];
+      mouthCorner = lm[291];
     }
-    const underEye = side === 'left' ? lm[233] : lm[450];
-    const nose = side === 'left' ? lm[50] : lm[280];
-    const cx = (anchor.x + inner.x) / 2;
-    const cy = (underEye.y + nose.y) / 2;
-    const faceHalfWidth = Math.abs(outer.x - inner.x);
-    const w = faceHalfWidth * scale.w * 1.8;
-    const h = Math.abs(nose.y - underEye.y) * scale.h * 2.2;
+    if (!faceEdge || !cheekCenter || !underEye || !noseSide || !mouthCorner) return null;
+    const cx = cheekCenter.x;
+    const cy = (underEye.y + mouthCorner.y) / 2;
+    const faceWidth = Math.abs(lm[234].x - lm[454].x);
+    const w = faceWidth * scale.w * 1.3;
+    const h = Math.abs(mouthCorner.y - underEye.y) * scale.h * 1.6;
     const x = cx - w / 2;
     const y = cy - h / 2;
     return this._toRect(x, y, w, h);
