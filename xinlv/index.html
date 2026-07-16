@@ -214,19 +214,13 @@
       }
       window.__faceMeshVersions = ['0.4.1633559619', '0.4.1657299874', '0.4.1629159166', '0.4.1628005669'];
       window.__cdnHosts = [
-        '/lib/mediapipe/',
         'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@',
         'https://unpkg.com/@mediapipe/face_mesh@'
       ];
       window.__cdnCombos = [];
       for (var hi = 0; hi < window.__cdnHosts.length; hi++) {
-        var host = window.__cdnHosts[hi];
-        if (host === '/lib/mediapipe/') {
-          window.__cdnCombos.push(host + 'face_mesh.min.js');
-        } else {
-          for (var vi = 0; vi < window.__faceMeshVersions.length; vi++) {
-            window.__cdnCombos.push(host + window.__faceMeshVersions[vi] + '/face_mesh.min.js');
-          }
+        for (var vi = 0; vi < window.__faceMeshVersions.length; vi++) {
+          window.__cdnCombos.push(window.__cdnHosts[hi] + window.__faceMeshVersions[vi] + '/face_mesh.min.js');
         }
       }
       window.__cdnIdx = 0;

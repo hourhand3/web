@@ -381,18 +381,19 @@ class FaceDetector {
   }
 
   _foreheadROI(lm, scale) {
-    if (!lm[10] || !lm[338] || !lm[297] || !lm[332] || !lm[284]) return null;
-    const p10 = lm[10], p338 = lm[338], p297 = lm[297];
-    const p332 = lm[332], p284 = lm[284];
+    if (!lm[10] || !lm[151] || !lm[338] || !lm[297]) return null;
+    const p10 = lm[10], p151 = lm[151], p338 = lm[338], p297 = lm[297];
     const cx = (p338.x + p297.x) / 2;
     const topY = p10.y;
-    const browY = Math.min(p332.y, p284.y);
+    const browY = p151.y;
+    const foreheadHeight = Math.max(0.01, browY - topY);
     const faceWidth = Math.abs(p297.x - p338.x) * 1.15;
     const w = faceWidth * scale.w;
-    const h = Math.max(Math.abs(browY - topY) * 1.4, faceWidth * scale.h);
-    const x = cx - w / 2;
-    const y = topY + Math.abs(browY - topY) * 0.15;
-    return this._toRect(x, y, w, h);
+    const h = Math.min(foreheadHeight * 0.7, faceWidth * scale.h * 2);
+    const y = topY + foreheadHeight * 0.1;
+    const bottomY = y + h;
+    const clampedH = Math.max(0.01, browY - y);
+    return this._toRect(cx - w / 2, y, w, clampedH);
   }
 
   _cheekROI(lm, side, scale) {
