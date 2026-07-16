@@ -8,6 +8,7 @@ class FaceDetector {
       minTrackingConfidence: 0.3,
       sendTimeoutMs: isMobile ? 5000 : 2500,
       initTimeoutMs: isMobile ? 60000 : 30000,
+      isMobile: isMobile,
       roiOptions: {
         useForehead: true,
         useCheeks: true,
@@ -94,6 +95,31 @@ class FaceDetector {
     }
     const cdnBase = this._currentCdnBase();
     this._stats.lastError = `正在加载 FaceMesh 模型...（CDN: ${cdnBase.substring(0, 60)}...）`;
+
+    const requiredFiles = [
+      'face_mesh_solution_wasm_bin.js',
+      'face_mesh_solution_simd_wasm_bin.js',
+      'face_mesh_solution_packed_assets_loader.js',
+      'face_mesh.binarypb'
+    ];
+    const checkFile = (file) => {
+      return new Promise((resolve) => {
+        const url = `${cdnBase}/${file}`;
+        const xhr = new XMLHttpRequest();
+        xhr.open('HEAD', url, true);
+        xhr.timeout = 10000;
+        xhr.onload = () => resolve({ file, ok: xhr.status >= 200 && xhr.status < 300 });
+        xhr.onerror = xhr.ontimeout = () => resolve({ file, ok: false });
+        xhr.send();
+      });
+    };
+    const checks = await Promise.all(requiredFiles.map(checkFile));
+    const failed = checks.filter(c => !c.ok);
+    if (failed.length > 0) {
+      const err = new Error(`WASM 文件预检查失败：${failed.map(c => c.file).join(', ')}`);
+      err.code = 'CDN_FALLBACK_NEEDED';
+      throw err;
+    }
 
     const self = this;
     let cdnScriptLoadError = null;
@@ -183,8 +209,9 @@ class FaceDetector {
       try {
         const warmImgData = warmCtx.getImageData(0, 0, 64, 64);
         const warmSendP = this.faceMesh.send({ image: warmImgData });
+        const warmTimeoutMs = this.options.isMobile ? 15000 : 4000;
         const warmTimeoutP = new Promise((_, rj) => {
-          setTimeout(() => rj(new Error('warmup timeout')), 4000);
+          setTimeout(() => rj(new Error('warmup timeout')), warmTimeoutMs);
         });
         await Promise.race([warmSendP, warmTimeoutP]);
       } catch (e) {
