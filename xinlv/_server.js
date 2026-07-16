@@ -2,7 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = 5173;
+const PORT = 8888;
 const ROOT = __dirname;
 
 const MIME = {
@@ -91,7 +91,9 @@ process.on('uncaughtException', (e) => {
   try { console.error('[SERVER] uncaught:', e.message); } catch (_) {}
 });
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log('HTTP server running at http://127.0.0.1:' + PORT + '/');
+server.listen(PORT, '0.0.0.0', () => {
+  console.log('HTTP server running at http://0.0.0.0:' + PORT + '/');
+  console.log('Local: http://127.0.0.1:' + PORT + '/');
+  console.log('LAN: http://192.168.110.195:' + PORT + '/');
   console.log('Serving: ' + ROOT);
 });
