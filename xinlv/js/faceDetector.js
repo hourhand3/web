@@ -39,6 +39,8 @@ class FaceDetector {
       try { this._cdnBaseOverride = window.__getFaceMeshBase(); } catch (_) {}
     }
     this._cdnTried = 0;
+    this._pendingSends = 0;
+    this._consecutiveNoResult = 0;
   }
 
   get lastLandmarks() { return this._lastLandmarks; }
@@ -266,16 +268,19 @@ class FaceDetector {
     this.options.roiOptions = { ...this.options.roiOptions, ...opt };
   }
 
-  async send(imageSource) {
-    if (!this.faceMesh || this._processingFrame) return;
-    this._processingFrame = true;
+  send(imageSource) {
+    if (!this.faceMesh) return;
+    const now = performance.now();
+    const debounceMs = this.options.isMobile ? 800 : 300;
+    if (now - (this._stats.lastSendAt || 0) < debounceMs) return;
+    this._stats.lastSendAt = now;
     let sendInput = null;
-    let inputType = null;
     try {
       if (imageSource && imageSource.tagName === 'VIDEO') {
         const v = imageSource;
         if (v.videoWidth > 0 && v.videoHeight > 0) {
-          const scale = Math.min(1, 480 / Math.max(v.videoWidth, v.videoHeight));
+          const maxDim = this.options.isMobile ? 320 : 480;
+          const scale = Math.min(1, maxDim / Math.max(v.videoWidth, v.videoHeight));
           const w = Math.max(1, Math.floor(v.videoWidth * scale));
           const h = Math.max(1, Math.floor(v.videoHeight * scale));
           if (this._bufCanvas.width !== w || this._bufCanvas.height !== h) {
@@ -284,9 +289,7 @@ class FaceDetector {
           }
           this._bufCtx.drawImage(v, 0, 0, w, h);
           sendInput = this._bufCtx.getImageData(0, 0, w, h);
-          inputType = 'imagedata';
         } else {
-          this._processingFrame = false;
           return;
         }
       } else if (imageSource && imageSource.tagName === 'CANVAS') {
@@ -295,59 +298,48 @@ class FaceDetector {
         const ctx = c.getContext('2d');
         if (ctx) {
           sendInput = ctx.getImageData(0, 0, w, h);
-          inputType = 'imagedata';
         } else {
-          this._processingFrame = false;
           return;
         }
       } else if (imageSource instanceof ImageData) {
         sendInput = imageSource;
-        inputType = 'imagedata';
       } else {
-        this._processingFrame = false;
         return;
       }
-      if (!sendInput) {
-        this._processingFrame = false;
-        return;
-      }
+      if (!sendInput) return;
       this._stats.sendCount++;
-      this._stats.lastSendAt = performance.now();
-      const sendTask = this.faceMesh.send({ image: sendInput });
-      const timeoutMs = this.options.sendTimeoutMs || 2500;
-      const timeoutTask = new Promise((_, reject) => {
-        setTimeout(() => {
-          const terr = new Error('FaceMesh 处理超时（> ' + timeoutMs + 'ms）[' + inputType + ']');
-          terr.code = 'SEND_TIMEOUT';
-          reject(terr);
-        }, timeoutMs);
-      });
-      await Promise.race([sendTask, timeoutTask]);
+      this._pendingSends++;
+      this._consecutiveNoResult++;
+      if (this._initDone && this._consecutiveNoResult >= 5 && this._pendingSends >= 3) {
+        try {
+          if (this.faceMesh && typeof this.faceMesh.close === 'function') {
+            this.faceMesh.close();
+          }
+          this.faceMesh = null;
+          this._initPromise = null;
+          this._initDone = false;
+          this._consecutiveNoResult = 0;
+          this._pendingSends = 0;
+          this._stats.lastError = '连续无回调，重新初始化 FaceMesh';
+          this.init();
+          return;
+        } catch (e) {
+          this._stats.lastError = '重新初始化失败: ' + e.message;
+        }
+      }
+      this.faceMesh.send({ image: sendInput });
     } catch (e) {
-      const code = e && e.code;
       const msg = (e && e.message) || String(e);
       this._stats.lastError = msg;
-      if (code === 'SEND_TIMEOUT') {
-        this._stats.timeoutCount++;
-        if (this._initDone && this._stats.timeoutCount >= 3 && this._forceCanvasSend !== true) {
-          this._forceCanvasSend = true;
-          this._stats.lastError = msg + ' · 切换 Canvas 路径重试';
-        }
-        if (this._initDone && typeof this.faceMesh === 'object' && this.faceMesh && typeof this.faceMesh.close === 'function' && this._stats.timeoutCount >= 12) {
-          try { this.faceMesh.close(); } catch (_) {}
-          this.faceMesh = null;
-        }
-      } else {
-        this._stats.failCount++;
-      }
-    } finally {
-      this._processingFrame = false;
+      this._stats.failCount++;
     }
   }
 
   _onResults(results) {
     this._stats.recvCount++;
     this._stats.lastRecvAt = performance.now();
+    this._pendingSends = Math.max(0, this._pendingSends - 1);
+    this._consecutiveNoResult = 0;
     const multiFace = results.multiFaceLandmarks;
     if (multiFace && multiFace.length > 0) {
       const landmarks = multiFace[0];
