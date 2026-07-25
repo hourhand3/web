@@ -65,44 +65,41 @@
 </div>
 
 <script>
-    const GITHUB_API_URL = "https://api.github.com/repos/hourhand3/web/contents/";
+    const GITHUB_API_URL = "https://api.github.com/repos/hourhand3/web/git/trees/main?recursive=1";
     const GITHUB_PAGES_BASE_URL = "https://hourhand3.github.io/web/";
 
     const rootFiles = [];
     const subFolderFiles = [];
 
-    async function fetchContents(path = "") {
-        const url = GITHUB_API_URL + path;
-        const response = await fetch(url);
+    async function fetchFileTree() {
+        const response = await fetch(GITHUB_API_URL);
         if (!response.ok) {
             throw new Error(`API 请求失败: ${response.status}`);
         }
-        return await response.json();
+        const data = await response.json();
+        return data.tree || [];
     }
 
-    async function scanDirectory(path = "") {
-        const contents = await fetchContents(path);
-        
-        for (const item of contents) {
-            if (item.type === "file" && item.name.endsWith(".html") && item.name !== "index.html") {
-                const filePath = path ? `${path}/${item.name}` : item.name;
-                const fileName = item.name.replace(".html", "");
-                
-                if (path) {
-                    subFolderFiles.push({
-                        path: filePath,
-                        name: fileName,
-                        folder: path
-                    });
-                } else {
-                    rootFiles.push({
-                        path: filePath,
-                        name: fileName
-                    });
-                }
-            } else if (item.type === "dir") {
-                const subPath = path ? `${path}/${item.name}` : item.name;
-                await scanDirectory(subPath);
+    function parseFileTree(tree) {
+        for (const item of tree) {
+            if (item.type !== 'blob') continue;
+            if (!item.path.endsWith('.html')) continue;
+            
+            if (item.path === 'index.html') continue;
+            
+            const parts = item.path.split('/');
+            
+            if (parts.length === 1) {
+                rootFiles.push({
+                    path: item.path,
+                    name: item.path.replace('.html', '')
+                });
+            } else {
+                subFolderFiles.push({
+                    path: item.path,
+                    name: parts[0],
+                    folder: parts[0]
+                });
             }
         }
     }
@@ -150,7 +147,8 @@
         subFolderFiles.length = 0;
 
         try {
-            await scanDirectory();
+            const tree = await fetchFileTree();
+            parseFileTree(tree);
             renderRootFiles();
             renderSubFolderFiles();
             
