@@ -22,6 +22,7 @@ class RPPGProcessor {
     this._butterB = null;
     this._butterA = null;
     this._filterState = { zi: null };
+    this._butterCache = {};
     this._lastStableBPM = null;
     this._nullBPMStreak = 0;
     this._lastFailReason = '';
@@ -76,6 +77,7 @@ class RPPGProcessor {
     this._peakTimes = [];
     this._lastPeakIndex = -1;
     this._filterState.zi = null;
+    this._butterCache = {};
     this._lastStableBPM = null;
   }
 
@@ -215,8 +217,8 @@ class RPPGProcessor {
     }
     const Xs = this._standardize(X);
     const Ys = this._standardize(Y);
-    const Xf = this._bandpassSimple(Xs, 0.7, 4);
-    const Yf = this._bandpassSimple(Ys, 0.7, 4);
+    const Xf = this._bandpassSimple(Xs, 0.75, 3.0);
+    const Yf = this._bandpassSimple(Ys, 0.75, 3.0);
     const sX = this._std(Xf);
     const sY = this._std(Yf);
     const alpha = (sY <= 0 || !isFinite(sY) || !isFinite(sX)) ? 0 : sX / sY;
@@ -271,10 +273,11 @@ class RPPGProcessor {
 
   _bandpass(signal, fs) {
     const low = this.options.minBPM / 60;
-    const high = this.options.maxBPM / 60;
-    const out = this._bandpassSimple(signal, low, high, fs);
-    if (out.some(function(v){return !isFinite(v)})) {
-      return signal.slice().fill(0);
+    const high = Math.min(3.0, this.options.maxBPM / 60);
+    let out = this._butterworthBandpass(signal, fs, low, high, this.options.bandpassOrder);
+    const outStd = this._std(out);
+    if (out.some(function(v){return !isFinite(v)}) || outStd < 0.01 || outStd > 100) {
+      out = this._bandpassSimple(signal, low, high, fs);
     }
     return out;
   }
@@ -292,8 +295,13 @@ class RPPGProcessor {
   _butterworthBandpass(x, fs, low, high, order) {
     const nyq = fs / 2;
     const Wn = [low / nyq, high / nyq];
-    const { b, a } = this._butterCoeffs(order, Wn);
-    return this._filtfilt(x, b, a);
+    const cacheKey = `${order}_${Wn[0].toFixed(6)}_${Wn[1].toFixed(6)}`;
+    let coeffs = this._butterCache[cacheKey];
+    if (!coeffs) {
+      coeffs = this._butterCoeffs(order, Wn);
+      this._butterCache[cacheKey] = coeffs;
+    }
+    return this._filtfilt(x, coeffs.b, coeffs.a);
   }
 
   _butterCoeffs(order, Wn) {
@@ -423,11 +431,12 @@ class RPPGProcessor {
     const N = filtered.length;
     if (N < 18 || fs <= 0) return { bpm: null, peaks: [], confidence: 0 };
 
+    const signalStd = this._std(filtered);
     const minDist = Math.max(3, Math.floor(fs * 60 / this.options.maxBPM));
     const peaks = this._findPeaks(filtered, {
       minDistance: minDist,
-      minProminence: 0.1,
-      minHeight: 0.04
+      minProminence: Math.max(0.15, 0.3 * signalStd),
+      minHeight: Math.max(0.08, 0.2 * signalStd)
     });
 
     if (peaks.length < 2) {
@@ -585,8 +594,13 @@ class RPPGProcessor {
     if (this._lastStableBPM === null) {
       this._lastStableBPM = newBPM;
     } else {
-      const alpha = Math.min(1, timestamps.length / 300);
-      this._lastStableBPM = this._lastStableBPM * (1 - alpha) + median * alpha;
+      const rateLimit = 8;
+      const clampedMedian = Math.max(
+        this._lastStableBPM - rateLimit,
+        Math.min(this._lastStableBPM + rateLimit, median)
+      );
+      const alpha = 0.12;
+      this._lastStableBPM = this._lastStableBPM * (1 - alpha) + clampedMedian * alpha;
     }
     this.currentBPM = Math.round(this._lastStableBPM);
   }
