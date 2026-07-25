@@ -272,8 +272,8 @@ class RPPGProcessor {
   }
 
   _bandpass(signal, fs) {
-    const low = this.options.minBPM / 60;
-    const high = Math.min(3.0, this.options.maxBPM / 60);
+    const low = Math.max(0.75, this.options.minBPM / 60);
+    const high = Math.min(2.5, this.options.maxBPM / 60);
     let out = this._butterworthBandpass(signal, fs, low, high, this.options.bandpassOrder);
     const outStd = this._std(out);
     if (out.some(function(v){return !isFinite(v)}) || outStd < 0.01 || outStd > 100) {
@@ -343,19 +343,21 @@ class RPPGProcessor {
   }
 
   _filtfilt(x, b, a) {
-    const y1 = this._filter(x, b, a);
+    const y1 = this._filter(x, b, a, true);
     const rev = y1.slice().reverse();
-    const y2 = this._filter(rev, b, a);
+    const y2 = this._filter(rev, b, a, true);
     return y2.reverse();
   }
 
-  _filter(x, b, a) {
+  _filter(x, b, a, resetState = false) {
     const N = x.length;
     const nb = b.length, na = a.length;
     const y = new Array(N).fill(0);
-    const zi = this._filterState.zi && this._filterState.zi.length === Math.max(nb, na) - 1
-      ? this._filterState.zi.slice()
-      : new Array(Math.max(nb, na) - 1).fill(0);
+    const zi = resetState
+      ? new Array(Math.max(nb, na) - 1).fill(0)
+      : (this._filterState.zi && this._filterState.zi.length === Math.max(nb, na) - 1
+          ? this._filterState.zi.slice()
+          : new Array(Math.max(nb, na) - 1).fill(0));
     const a0 = a[0] || 1;
     for (let n = 0; n < N; n++) {
       let yn = b[0] * x[n] + zi[0];
@@ -369,6 +371,9 @@ class RPPGProcessor {
         zi[i - 1] -= (a[i] / a0) * yn;
       }
       y[n] = yn;
+    }
+    if (!resetState) {
+      this._filterState.zi = zi.slice();
     }
     return y;
   }
@@ -429,50 +434,57 @@ class RPPGProcessor {
 
   _estimateBPM(filtered, fs, timestamps) {
     const N = filtered.length;
-    if (N < 18 || fs <= 0) return { bpm: null, peaks: [], confidence: 0 };
+    if (N < 36 || fs <= 0) return { bpm: null, peaks: [], confidence: 0 };
 
-    const signalStd = this._std(filtered);
-    const minDist = Math.max(3, Math.floor(fs * 60 / this.options.maxBPM));
-    const peaks = this._findPeaks(filtered, {
-      minDistance: minDist,
-      minProminence: Math.max(0.15, 0.3 * signalStd),
-      minHeight: Math.max(0.08, 0.2 * signalStd)
-    });
+    const result = this._bpmFromACF(filtered, fs);
+    if (result.bpm) {
+      return result;
+    }
+    return this._bpmFromFFT(filtered, fs);
+  }
 
-    if (peaks.length < 2) {
-      return this._bpmFromFFT(filtered, fs);
+  _bpmFromACF(signal, fs) {
+    const N = signal.length;
+    if (N < 36) return { bpm: null, peaks: [], confidence: 0 };
+
+    const minLag = Math.max(2, Math.floor(fs * 60 / 150));
+    const maxLag = Math.min(Math.floor(N / 2), Math.floor(fs * 60 / 45));
+
+    if (minLag >= maxLag) return { bpm: null, peaks: [], confidence: 0 };
+
+    const acf = new Array(maxLag + 1).fill(0);
+    const mean = this._mean(signal);
+    let varSum = 0;
+    for (let i = 0; i < N; i++) varSum += (signal[i] - mean) ** 2;
+
+    if (varSum < 1e-10) return { bpm: null, peaks: [], confidence: 0 };
+
+    for (let lag = 0; lag <= maxLag; lag++) {
+      let sum = 0;
+      for (let i = 0; i < N - lag; i++) {
+        sum += (signal[i] - mean) * (signal[i + lag] - mean);
+      }
+      acf[lag] = sum / varSum;
     }
 
-    const intervals = [];
-    for (let i = 1; i < peaks.length; i++) {
-      const dt = (timestamps[peaks[i]] - timestamps[peaks[i - 1]]) / 1000;
-      if (dt > 0) intervals.push(dt);
+    let maxAcf = -1, maxLag_ = -1;
+    for (let lag = minLag; lag <= maxLag; lag++) {
+      if (acf[lag] > maxAcf) {
+        maxAcf = acf[lag];
+        maxLag_ = lag;
+      }
     }
 
-    if (intervals.length < 2) {
-      return this._bpmFromFFT(filtered, fs);
-    }
+    if (maxLag_ < 0 || maxAcf < 0.25) return { bpm: null, peaks: [], confidence: 0 };
 
-    intervals.sort((a, b) => a - b);
-    const q1 = intervals[Math.floor(intervals.length * 0.25)];
-    const q3 = intervals[Math.floor(intervals.length * 0.75)];
-    const iqr = q3 - q1;
-    const valid = intervals.filter(d => d >= q1 - 1.5 * iqr && d <= q3 + 1.5 * iqr);
-    if (valid.length < 2) return this._bpmFromFFT(filtered, fs);
+    const periodSamples = maxLag_;
+    const periodSeconds = periodSamples / fs;
+    const bpm = 60 / periodSeconds;
 
-    const meanRR = this._mean(valid);
-    const bpm = 60 / meanRR;
-    if (bpm < this.options.minBPM || bpm > this.options.maxBPM) {
-      return this._bpmFromFFT(filtered, fs);
-    }
+    if (bpm < 45 || bpm > 150) return { bpm: null, peaks: [], confidence: 0 };
 
-    const rrStd = this._std(valid);
-    const cv = rrStd / meanRR;
-    const nPeaks = peaks.length;
-    const expected = (timestamps[timestamps.length - 1] - timestamps[0]) / 1000 * (bpm / 60);
-    const peakRatio = Math.min(1, nPeaks / Math.max(1, expected));
-    const confidence = Math.max(0, Math.min(1, (1 - Math.min(cv, 1)) * 0.55 + peakRatio * 0.45));
-    return { bpm, peaks, confidence };
+    const confidence = Math.max(0, Math.min(1, (maxAcf - 0.2) * 1.5));
+    return { bpm, peaks: [], confidence };
   }
 
   _bpmFromFFT(signal, fs) {
@@ -483,8 +495,10 @@ class RPPGProcessor {
     while (re.length < M) re.push(0);
     const im = new Array(M).fill(0);
     this._fft(re, im, false);
-    const minIdx = Math.max(1, Math.floor(this.options.minBPM / 60 * M / fs));
-    const maxIdx = Math.min(M / 2 - 1, Math.ceil(this.options.maxBPM / 60 * M / fs));
+    const minFreq = 45 / 60;
+    const maxFreq = 150 / 60;
+    const minIdx = Math.max(1, Math.floor(minFreq * M / fs));
+    const maxIdx = Math.min(M / 2 - 1, Math.ceil(maxFreq * M / fs));
     let maxAmp = -1, maxIdx_ = -1;
     const mags = new Array(maxIdx + 1);
     for (let i = minIdx; i <= maxIdx; i++) {
