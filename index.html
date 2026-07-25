@@ -24,6 +24,16 @@
         .icon {margin-right: 10px; font-size: 18px;}
         .folder-icon {color: #f39c12;}
         .file-icon {color: #3498db;}
+        .loading {text-align: center; padding: 2rem; color: #666;}
+        .error {text-align: center; padding: 2rem; color: #e74c3c; background: #fef5f5; border-radius: 8px; margin-top: 1rem;}
+        .refresh-btn {
+            display: inline-block; padding: 0.5rem 1rem;
+            background: #3498db; color: white;
+            border: none; border-radius: 4px;
+            cursor: pointer; margin-top: 1rem;
+            font-size: 1rem;
+        }
+        .refresh-btn:hover {background: #2980b9;}
     </style>
 </head>
 <body>
@@ -31,42 +41,78 @@
     <h1>📁 网站文件目录</h1>
     <p class="desc">自动同步仓库中的所有网页文件，新增自动更新</p>
 
-    <!-- 根目录文件分类 -->
-    <div class="category">
-        <h2 class="category-title">📄 根目录工具</h2>
-        <ul id="rootFiles"></ul>
+    <div id="loading" class="loading">
+        <div>⏳ 正在加载文件列表...</div>
     </div>
 
-    <!-- 子文件夹分类 -->
-    <div class="category">
-        <h2 class="category-title">📂 子文件夹项目</h2>
-        <ul id="subFolderFiles"></ul>
+    <div id="content" style="display: none;">
+        <div class="category">
+            <h2 class="category-title">📄 根目录工具</h2>
+            <ul id="rootFiles"></ul>
+        </div>
+
+        <div class="category">
+            <h2 class="category-title">📂 子文件夹项目</h2>
+            <ul id="subFolderFiles"></ul>
+        </div>
+    </div>
+
+    <div id="error" class="error" style="display: none;">
+        <div>❌ 加载文件列表失败</div>
+        <div style="margin-top: 0.5rem; font-size: 0.9rem;">可能是 GitHub API 限制，请稍后重试</div>
+        <button class="refresh-btn" onclick="loadFileList()">🔄 重新加载</button>
     </div>
 </div>
 
 <script>
-    // 🔧 只需要改这里！
-    const GITHUB_PAGES_BASE_URL = "https://hourhand3.github.io/web/"; // 你的GitHub Pages地址
+    const GITHUB_API_URL = "https://api.github.com/repos/hourhand3/web/contents/";
+    const GITHUB_PAGES_BASE_URL = "https://hourhand3.github.io/web/";
 
-    // 1. 根目录的HTML文件（直接放在web文件夹下的）
-    const rootFiles = [
-        { path: "iptv.html", name: "IPTV电视" },
-        { path: "人脸测距_防近视.html", name: "人脸测距防近视" },
-        { path: "歌词整理.html", name: "歌词整理工具" },
-        { path: "snake.html", name: "贪吃蛇游戏" },
-        { path: "阅读速度测试.html", name: "阅读速度测试" }
-    ];
+    const rootFiles = [];
+    const subFolderFiles = [];
 
-    // 2. 子文件夹里的HTML文件（按文件夹分类，新增直接加一行）
-    const subFolderFiles = [
-        { path: "舒尔特表游戏/index.html", name: "舒尔特表游戏", folder: "舒尔特表游戏" }
-        // 以后新增子文件夹，直接在这里加一行：
-        // { path: "新文件夹/index.html", name: "新工具", folder: "新文件夹" }
-    ];
+    async function fetchContents(path = "") {
+        const url = GITHUB_API_URL + path;
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`API 请求失败: ${response.status}`);
+        }
+        return await response.json();
+    }
 
-    // 生成根目录文件列表
+    async function scanDirectory(path = "") {
+        const contents = await fetchContents(path);
+        
+        for (const item of contents) {
+            if (item.type === "file" && item.name.endsWith(".html") && item.name !== "index.html") {
+                const filePath = path ? `${path}/${item.name}` : item.name;
+                const fileName = item.name.replace(".html", "");
+                
+                if (path) {
+                    subFolderFiles.push({
+                        path: filePath,
+                        name: fileName,
+                        folder: path
+                    });
+                } else {
+                    rootFiles.push({
+                        path: filePath,
+                        name: fileName
+                    });
+                }
+            } else if (item.type === "dir") {
+                const subPath = path ? `${path}/${item.name}` : item.name;
+                await scanDirectory(subPath);
+            }
+        }
+    }
+
     function renderRootFiles() {
         const list = document.getElementById('rootFiles');
+        if (rootFiles.length === 0) {
+            list.innerHTML = '<li style="color: #999;">暂无根目录文件</li>';
+            return;
+        }
         rootFiles.forEach(file => {
             const li = document.createElement('li');
             const a = document.createElement('a');
@@ -78,9 +124,12 @@
         });
     }
 
-    // 生成子文件夹文件列表
     function renderSubFolderFiles() {
         const list = document.getElementById('subFolderFiles');
+        if (subFolderFiles.length === 0) {
+            list.innerHTML = '<li style="color: #999;">暂无子文件夹项目</li>';
+            return;
+        }
         subFolderFiles.forEach(file => {
             const li = document.createElement('li');
             const a = document.createElement('a');
@@ -92,10 +141,30 @@
         });
     }
 
-    // 页面加载时执行渲染
+    async function loadFileList() {
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('content').style.display = 'none';
+        document.getElementById('error').style.display = 'none';
+        
+        rootFiles.length = 0;
+        subFolderFiles.length = 0;
+
+        try {
+            await scanDirectory();
+            renderRootFiles();
+            renderSubFolderFiles();
+            
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('content').style.display = 'block';
+        } catch (error) {
+            console.error('加载失败:', error);
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
-        renderRootFiles();
-        renderSubFolderFiles();
+        loadFileList();
     });
 </script>
 </body>
