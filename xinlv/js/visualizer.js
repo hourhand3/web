@@ -194,6 +194,7 @@ class Visualizer {
     if (el) {
       if (value != null) {
         el.textContent = String(value);
+        this._updateBPMColor(el, value);
         if (value !== this._lastBPM) {
           el.classList.remove('pulse');
           void el.offsetWidth;
@@ -202,8 +203,10 @@ class Visualizer {
         }
       } else if (diagnostics && diagnostics.lastAttemptedBPM && diagnostics.nullBPMStreak >= 6) {
         el.textContent = `~${Math.round(diagnostics.lastAttemptedBPM)}`;
+        el.style.color = '';
       } else {
         el.textContent = '--';
+        el.style.color = '';
       }
     }
     const badge = this.els.bpmConfidence;
@@ -224,6 +227,22 @@ class Visualizer {
         badge.textContent = '信号: 累积采样中...';
       }
     }
+  }
+
+  _updateBPMColor(el, bpm) {
+    let color;
+    if (bpm >= 60 && bpm <= 100) {
+      color = '#22c55e';
+    } else if ((bpm >= 50 && bpm < 60) || (bpm > 100 && bpm <= 120)) {
+      color = '#f59e0b';
+    } else {
+      color = '#ef4444';
+    }
+    el.style.background = 'none';
+    el.style.webkitBackgroundClip = 'text';
+    el.style.backgroundClip = 'text';
+    el.style.webkitTextFillColor = color;
+    el.style.color = color;
   }
 
   updateInfo({ fps, samples, stability, cameraLabel }) {
