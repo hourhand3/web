@@ -1,0 +1,1 @@
+New-SelfSignedCertificate -DnsName "192.168.110.195","localhost" -CertStoreLocation "cert:\LocalMachine\My" -FriendlyName "AcousticDataTransfer" -NotAfter (Get-Date).AddYears(1) 2>&1 | Out-File C:\Users\hasee\Documents\shengchuan\cert-output.txt; $Error[0].Exception.Message 2>&1 | Out-File C:\Users\hasee\Documents\shengchuan\cert-error.txt -Append
