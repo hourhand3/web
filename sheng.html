@@ -3,204 +3,216 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acoustic Transfer - Deep Debug</title>
+    <title>Acoustic Transfer - FSK Demo</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #111; color: #eee; }
-        .card { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        body { font-family: sans-serif; padding: 20px; background: #111; color: #eee; max-width: 800px; margin: 0 auto; }
+        .card { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #333; }
         button { padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; font-weight: bold; }
         .btn-send { background: #4caf50; color: #fff; }
         .btn-recv { background: #2196f3; color: #fff; }
         .btn-test { background: #ff9800; color: #fff; }
-        .log-box { background: #000; padding: 10px; border-radius: 5px; font-family: monospace; font-size: 12px; height: 150px; overflow-y: auto; margin-top: 10px; border: 1px solid #333; }
+        input { padding: 8px; width: 200px; border-radius: 4px; border: 1px solid #555; background: #333; color: #fff; }
         .status { font-size: 14px; margin-top: 10px; color: #aaa; }
+        .result-box { background: #000; padding: 15px; border-radius: 5px; font-family: monospace; font-size: 18px; min-height: 40px; margin-top: 10px; border: 1px solid #4caf50; color: #4caf50; word-break: break-all;}
+        .log-box { background: #000; padding: 10px; border-radius: 5px; font-family: monospace; font-size: 12px; height: 100px; overflow-y: auto; margin-top: 10px; border: 1px solid #333; color: #888; }
     </style>
 </head>
 <body>
 
     <h2>🎙️ 接收端 (Receiver)</h2>
     <div class="card">
-        <button class="btn-test" id="btnMicTest">1. 测试麦克风 (自听)</button>
-        <button class="btn-recv" id="btnStartListen">2. 开始监听</button>
+        <button class="btn-recv" id="btnStartListen">开始监听</button>
+        <button class="btn-test" id="btnStopListen" style="background:#f44336;">停止监听</button>
         <div class="status">状态: <span id="recvStatus">等待操作</span></div>
-        <div class="status">实时能量: <span id="energyVal">-100 dB</span></div>
+        <div class="status">实时能量: <span id="energyVal">-100 dB</span> | 当前比特: <span id="currentBit">-</span></div>
+        
+        <div style="margin-top:10px; color:#aaa; font-size:12px;">👇 接收到的明文消息</div>
+        <div class="result-box" id="receivedText">等待接收...</div>
+        
         <div class="log-box" id="recvLog">等待初始化...</div>
     </div>
 
     <h2>📡 发送端 (Sender)</h2>
     <div class="card">
-        <input type="text" id="sendText" value="Hi" style="padding: 8px; width: 200px;" />
+        <input type="text" id="sendText" value="Hi" />
         <button class="btn-send" id="btnSend">发送文本</button>
-        <button class="btn-test" id="btnTestTone">测试高频音</button>
         <div class="status">状态: <span id="sendStatus">等待操作</span></div>
         <div class="log-box" id="sendLog">等待初始化...</div>
     </div>
 
 <script>
+    // ================= 核心配置 =================
+    const FREQ_0 = 14000; // 代表比特 0
+    const FREQ_1 = 15000; // 代表比特 1
+    const BIT_DURATION_MS = 50; // 每个比特持续 50ms
+    const ENERGY_THRESHOLD = -65; // 信号判定阈值 (dB)
+
     // ================= 调试日志工具 =================
-    const recvLog = document.getElementById('recvLog');
-    const sendLog = document.getElementById('sendLog');
-    
-    function log(type, msg) {
+    const recvLogEl = document.getElementById('recvLog');
+    const sendLogEl = document.getElementById('sendLog');
+    const log = (type, msg) => {
         const time = new Date().toLocaleTimeString();
         const line = `[${time}] ${msg}\n`;
-        if (type === 'recv') {
-            recvLog.innerText += line;
-            recvLog.scrollTop = recvLog.scrollHeight;
-        } else {
-            sendLog.innerText += line;
-            sendLog.scrollTop = sendLog.scrollHeight;
-        }
+        if (type === 'recv') { recvLogEl.innerText += line; recvLogEl.scrollTop = recvLogEl.scrollHeight; }
+        else { sendLogEl.innerText += line; sendLogEl.scrollTop = sendLogEl.scrollHeight; }
         console.log(`[${type}] ${msg}`);
-    }
+    };
 
-    // ================= 接收端逻辑 =================
-    const recvStatus = document.getElementById('recvStatus');
-    const energyVal = document.getElementById('energyVal');
-    let audioCtx = null;
-    let analyser = null;
+    // ================= 发送端逻辑 (FSK 编码) =================
+    document.getElementById('btnSend').onclick = async () => {
+        const text = document.getElementById('sendText').value;
+        if (!text) return;
+        
+        const sendStatus = document.getElementById('sendStatus');
+        sendStatus.innerText = "正在发送...";
+        log('send', `开始发送文本: "${text}"`);
+        
+        // 1. 文本转二进制字符串
+        let bitStream = '';
+        for (let i = 0; i < text.length; i++) {
+            bitStream += text.charCodeAt(i).toString(2).padStart(8, '0');
+        }
+        log('send', `二进制流 (${bitStream.length} bits): ${bitStream}`);
+        
+        // 2. 初始化音频上下文
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (ctx.state === 'suspended') await ctx.resume();
+        
+        // 3. 逐个比特播放 FSK 信号
+        for (let i = 0; i < bitStream.length; i++) {
+            const bit = bitStream[i];
+            const freq = bit === '0' ? FREQ_0 : FREQ_1;
+            
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.frequency.value = freq;
+            gain.gain.value = 1.0; // 最大音量
+            
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            
+            osc.start();
+            // 等待一个比特的时间
+            await new Promise(resolve => setTimeout(resolve, BIT_DURATION_MS));
+            osc.stop();
+        }
+        
+        ctx.close();
+        sendStatus.innerText = "发送完成";
+        log('send', "✅ 文本发送完毕");
+    };
 
-    // 1. 麦克风自测功能 (排查硬件链路)
-    document.getElementById('btnMicTest').onclick = async () => {
-        recvStatus.innerText = "正在测试麦克风...";
-        log('recv', "开始麦克风自测...");
+    // ================= 接收端逻辑 (FSK 解码) =================
+    let recvAudioCtx = null;
+    let recvAnalyser = null;
+    let isListening = false;
+    let currentBitBuffer = '';
+    let receivedMessage = '';
+
+    document.getElementById('btnStartListen').onclick = async () => {
+        if (isListening) return;
+        
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ 
-                audio: { 
-                    echoCancellation: false, 
-                    noiseSuppression: false, 
-                    autoGainControl: false 
-                } 
+                audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } 
             });
-            const testCtx = new (window.AudioContext || window.webkitAudioContext)();
-            const source = testCtx.createMediaStreamSource(stream);
-            source.connect(testCtx.destination); // 直接将麦克风连到扬声器
             
-            recvStatus.innerText = "正在播放麦克风声音，请对着麦克风说话...";
-            log('recv', "自测成功！如果你能听到自己的声音，说明硬件链路正常。");
+            recvAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (recvAudioCtx.state === 'suspended') await recvAudioCtx.resume();
             
-            setTimeout(() => {
-                source.disconnect();
-                testCtx.close();
-                stream.getTracks().forEach(t => t.stop());
-                recvStatus.innerText = "自测结束";
-            }, 3000);
+            const source = recvAudioCtx.createMediaStreamSource(stream);
+            recvAnalyser = recvAudioCtx.createAnalyser();
+            recvAnalyser.fftSize = 4096;
+            source.connect(recvAnalyser);
+            
+            isListening = true;
+            receivedMessage = '';
+            currentBitBuffer = '';
+            document.getElementById('receivedText').innerText = '';
+            document.getElementById('recvStatus').innerText = "监听中...";
+            log('recv', "✅ 开始监听，等待 FSK 信号...");
+            
+            analyzeLoop();
         } catch (e) {
-            recvStatus.innerText = "麦克风自测失败";
-            log('recv', `❌ 自测失败: ${e.name} - ${e.message}`);
+            log('recv', `❌ 麦克风初始化失败: ${e.message}`);
         }
     };
 
-    // 2. 开始监听
-    document.getElementById('btnStartListen').onclick = async () => {
-        recvStatus.innerText = "正在初始化音频上下文...";
-        log('recv', "请求麦克风权限 (强制关闭降噪/AEC)...");
-        
-        try {
-            // 关键：强制关闭浏览器的音频增强
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                audio: { 
-                    echoCancellation: false, 
-                    noiseSuppression: false, 
-                    autoGainControl: false 
-                } 
-            });
-            
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            
-            // 关键：强制恢复 AudioContext
-            if (audioCtx.state === 'suspended') {
-                log('recv', "AudioContext 处于挂起状态，正在尝试恢复...");
-                await audioCtx.resume();
-            }
-            
-            if (audioCtx.state !== 'running') {
-                throw new Error("AudioContext 无法启动，当前状态: " + audioCtx.state);
-            }
-
-            log('recv', `✅ AudioContext 启动成功! 采样率: ${audioCtx.sampleRate}Hz`);
-            
-            const source = audioCtx.createMediaStreamSource(stream);
-            analyser = audioCtx.createAnalyser();
-            analyser.fftSize = 4096;
-            source.connect(analyser);
-            
-            recvStatus.innerText = "监听中...";
-            log('recv', "开始实时分析频谱...");
-            analyzeLoop();
-            
-        } catch (e) {
-            recvStatus.innerText = "初始化失败";
-            log('recv', `❌ 致命错误: ${e.name} - ${e.message}`);
-        }
+    document.getElementById('btnStopListen').onclick = () => {
+        isListening = false;
+        if (recvAudioCtx) recvAudioCtx.close();
+        document.getElementById('recvStatus').innerText = "已停止";
+        log('recv', "监听已停止");
     };
 
     function analyzeLoop() {
-        if (!analyser) return;
-        const dataArray = new Float32Array(analyser.frequencyBinCount);
-        analyser.getFloatFrequencyData(dataArray);
+        if (!isListening || !recvAnalyser) return;
         
-        // 寻找全局最大能量
-        let maxVal = -100;
-        for (let i = 0; i < dataArray.length; i++) {
-            if (dataArray[i] > maxVal) maxVal = dataArray[i];
-        }
+        const dataArray = new Float32Array(recvAnalyser.frequencyBinCount);
+        recvAnalyser.getFloatFrequencyData(dataArray);
         
-        energyVal.innerText = maxVal.toFixed(2) + " dB";
+        // 计算 14kHz 和 15kHz 频段的能量
+        const bin14k = Math.round(FREQ_0 * recvAnalyser.fftSize / recvAudioCtx.sampleRate);
+        const bin15k = Math.round(FREQ_1 * recvAnalyser.fftSize / recvAudioCtx.sampleRate);
         
-        // 如果能量大于 -60dB，记录一条日志（避免刷屏）
-        if (maxVal > -60) {
-            log('recv', `🔊 检测到有效声音! 峰值能量: ${maxVal.toFixed(2)} dB`);
+        // 取中心频率前后 3 个 bin 的平均值，增加容错率
+        const getAvgEnergy = (centerBin) => {
+            let sum = 0;
+            for(let i = -3; i <= 3; i++) sum += dataArray[centerBin + i];
+            return sum / 7;
+        };
+        
+        const energy14k = getAvgEnergy(bin14k);
+        const energy15k = getAvgEnergy(bin15k);
+        const maxEnergy = Math.max(energy14k, energy15k);
+        
+        // 更新 UI
+        document.getElementById('energyVal').innerText = maxEnergy.toFixed(2) + ' dB';
+        
+        // 只有当能量超过阈值时，才进行比特判定
+        if (maxEnergy > ENERGY_THRESHOLD) {
+            let detectedBit = '-';
+            if (energy14k > energy15k) {
+                detectedBit = '0';
+            } else {
+                detectedBit = '1';
+            }
+            document.getElementById('currentBit').innerText = detectedBit;
+            
+            // 简单的防抖：如果当前比特和上一个不同，或者刚启动，才追加到 buffer
+            // 实际工程中需要更复杂的时钟同步，这里用简单的定时器模拟
+            processBit(detectedBit);
+        } else {
+            document.getElementById('currentBit').innerText = '-';
         }
         
         requestAnimationFrame(analyzeLoop);
     }
 
-    // ================= 发送端逻辑 =================
-    const sendStatus = document.getElementById('sendStatus');
-    
-    // 发送高频测试音
-    document.getElementById('btnTestTone').onclick = () => {
-        sendStatus.innerText = "正在播放 14kHz 测试音...";
-        log('send', "播放 14kHz 测试音 (持续2秒)");
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        
-        osc.frequency.value = 14000;
-        gain.gain.value = 1.0; // 最大音量
-        
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        setTimeout(() => { osc.stop(); ctx.close(); sendStatus.innerText = "测试音播放完毕"; }, 2000);
-    };
-
-    // 发送文本 (简单 FSK)
-    document.getElementById('btnSend').onclick = () => {
-        const text = document.getElementById('sendText').value;
-        sendStatus.innerText = "正在发送...";
-        log('send', `开始发送文本: "${text}"`);
-        
-        // 这里简化为发送一个 14kHz 的长音代表数据，实际应替换为 FSK 编码
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        
-        osc.frequency.value = 14000;
-        gain.gain.value = 1.0;
-        
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        
-        log('send', "正在输出 14kHz 载波...");
-        setTimeout(() => { 
-            osc.stop(); 
-            ctx.close(); 
-            sendStatus.innerText = "发送完成";
-            log('send', "发送结束");
-        }, 3000);
-    };
+    // 简单的比特组装逻辑 (带防抖)
+    let lastBit = null;
+    let bitHoldTimer = null;
+    function processBit(bit) {
+        // 只有当检测到的比特发生变化，或者这是第一个有效比特时，才认为收到了一个新比特
+        // 这能防止同一个 50ms 的信号被记录为多个比特
+        if (bit !== lastBit) {
+            lastBit = bit;
+            currentBitBuffer += bit;
+            log('recv', `收到比特: ${bit} (Buffer: ${currentBitBuffer})`);
+            
+            // 如果凑齐了 8 个比特，转换为字符
+            if (currentBitBuffer.length === 8) {
+                const charCode = parseInt(currentBitBuffer, 2);
+                // 过滤掉不可见字符
+                if (charCode >= 32 && charCode <= 126) {
+                    receivedMessage += String.fromCharCode(charCode);
+                    document.getElementById('receivedText').innerText = receivedMessage;
+                    log('recv', `🎉 解析出字符: "${String.fromCharCode(charCode)}"`);
+                }
+                currentBitBuffer = ''; // 清空 buffer，准备接收下一个字符
+            }
+        }
+    }
 </script>
 </body>
 </html>
