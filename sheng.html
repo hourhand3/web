@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acoustic Transfer - FEC & Interleaving Demo</title>
+    <title>Acoustic Transfer - Frame Protocol Demo</title>
     <style>
         body { font-family: sans-serif; padding: 20px; background: #111; color: #eee; max-width: 800px; margin: 0 auto; }
         .card { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #333; }
@@ -45,6 +45,7 @@
     const BIT_DURATION_MS = 60; 
     const ENERGY_THRESHOLD = -65; 
     const PREAMBLE = '10101010'; 
+    const TERMINATOR = '11111111'; // 结束符
 
     // ================= 调试日志工具 =================
     const recvLogEl = document.getElementById('recvLog');
@@ -57,8 +58,7 @@
         console.log(`[${type}] ${msg}`);
     };
 
-    // ================= 纠错与校验算法 (Hamming & CRC) =================
-    // 简化的 CRC-8 算法
+    // ================= 纠错与校验算法 =================
     function crc8(data) {
         let crc = 0x00;
         for (let b of data) {
@@ -68,25 +68,27 @@
         return crc & 0xFF;
     }
 
-    // 发送端：数据打包 + 交织
-    function encodePayload(text) {
+    // 发送端：构建完整的数据帧
+    function buildFrame(text) {
         let bytes = Array.from(text).map(c => c.charCodeAt(0));
         let crc = crc8(bytes);
-        bytes.push(crc); // 追加 CRC 校验位
+        bytes.push(crc);
         
-        // 简单的交织：将字节转换为二进制，然后按列读取
-        let bits = bytes.map(b => b.toString(2).padStart(8, '0')).join('');
+        // 长度头 (1字节) + 数据 + CRC(1字节)
+        let frameBytes = [bytes.length - 1, ...bytes]; // length 不包含自身和CRC
+        let bits = frameBytes.map(b => b.toString(2).padStart(8, '0')).join('');
+        
+        // 简单交织
         let interleaved = '';
         for (let i = 0; i < 8; i++) {
             for (let j = i; j < bits.length; j += 8) interleaved += bits[j];
         }
-        return interleaved;
+        return interleaved + TERMINATOR;
     }
 
-    // 接收端：解交织 + CRC 校验
-    function decodePayload(bits) {
+    // 接收端：解交织 + 校验
+    function parseFrame(bits) {
         if (bits.length % 8 !== 0) return null;
-        // 解交织
         let deinterleaved = '';
         let rows = bits.length / 8;
         for (let i = 0; i < rows; i++) {
@@ -96,14 +98,16 @@
         let bytes = [];
         for (let i = 0; i < deinterleaved.length; i += 8) bytes.push(parseInt(deinterleaved.substr(i, 8), 2));
         
-        let receivedCrc = bytes.pop();
-        let calcCrc = crc8(bytes);
+        let len = bytes[0];
+        let dataBytes = bytes.slice(1, 1 + len);
+        let receivedCrc = bytes[1 + len];
+        let calcCrc = crc8(dataBytes);
         
         if (receivedCrc !== calcCrc) {
             log('recv', `⚠️ CRC 校验失败! 收到: ${receivedCrc}, 计算: ${calcCrc}`);
             return null;
         }
-        return bytes.map(b => String.fromCharCode(b)).join('');
+        return dataBytes.map(b => String.fromCharCode(b)).join('');
     }
 
     // ================= 发送端逻辑 =================
@@ -115,9 +119,9 @@
         sendStatus.innerText = "正在编码并发送...";
         log('send', `开始发送文本: "${text}"`);
         
-        const payloadBits = encodePayload(text);
+        const payloadBits = buildFrame(text);
         const fullStream = PREAMBLE + payloadBits;
-        log('send', `完整二进制流 (${fullStream.length} bits, 含CRC与交织)`);
+        log('send', `完整二进制流 (${fullStream.length} bits, 含帧头/尾与CRC)`);
         
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         if (ctx.state === 'suspended') await ctx.resume();
@@ -206,21 +210,27 @@
             for(let i=0; i<8; i++) if(preambleBuffer[i] !== PREAMBLE[i]) diff++;
             if (diff <= 2) {
                 isSynced = true; currentBitBuffer = '';
-                log('recv', `🎯 成功匹配前导码！开始接收数据...`);
-                document.getElementById('recvStatus').innerText = "接收数据中...";
+                log('recv', `🎯 成功匹配前导码！开始接收数据帧...`);
+                document.getElementById('recvStatus').innerText = "接收数据帧中...";
             }
         } else {
             currentBitBuffer += bit;
-            // 假设发送端数据长度已知或包含长度头，这里简单假设接收满一定长度后尝试解码
-            // 实际工程中应有明确的结束符或长度字段
-            if (currentBitBuffer.length > 100 && currentBitBuffer.length % 8 === 0) { 
-                // 尝试解码（实际应等到结束符）
-                let decoded = decodePayload(currentBitBuffer);
+            
+            // 检查是否收到结束符
+            if (currentBitBuffer.length >= 8 && currentBitBuffer.slice(-8) === TERMINATOR) {
+                let frameBits = currentBitBuffer.slice(0, -8); // 去掉结束符
+                log('recv', `📦 收到完整数据帧 (${frameBits.length} bits)，正在解析...`);
+                
+                let decoded = parseFrame(frameBits);
                 if (decoded) {
                     document.getElementById('receivedText').innerText = decoded;
                     log('recv', `🎉 成功解析明文: "${decoded}"`);
-                    isSynced = false; // 重置状态，准备接收下一包
                 }
+                
+                // 重置状态，准备接收下一包
+                isSynced = false; 
+                currentBitBuffer = '';
+                document.getElementById('recvStatus').innerText = "监听中，等待前导码...";
             }
         }
     }
