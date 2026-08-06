@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acoustic Transfer - Anti-False-Terminator Demo</title>
+    <title>Acoustic Transfer - State Machine Demo</title>
     <style>
         body { font-family: sans-serif; padding: 20px; background: #111; color: #eee; max-width: 800px; margin: 0 auto; }
         .card { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #333; }
@@ -42,10 +42,9 @@
     // ================= 核心配置 =================
     const FREQ_0 = 14000; 
     const FREQ_1 = 15000; 
-    const BIT_DURATION_MS = 60; 
     const ENERGY_THRESHOLD = -65; 
     const PREAMBLE = '10101010'; 
-    const TERMINATOR = '10101011'; // 更换为带跳变的结束符，防止纯1误匹配
+    const TERMINATOR = '10101011'; 
 
     // ================= 调试日志工具 =================
     const recvLogEl = document.getElementById('recvLog');
@@ -68,17 +67,13 @@
         return crc & 0xFF;
     }
 
-    // 发送端：构建完整的数据帧
     function buildFrame(text) {
         let bytes = Array.from(text).map(c => c.charCodeAt(0));
         let crc = crc8(bytes);
         bytes.push(crc);
-        
-        // 长度头 (1字节) + 数据 + CRC(1字节)
         let frameBytes = [bytes.length - 1, ...bytes]; 
         let bits = frameBytes.map(b => b.toString(2).padStart(8, '0')).join('');
         
-        // 简单交织
         let interleaved = '';
         for (let i = 0; i < 8; i++) {
             for (let j = i; j < bits.length; j += 8) interleaved += bits[j];
@@ -86,7 +81,6 @@
         return interleaved + TERMINATOR;
     }
 
-    // 接收端：解交织 + 校验
     function parseFrame(bits) {
         if (bits.length % 8 !== 0) return null;
         let deinterleaved = '';
@@ -136,21 +130,25 @@
             osc.connect(gain);
             gain.connect(ctx.destination);
             osc.start();
-            await new Promise(resolve => setTimeout(resolve, BIT_DURATION_MS));
+            await new Promise(resolve => setTimeout(resolve, 60));
             osc.stop();
         }
         
-        // 发送完毕后静音 200ms，作为物理边界
         await new Promise(resolve => setTimeout(resolve, 200));
-        
         ctx.close();
         sendStatus.innerText = "发送完成";
         log('send', "✅ 文本发送完毕");
     };
 
-    // ================= 接收端逻辑 =================
+    // ================= 接收端逻辑 (纯状态机) =================
     let recvAudioCtx = null, recvAnalyser = null, isListening = false;
-    let currentBitBuffer = '', preambleBuffer = '', isSynced = false, lastBitTimestamp = 0;
+    
+    // 状态机变量
+    let isSignalActive = false;      // 当前是否处于高能量状态
+    let currentBitBuffer = '';       // 数据帧缓冲区
+    let preambleBuffer = '';         // 前导码缓冲区
+    let isSynced = false;            // 是否已同步
+    let activeStartTime = 0;         // 高能量状态开始的时间（仅用于超时保护）
 
     document.getElementById('btnStartListen').onclick = async () => {
         if (isListening) return;
@@ -166,10 +164,14 @@
             source.connect(recvAnalyser);
             
             isListening = true;
-            currentBitBuffer = ''; preambleBuffer = ''; isSynced = false; lastBitTimestamp = 0;
+            isSignalActive = false;
+            currentBitBuffer = ''; 
+            preambleBuffer = ''; 
+            isSynced = false;
+            
             document.getElementById('receivedText').innerText = '';
-            document.getElementById('recvStatus').innerText = "监听中，等待前导码...";
-            log('recv', "✅ 开始监听，等待前导码...");
+            document.getElementById('recvStatus').innerText = "监听中...";
+            log('recv', "✅ 开始监听...");
             analyzeLoop();
         } catch (e) { log('recv', `❌ 麦克风初始化失败: ${e.message}`); }
     };
@@ -194,14 +196,33 @@
         const maxEnergy = Math.max(energy14k, energy15k);
         document.getElementById('energyVal').innerText = maxEnergy.toFixed(2) + ' dB';
         
+        // 核心状态机逻辑
         const now = Date.now();
-        if (maxEnergy > ENERGY_THRESHOLD) {
+        const isAboveThreshold = maxEnergy > ENERGY_THRESHOLD;
+        
+        // 1. 上升沿：从静音变为有信号
+        if (isAboveThreshold && !isSignalActive) {
+            isSignalActive = true;
+            activeStartTime = now;
+            
+            // 判定当前比特是 0 还是 1
             let detectedBit = energy14k > energy15k ? '0' : '1';
-            if (now - lastBitTimestamp > BIT_DURATION_MS * 0.75) { 
-                lastBitTimestamp = now; 
-                processBit(detectedBit);
-            }
+            processBit(detectedBit);
         }
+        // 2. 下降沿：从有信号变为静音
+        else if (!isAboveThreshold && isSignalActive) {
+            isSignalActive = false;
+            // 下降沿不需要记录比特，只需要重置状态
+        }
+        // 3. 超时保护：如果一直处于高能量状态超过 150ms，可能是环境噪音，强制复位
+        else if (isSignalActive && (now - activeStartTime > 150)) {
+            isSignalActive = false;
+            log('recv', "⚠️ 信号超时，强制复位状态机");
+            isSynced = false;
+            currentBitBuffer = '';
+            preambleBuffer = '';
+        }
+        
         requestAnimationFrame(analyzeLoop);
     }
 
@@ -212,17 +233,16 @@
             let diff = 0;
             for(let i=0; i<8; i++) if(preambleBuffer[i] !== PREAMBLE[i]) diff++;
             if (diff <= 2) {
-                isSynced = true; currentBitBuffer = '';
+                isSynced = true; 
+                currentBitBuffer = '';
                 log('recv', `🎯 成功匹配前导码！开始接收数据帧...`);
                 document.getElementById('recvStatus').innerText = "接收数据帧中...";
             }
         } else {
             currentBitBuffer += bit;
             
-            // 核心修复：检查结束符，并且必须满足最小长度限制
-            // 假设最少发送 1 个字节，1(长度)+1(数据)+1(CRC) = 3 bytes = 24 bits
+            // 检查结束符
             const MIN_FRAME_BITS = 24; 
-            
             if (currentBitBuffer.length >= MIN_FRAME_BITS && 
                 currentBitBuffer.slice(-8) === TERMINATOR) {
                 
@@ -237,7 +257,7 @@
                 
                 isSynced = false; 
                 currentBitBuffer = '';
-                document.getElementById('recvStatus').innerText = "监听中，等待前导码...";
+                document.getElementById('recvStatus').innerText = "监听中...";
             }
         }
     }
