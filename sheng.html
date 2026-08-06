@@ -3,20 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>声波数据传输 (稳定版)</title>
+    <title>声波数据传输 (GitHub兼容版)</title>
     
     <!-- 引入 React -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
     <!-- 引入 Babel -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
     <!-- 引入 Ant Design CSS -->
     <link rel="stylesheet" href="https://unpkg.com/antd@5.12.0/dist/reset.css">
     
     <!-- 引入 Day.js (Antd 依赖) -->
-    <script src="https://unpkg.com/dayjs@1/dayjs.min.js"></script>
+    <script crossorigin src="https://unpkg.com/dayjs@1/dayjs.min.js"></script>
     
     <!-- 引入 Ant Design JS -->
     <script crossorigin src="https://unpkg.com/antd@5.12.0/dist/antd.min.js"></script>
@@ -46,39 +46,78 @@
             font-size: 12px;
             color: #888;
             margin-top: 5px;
-        }
-        .error-boundary {
-            padding: 20px;
-            background: #fff2f0;
-            border: 1px solid #ffccc7;
+            background: #f9f9f9;
+            padding: 8px;
             border-radius: 4px;
-            margin-bottom: 20px;
+            border: 1px solid #eee;
+        }
+        .status-badge {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .status-ok { background-color: #52c41a; }
+        .status-error { background-color: #ff4d4f; }
+        .status-waiting { background-color: #faad14; }
+        /* 错误弹窗样式 */
+        .error-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            padding: 20px;
+            text-align: center;
+        }
+        .error-box {
+            background: #333;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 500px;
+            border: 1px solid #ff4d4f;
         }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
-    <script type="text/babel">
-        // 全局错误捕获，防止 Script error 导致页面完全无响应
+    <!-- 全局错误捕获脚本 -->
+    <script>
         window.onerror = function(message, source, lineno, colno, error) {
-            console.error('Global Error:', message, source, lineno, colno, error);
-            const root = document.getElementById('root');
-            if (root) {
-                root.innerHTML = `
-                    <div class="error-boundary">
-                        <h3>发生错误</h3>
-                        <p><strong>信息:</strong> ${message}</p>
-                        <p><strong>建议:</strong> 请尝试使用 Chrome/Edge 浏览器，并通过本地服务器 (Live Server) 运行此文件，而不是直接双击打开。</p>
-                    </div>
-                `;
-            }
-            return true;
+            console.error("Global Error Caught:", message, source, lineno, colno, error);
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-overlay';
+            errorDiv.innerHTML = `
+                <div class="error-box">
+                    <h2 style="color:#ff4d4f">应用运行错误</h2>
+                    <p><strong>错误信息:</strong> ${message}</p>
+                    <p><strong>位置:</strong> ${source} : ${lineno}:${colno}</p>
+                    <p>请截图反馈给开发者。</p>
+                    <button onclick="this.parentElement.parentElement.remove()" style="padding:5px 10px; cursor:pointer;">关闭</button>
+                </div>
+            `;
+            document.body.appendChild(errorDiv);
+            return true; // 阻止默认错误处理
         };
 
+        window.addEventListener('unhandledrejection', function(event) {
+            console.error("Unhandled Promise Rejection:", event.reason);
+            alert("程序发生未处理的异步错误: " + event.reason);
+        });
+    </script>
+
+    <script type="text/babel">
         const { useState, useEffect, useRef, useCallback } = React;
         const { 
-            Card, Tabs, Input, Button, Space, Typography, Progress, Alert, Tag, Row, Col, Statistic, Divider, Slider 
+            Card, Tabs, Input, Button, Space, Typography, Progress, Alert, Tag, Row, Col, Statistic, Divider, Slider, message 
         } = antd;
 
         const { Title, Text } = Typography;
@@ -94,7 +133,6 @@
         const IconStop = () => (<svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M720 160H176c-8.8 0-16 7.2-16 16v544c0 8.8 7.2 16 16 16h544c8.8 0 16-7.2 16-16V176c0-8.8-7.2-16-16-16z"></path></svg>);
 
         // --- 核心参数配置 ---
-        const SAMPLE_RATE = 48000;
         const FREQ_0 = 18000; 
         const FREQ_1 = 19000; 
         const BIT_DURATION_MS = 80; 
@@ -114,6 +152,7 @@
             const [signalStrength, setSignalStrength] = useState(0);
             const [detectedBit, setDetectedBit] = useState(null);
             const [receiverError, setReceiverError] = useState('');
+            const [systemStatus, setSystemStatus] = useState({ secure: false, micSupported: false });
             
             // Debug State
             const [debugEnergy0, setDebugEnergy0] = useState(-100);
@@ -134,17 +173,27 @@
             const bitCountRef = useRef(0);
             const syncStateRef = useRef('IDLE');
 
+            // 检查环境安全性
+            useEffect(() => {
+                try {
+                    const isSecure = window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost';
+                    const hasMic = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+                    setSystemStatus({ secure: isSecure, micSupported: hasMic });
+                } catch (e) {
+                    console.error("Environment check failed", e);
+                }
+            }, []);
+
             const initAudioContext = async () => {
                 if (!audioContextRef.current) {
                     try {
-                        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
-                            sampleRate: SAMPLE_RATE,
-                        });
+                        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
                     } catch (e) {
                         console.error("AudioContext init failed", e);
                         throw new Error("浏览器不支持 Web Audio API");
                     }
                 }
+                
                 if (audioContextRef.current.state === 'suspended') {
                     await audioContextRef.current.resume();
                 }
@@ -167,8 +216,9 @@
                         osc.stop();
                         osc.disconnect();
                     }, 500);
+                    message.success("测试音已播放");
                 } catch (e) {
-                    alert("音频初始化失败: " + e.message);
+                    message.error("音频初始化失败: " + e.message);
                 }
             };
 
@@ -263,9 +313,8 @@
                 try {
                     const ctx = await initAudioContext();
                     
-                    // 检查浏览器是否支持 getUserMedia
                     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                        throw new Error("当前浏览器不支持麦克风访问，请使用 Chrome/Edge/Firefox 最新版本。");
+                        throw new Error("当前浏览器不支持麦克风访问。");
                     }
 
                     const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -273,31 +322,35 @@
                             echoCancellation: false,
                             noiseSuppression: false,
                             autoGainControl: false,
-                            latency: 0
+                            latency: 0,
+                            sampleRate: 48000 
                         } 
                     });
                     streamRef.current = stream;
                     
                     const source = ctx.createMediaStreamSource(stream);
                     analyserRef.current = ctx.createAnalyser();
-                    analyserRef.current.fftSize = 16384; 
-                    analyserRef.current.smoothingTimeConstant = 0.2; 
+                    analyserRef.current.fftSize = 32768; 
+                    analyserRef.current.smoothingTimeConstant = 0.1; 
                     
                     source.connect(analyserRef.current);
                     setIsReceiving(true);
+                    message.success("麦克风已启动，正在监听...");
                     
                     analyzeFrequency();
                 } catch (error) {
                     console.error('Reception error:', error);
                     let errorMsg = '麦克风访问失败。';
                     if (error.name === 'NotAllowedError') {
-                        errorMsg = '您拒绝了麦克风权限。请在浏览器地址栏左侧点击锁图标，允许麦克风访问。';
+                        errorMsg = '您拒绝了麦克风权限。请在浏览器地址栏左侧点击锁图标，重置权限并允许。';
                     } else if (error.name === 'NotFoundError') {
-                        errorMsg = '未检测到麦克风设备。';
-                    } else if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-                        errorMsg = '安全限制：麦克风访问通常需要 HTTPS 或 localhost 环境。请尝试使用 Live Server 插件运行此文件。';
+                        errorMsg = '未检测到麦克风设备。请检查硬件连接。';
+                    } else if (error.name === 'NotReadableError') {
+                        errorMsg = '麦克风被其他应用占用。请关闭其他录音软件。';
+                    } else if (!systemStatus.secure) {
+                        errorMsg = '安全限制：麦克风访问需要 HTTPS 环境。当前协议: ' + location.protocol;
                     } else {
-                        errorMsg += error.message;
+                        errorMsg += ` (${error.name}: ${error.message})`;
                     }
                     setReceiverError(errorMsg);
                     setIsReceiving(false);
@@ -311,6 +364,11 @@
                 }
                 if (streamRef.current) {
                     streamRef.current.getTracks().forEach(track => track.stop());
+                    streamRef.current = null;
+                }
+                if (analyserRef.current) {
+                    analyserRef.current.disconnect();
+                    analyserRef.current = null;
                 }
             };
 
@@ -320,11 +378,12 @@
                 const dataArray = new Float32Array(analyserRef.current.frequencyBinCount);
                 analyserRef.current.getFloatFrequencyData(dataArray);
 
-                const binWidth = SAMPLE_RATE / analyserRef.current.fftSize;
+                const actualSampleRate = audioContextRef.current.sampleRate;
+                const binWidth = actualSampleRate / analyserRef.current.fftSize;
                 
                 const getEnergy = (freq) => {
                     const centerBin = Math.floor(freq / binWidth);
-                    const range = 12; 
+                    const range = Math.max(5, Math.floor(actualSampleRate / 2000)); 
                     let sum = 0;
                     let count = 0;
                     for (let i = centerBin - range; i <= centerBin + range; i++) {
@@ -345,12 +404,12 @@
                 const maxEnergy = Math.max(energy18k, energy19k);
                 const minEnergy = Math.min(energy18k, energy19k);
                 
-                const threshold = -60; 
-                const diffThreshold = 8; 
+                const threshold = -65; 
+                const diffThreshold = 6; 
 
                 const isSignalPresent = maxEnergy > threshold && (maxEnergy - minEnergy) > diffThreshold;
                 
-                const strength = Math.max(0, Math.min(100, (maxEnergy + 70) * 2)); 
+                const strength = Math.max(0, Math.min(100, (maxEnergy + 80) * 2)); 
                 setSignalStrength(strength);
 
                 const now = Date.now();
@@ -359,7 +418,7 @@
                     const detected = energy19k > energy18k ? 1 : 0;
                     setDetectedBit(detected);
                     
-                    if (now - lastBitTimeRef.current > BIT_DURATION_MS * 0.6) {
+                    if (now - lastBitTimeRef.current > BIT_DURATION_MS * 0.5) {
                         lastBitTimeRef.current = now;
                         
                         if (syncStateRef.current === 'IDLE' || syncStateRef.current === 'SYNCING') {
@@ -406,12 +465,20 @@
             return (
                 <div className="container">
                     <Title level={3} style={{ textAlign: 'center', marginBottom: 10 }}>
-                        <IconSound /> 声波文本传输 (稳定版)
+                        <IconSound /> 声波文本传输 (GitHub兼容版)
                     </Title>
-                    <Text type="secondary" style={{ display: 'block', textAlign: 'center', marginBottom: 20 }}>
-                        请确保电脑音量调大，手机靠近扬声器
-                    </Text>
                     
+                    <Row justify="center" gutter={16} style={{ marginBottom: 15 }}>
+                        <Col>
+                            <span className={`status-badge ${systemStatus.secure ? 'status-ok' : 'status-error'}`}></span>
+                            <Text type="secondary">HTTPS: {systemStatus.secure ? 'OK' : 'Fail'}</Text>
+                        </Col>
+                        <Col>
+                            <span className={`status-badge ${systemStatus.micSupported ? 'status-ok' : 'status-error'}`}></span>
+                            <Text type="secondary">Mic API: {systemStatus.micSupported ? 'OK' : 'Fail'}</Text>
+                        </Col>
+                    </Row>
+
                     <Card bordered={false} className="card-shadow">
                         <Tabs activeKey={activeTab} onChange={setActiveTab} centered>
                             <TabPane tab={<span><IconDesktop /> 发送端</span>} key="sender">
@@ -461,7 +528,7 @@
 
                             <TabPane tab={<span><IconMobile /> 接收端</span>} key="receiver">
                                 <Space direction="vertical" style={{ width: '100%' }}>
-                                    {receiverError && <Alert message={receiverError} type="error" showIcon />}
+                                    {receiverError && <Alert message={receiverError} type="error" showIcon closable />}
                                     
                                     <Button 
                                         type="primary" 
@@ -469,10 +536,20 @@
                                         icon={isReceiving ? <IconStop /> : <IconRecord />}
                                         onClick={isReceiving ? stopReception : startReception}
                                         danger={isReceiving}
+                                        disabled={!systemStatus.secure || !systemStatus.micSupported}
                                     >
                                         {isReceiving ? '停止监听' : '开始监听'}
                                     </Button>
                                     
+                                    {!systemStatus.secure && (
+                                        <Alert 
+                                            message="非安全环境" 
+                                            description="麦克风访问需要 HTTPS 或 localhost。如果您在 GitHub Pages 上，请确保网址以 https:// 开头。" 
+                                            type="warning" 
+                                            showIcon 
+                                        />
+                                    )}
+
                                     <Divider orientation="left">信号监测 (调试用)</Divider>
                                     <Row gutter={16}>
                                         <Col span={12}>
@@ -485,9 +562,11 @@
                                     </Row>
                                     
                                     <div className="debug-info">
+                                        <div>采样率: {audioContextRef.current ? audioContextRef.current.sampleRate : '未初始化'} Hz</div>
                                         <div>18kHz 能量: {debugEnergy0} dB</div>
                                         <div>19kHz 能量: {debugEnergy1} dB</div>
-                                        <div>阈值: > -60 dB 且差值 > 8 dB</div>
+                                        {/* 修复点：使用 HTML 实体 &gt; 替代 > 以避免 JSX 解析歧义 */}
+                                        <div>{"阈值: > -65 dB 且差值 > 6 dB"}</div>
                                     </div>
 
                                     <Divider orientation="left">接收结果</Divider>
@@ -502,19 +581,20 @@
                             </TabPane>
                         </Tabs>
                     </Card>
-                    
-                    <Alert 
-                        message="提示：如果点击按钮无反应或报错，请检查浏览器控制台 (F12)。建议使用 VS Code 的 Live Server 插件运行此文件。" 
-                        type="info" 
-                        showIcon 
-                        style={{ marginTop: 20 }} 
-                    />
                 </div>
             );
         };
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<AcousticTransferApp />);
+        // 确保 DOM 和库都加载完成后再渲染
+        window.onload = function() {
+            try {
+                const root = ReactDOM.createRoot(document.getElementById('root'));
+                root.render(<AcousticTransferApp />);
+            } catch (e) {
+                console.error("Render failed", e);
+                document.body.innerHTML = `<div style="color:red; padding:20px;">渲染失败: ${e.message}</div>`;
+            }
+        };
     </script>
 </body>
 </html>
