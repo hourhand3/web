@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acoustic Transfer - State Machine Demo</title>
+    <title>Acoustic Transfer - Wideband Capture Demo</title>
     <style>
         body { font-family: sans-serif; padding: 20px; background: #111; color: #eee; max-width: 800px; margin: 0 auto; }
         .card { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #333; }
@@ -24,7 +24,7 @@
         <button class="btn-recv" id="btnStartListen">开始监听</button>
         <button class="btn-stop" id="btnStopListen">停止监听</button>
         <div class="status">状态: <span id="recvStatus">等待操作</span></div>
-        <div class="status">实时能量: <span id="energyVal">-100 dB</span></div>
+        <div class="status">实时能量: <span id="energyVal">-100 dB</span> | 底噪: <span id="noiseVal">-</span></div>
         <div style="margin-top:10px; color:#aaa; font-size:12px;">👇 接收到的明文消息</div>
         <div class="result-box" id="receivedText">等待接收...</div>
         <div class="log-box" id="recvLog">等待初始化...</div>
@@ -42,9 +42,11 @@
     // ================= 核心配置 =================
     const FREQ_0 = 14000; 
     const FREQ_1 = 15000; 
-    const ENERGY_THRESHOLD = -65; 
+    const BIT_DURATION_MS = 60; 
+    const GUARD_INTERVAL_MS = 10; // 比特间的静音保护间隔
     const PREAMBLE = '10101010'; 
     const TERMINATOR = '10101011'; 
+    const SIGNAL_MARGIN_DB = 15; // 信号必须比底噪高出 15dB 才视为有效
 
     // ================= 调试日志工具 =================
     const recvLogEl = document.getElementById('recvLog');
@@ -104,7 +106,7 @@
         return dataBytes.map(b => String.fromCharCode(b)).join('');
     }
 
-    // ================= 发送端逻辑 =================
+    // ================= 发送端逻辑 (带保护间隔) =================
     document.getElementById('btnSend').onclick = async () => {
         const text = document.getElementById('sendText').value;
         if (!text) return;
@@ -130,8 +132,13 @@
             osc.connect(gain);
             gain.connect(ctx.destination);
             osc.start();
-            await new Promise(resolve => setTimeout(resolve, 60));
+            await new Promise(resolve => setTimeout(resolve, BIT_DURATION_MS));
             osc.stop();
+            
+            // 核心：每个比特之间插入静音保护间隔
+            if (i < fullStream.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, GUARD_INTERVAL_MS));
+            }
         }
         
         await new Promise(resolve => setTimeout(resolve, 200));
@@ -140,15 +147,10 @@
         log('send', "✅ 文本发送完毕");
     };
 
-    // ================= 接收端逻辑 (纯状态机) =================
+    // ================= 接收端逻辑 (宽频带捕获 + 动态底噪) =================
     let recvAudioCtx = null, recvAnalyser = null, isListening = false;
-    
-    // 状态机变量
-    let isSignalActive = false;      // 当前是否处于高能量状态
-    let currentBitBuffer = '';       // 数据帧缓冲区
-    let preambleBuffer = '';         // 前导码缓冲区
-    let isSynced = false;            // 是否已同步
-    let activeStartTime = 0;         // 高能量状态开始的时间（仅用于超时保护）
+    let isSignalActive = false, currentBitBuffer = '', preambleBuffer = '', isSynced = false, activeStartTime = 0;
+    let noiseFloor = -100; // 动态底噪
 
     document.getElementById('btnStartListen').onclick = async () => {
         if (isListening) return;
@@ -160,15 +162,11 @@
             const source = recvAudioCtx.createMediaStreamSource(stream);
             recvAnalyser = recvAudioCtx.createAnalyser();
             recvAnalyser.fftSize = 4096;
-            recvAnalyser.smoothingTimeConstant = 0.6; 
+            recvAnalyser.smoothingTimeConstant = 0.8; // 提高平滑度，减少毛刺
             source.connect(recvAnalyser);
             
             isListening = true;
-            isSignalActive = false;
-            currentBitBuffer = ''; 
-            preambleBuffer = ''; 
-            isSynced = false;
-            
+            isSignalActive = false; currentBitBuffer = ''; preambleBuffer = ''; isSynced = false;
             document.getElementById('receivedText').innerText = '';
             document.getElementById('recvStatus').innerText = "监听中...";
             log('recv', "✅ 开始监听...");
@@ -190,37 +188,42 @@
         
         const bin14k = Math.round(FREQ_0 * recvAnalyser.fftSize / recvAudioCtx.sampleRate);
         const bin15k = Math.round(FREQ_1 * recvAnalyser.fftSize / recvAudioCtx.sampleRate);
-        const getAvgEnergy = (centerBin) => { let sum = 0; for(let i = -3; i <= 3; i++) sum += dataArray[centerBin + i]; return sum / 7; };
         
-        const energy14k = getAvgEnergy(bin14k), energy15k = getAvgEnergy(bin15k);
+        // 核心修复：扩大捕获带宽，取前后 15 个 bin 的总和
+        const getBandEnergy = (centerBin) => {
+            let sum = 0;
+            for(let i = -15; i <= 15; i++) sum += dataArray[centerBin + i];
+            return sum / 31;
+        };
+        
+        const energy14k = getBandEnergy(bin14k);
+        const energy15k = getBandEnergy(bin15k);
         const maxEnergy = Math.max(energy14k, energy15k);
+        
+        // 动态更新底噪（使用滑动平均）
+        if (maxEnergy < noiseFloor + 5) {
+            noiseFloor = noiseFloor * 0.95 + maxEnergy * 0.05;
+        }
+        
         document.getElementById('energyVal').innerText = maxEnergy.toFixed(2) + ' dB';
+        document.getElementById('noiseVal').innerText = noiseFloor.toFixed(2) + ' dB';
         
-        // 核心状态机逻辑
+        // 动态阈值判定
         const now = Date.now();
-        const isAboveThreshold = maxEnergy > ENERGY_THRESHOLD;
+        const isAboveThreshold = maxEnergy > (noiseFloor + SIGNAL_MARGIN_DB);
         
-        // 1. 上升沿：从静音变为有信号
+        // 状态机：上升沿触发
         if (isAboveThreshold && !isSignalActive) {
             isSignalActive = true;
             activeStartTime = now;
-            
-            // 判定当前比特是 0 还是 1
             let detectedBit = energy14k > energy15k ? '0' : '1';
             processBit(detectedBit);
-        }
-        // 2. 下降沿：从有信号变为静音
-        else if (!isAboveThreshold && isSignalActive) {
+        } else if (!isAboveThreshold && isSignalActive) {
             isSignalActive = false;
-            // 下降沿不需要记录比特，只需要重置状态
-        }
-        // 3. 超时保护：如果一直处于高能量状态超过 150ms，可能是环境噪音，强制复位
-        else if (isSignalActive && (now - activeStartTime > 150)) {
+        } else if (isSignalActive && (now - activeStartTime > 150)) {
             isSignalActive = false;
             log('recv', "⚠️ 信号超时，强制复位状态机");
-            isSynced = false;
-            currentBitBuffer = '';
-            preambleBuffer = '';
+            isSynced = false; currentBitBuffer = ''; preambleBuffer = '';
         }
         
         requestAnimationFrame(analyzeLoop);
@@ -233,30 +236,22 @@
             let diff = 0;
             for(let i=0; i<8; i++) if(preambleBuffer[i] !== PREAMBLE[i]) diff++;
             if (diff <= 2) {
-                isSynced = true; 
-                currentBitBuffer = '';
+                isSynced = true; currentBitBuffer = '';
                 log('recv', `🎯 成功匹配前导码！开始接收数据帧...`);
                 document.getElementById('recvStatus').innerText = "接收数据帧中...";
             }
         } else {
             currentBitBuffer += bit;
-            
-            // 检查结束符
             const MIN_FRAME_BITS = 24; 
-            if (currentBitBuffer.length >= MIN_FRAME_BITS && 
-                currentBitBuffer.slice(-8) === TERMINATOR) {
-                
+            if (currentBitBuffer.length >= MIN_FRAME_BITS && currentBitBuffer.slice(-8) === TERMINATOR) {
                 let frameBits = currentBitBuffer.slice(0, -8); 
                 log('recv', `📦 收到完整数据帧 (${frameBits.length} bits)，正在解析...`);
-                
                 let decoded = parseFrame(frameBits);
                 if (decoded) {
                     document.getElementById('receivedText').innerText = decoded;
                     log('recv', `🎉 成功解析明文: "${decoded}"`);
                 }
-                
-                isSynced = false; 
-                currentBitBuffer = '';
+                isSynced = false; currentBitBuffer = '';
                 document.getElementById('recvStatus').innerText = "监听中...";
             }
         }
