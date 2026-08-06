@@ -3,54 +3,168 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>声波数据传输 (终极鲁棒版)</title>
+    <title>声波数据传输 (修复版)</title>
     
+    <!-- 核心依赖 -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/antd@5.12.0/dist/reset.css">
+    
+    <!-- Antd 5.x UMD 版本 -->
     <script crossorigin src="https://unpkg.com/antd@5.12.0/dist/antd.min.js"></script>
-
+    
     <style>
-        body { background-color: #f0f2f5; padding: 20px; font-family: sans-serif; }
+        body { 
+            background-color: #f0f2f5; 
+            padding: 20px; 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; 
+        }
         .container { max-width: 600px; margin: 0 auto; }
-        .card-shadow { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .debug-panel { background: #222; color: #0f0; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; margin-top: 10px; height: 150px; overflow-y: auto; }
-        canvas { width: 100%; height: 80px; background: #333; margin-top: 5px; border-radius: 4px; }
-        .status-indicator { display: flex; align-items: center; justify-content: center; height: 40px; background: #eee; border-radius: 4px; margin-bottom: 10px; font-weight: bold; }
-        .status-active { background: #d9f7be; color: #389e0d; }
-        .status-idle { background: #fff1f0; color: #cf1322; }
+        .card { 
+            background: #fff; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
+            padding: 24px; 
+            margin-bottom: 20px;
+        }
+        .header { text-align: center; margin-bottom: 24px; }
+        .debug-panel { 
+            background: #1f1f1f; 
+            color: #00ff00; 
+            padding: 10px; 
+            border-radius: 4px; 
+            font-family: 'Courier New', Courier, monospace; 
+            font-size: 12px; 
+            height: 150px; 
+            overflow-y: auto; 
+            margin-top: 10px;
+            white-space: pre-wrap;
+        }
+        canvas { 
+            width: 100%; 
+            height: 100px; 
+            background: #000; 
+            border-radius: 4px; 
+            margin-top: 10px; 
+            display: block;
+        }
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            padding: 10px;
+            background: #fafafa;
+            border-radius: 4px;
+        }
+        .status-item { text-align: center; }
+        .status-label { font-size: 12px; color: #888; }
+        .status-value { font-size: 18px; font-weight: bold; color: #333; }
+        .progress-bar {
+            height: 6px;
+            background: #eee;
+            border-radius: 3px;
+            margin-top: 5px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #1890ff;
+            transition: width 0.3s;
+        }
+        /* 简单的 Tab 样式替代 */
+        .tabs { display: flex; border-bottom: 1px solid #eee; margin-bottom: 20px; }
+        .tab { 
+            padding: 10px 20px; 
+            cursor: pointer; 
+            border-bottom: 2px solid transparent; 
+            font-weight: 500;
+        }
+        .tab.active { 
+            border-bottom-color: #1890ff; 
+            color: #1890ff; 
+        }
+        .btn {
+            display: inline-block;
+            font-weight: 400;
+            text-align: center;
+            cursor: pointer;
+            background-image: none;
+            border: 1px solid transparent;
+            white-space: nowrap;
+            padding: 6px 15px;
+            font-size: 14px;
+            border-radius: 6px;
+            transition: all 0.3s;
+            user-select: none;
+        }
+        .btn-primary {
+            color: #fff;
+            background-color: #1890ff;
+            border-color: #1890ff;
+            box-shadow: 0 2px 0 rgba(0,0,0,0.045);
+        }
+        .btn-primary:hover { background-color: #40a9ff; border-color: #40a9ff; }
+        .btn-danger {
+            color: #fff;
+            background-color: #ff4d4f;
+            border-color: #ff4d4f;
+        }
+        .btn-danger:hover { background-color: #ff7875; border-color: #ff7875; }
+        .btn-block { display: block; width: 100%; }
+        .input-area {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.3s;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+        }
+        .input-area:focus { border-color: #40a9ff; outline: 0; box-shadow: 0 0 0 2px rgba(24,144,255,0.2); }
+        textarea.input-area { resize: vertical; min-height: 80px; }
+        
+        .tag {
+            display: inline-block;
+            padding: 2px 8px;
+            font-size: 12px;
+            border-radius: 4px;
+            margin-right: 5px;
+        }
+        .tag-red { background: #fff1f0; border: 1px solid #ffa39e; color: #cf1322; }
+        .tag-green { background: #f6ffed; border: 1px solid #b7eb8f; color: #389e0d; }
+        
+        .alert-error {
+            background: #fff2f0;
+            border: 1px solid #ffccc7;
+            padding: 10px 15px;
+            border-radius: 4px;
+            color: #cf1322;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef, useCallback } = React;
-        const { Card, Tabs, Input, Button, Space, Typography, Progress, Alert, Tag, Row, Col, Statistic, Divider, Switch, message } = antd;
-        const { Title, Text } = Typography;
-        const { TabPane } = Tabs;
+        const { useState, useEffect, useRef } = React;
 
         // --- 核心参数配置 ---
-        // 使用更低的频率以确保兼容性，同时拉开间距
         const FREQ_0_START = 12000; 
-        const FREQ_0_END = 13000;   // Bit 0: Chirp from 12k to 13k
+        const FREQ_0_END = 13000;   
         const FREQ_1_START = 14000; 
-        const FREQ_1_END = 15000;   // Bit 1: Chirp from 14k to 15k
+        const FREQ_1_END = 15000;   
         
-        const BIT_DURATION_MS = 150; // 增加比特持续时间，提高信噪比
-        const SAMPLE_RATE = 48000;   // 目标采样率
+        const BIT_DURATION_MS = 150; 
+        const SAMPLE_RATE = 48000;   
 
-        const IconSound = () => (<svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor"><path d="M704 448H584V328c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v120H392c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h120v120c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8V520h120c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM400 256c-132.5 0-240 107.5-240 240s107.5 240 240 240 240-107.5 240-240-107.5-240-240-240zm0 416c-97.2 0-176-78.8-176-176s78.8-176 176-176 176 78.8 176 176-78.8 176-176 176z"></path></svg>);
-        const IconPlay = () => (<svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor"><path d="M724 218.3V141c0-6.7-7.7-10.4-12.9-6.3L260.3 486.8a31.86 31.86 0 000 50.3l450.8 352.1c5.3 4.1 12.9.4 12.9-6.3v-77.3c0-4.9-2.3-9.6-6.1-12.6l-360-281 360-281.1c3.8-3 6.1-7.7 6.1-12.6z"></path></svg>);
-        const IconRecord = () => (<svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor"><path d="M448 744c163.5 0 296-132.5 296-296S611.5 152 448 152 152 284.5 152 448s132.5 296 296 296z"></path></svg>);
-        const IconStop = () => (<svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor"><path d="M720 160H176c-8.8 0-16 7.2-16 16v544c0 8.8 7.2 16 16 16h544c8.8 0 16-7.2 16-16V176c0-8.8-7.2-16-16-16z"></path></svg>);
-
-        const AcousticTransferApp = () => {
+        const App = () => {
             const [activeTab, setActiveTab] = useState('sender');
             
             // Sender State
-            const [textToSend, setTextToSend] = useState('Hi');
+            const [textToSend, setTextToSend] = useState('Hello');
             const [isSending, setIsSending] = useState(false);
             const [sendProgress, setSendProgress] = useState(0);
             
@@ -67,9 +181,8 @@
             const streamRef = useRef(null);
             const analyserRef = useRef(null);
             const animationFrameRef = useRef(null);
-            const sendTimeoutRef = useRef(null);
             
-            // Decoder State Refs (使用 Ref 避免闭包陷阱)
+            // Decoder State Refs
             const decoderState = useRef({
                 energy0History: [],
                 energy1History: [],
@@ -77,7 +190,7 @@
                 lastBitTime: 0,
                 currentByte: 0,
                 bitCount: 0,
-                syncState: 'IDLE', // IDLE, SYNCING, RECEIVING
+                syncState: 'IDLE',
                 preambleCount: 0
             });
 
@@ -85,7 +198,6 @@
                 setDebugLogs(prev => [...prev.slice(-20), `${new Date().toLocaleTimeString()} ${msg}`]);
             };
 
-            // 初始化 AudioContext
             const initAudioContext = async () => {
                 if (!audioContextRef.current) {
                     audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
@@ -96,17 +208,15 @@
                 return audioContextRef.current;
             };
 
-            // --- Sender Logic: Chirp Generation ---
+            // --- Sender Logic ---
             const playChirp = (ctx, destination, startFreq, endFreq, durationSec, startTime) => {
                 const oscillator = ctx.createOscillator();
                 const gainNode = ctx.createGain();
                 
                 oscillator.type = 'sine';
-                // 线性调频模拟
                 oscillator.frequency.setValueAtTime(startFreq, startTime);
                 oscillator.frequency.linearRampToValueAtTime(endFreq, startTime + durationSec);
                 
-                // 包络：淡入淡出，避免爆音
                 gainNode.gain.setValueAtTime(0, startTime);
                 gainNode.gain.linearRampToValueAtTime(1.0, startTime + 0.01);
                 gainNode.gain.setValueAtTime(1.0, startTime + durationSec - 0.01);
@@ -117,8 +227,6 @@
                 
                 oscillator.start(startTime);
                 oscillator.stop(startTime + durationSec);
-                
-                return oscillator;
             };
 
             const startTransmission = async () => {
@@ -129,7 +237,6 @@
                     setSendProgress(0);
                     addLog("开始发送...");
 
-                    // 准备数据
                     const bits = [];
                     for (let i = 0; i < textToSend.length; i++) {
                         const charCode = textToSend.charCodeAt(i);
@@ -138,11 +245,10 @@
                         }
                     }
                     
-                    // 前导码: 1010101010 (用于同步)
                     const preamble = [1, 0, 1, 0, 1, 0, 1, 0, 1, 0];
                     const payload = [...preamble, ...bits];
                     
-                    let currentTime = ctx.currentTime + 0.1; // 稍微延迟一点开始
+                    let currentTime = ctx.currentTime + 0.1;
                     const bitDurationSec = BIT_DURATION_MS / 1000;
                     const totalBits = payload.length;
 
@@ -154,13 +260,11 @@
                         }
                         currentTime += bitDurationSec;
                         
-                        // 更新进度条 (粗略估计)
                         setTimeout(() => {
                             setSendProgress(Math.floor(((index + 1) / totalBits) * 100));
                         }, (currentTime - ctx.currentTime) * 1000);
                     });
 
-                    // 清理状态
                     setTimeout(() => {
                         setIsSending(false);
                         setSendProgress(100);
@@ -197,7 +301,6 @@
                         throw new Error("浏览器不支持麦克风访问");
                     }
 
-                    // 关键：尝试关闭所有音频处理
                     const constraints = {
                         audio: {
                             echoCancellation: false,
@@ -213,13 +316,12 @@
                     
                     const source = ctx.createMediaStreamSource(stream);
                     analyserRef.current = ctx.createAnalyser();
-                    // 使用较大的 FFT 以获得更好的频率分辨率
                     analyserRef.current.fftSize = 16384; 
-                    analyserRef.current.smoothingTimeConstant = 0.8; // 平滑处理
+                    analyserRef.current.smoothingTimeConstant = 0.8; 
                     
                     source.connect(analyserRef.current);
                     setIsReceiving(true);
-                    addLog("监听中... 请靠近扬声器并播放测试音");
+                    addLog("监听中...");
                     
                     analyzeFrequencyLoop();
                 } catch (error) {
@@ -256,8 +358,6 @@
                 let count = 0;
                 for (let i = minBin; i <= maxBin; i++) {
                     if (i >= 0 && i < dataArray.length) {
-                        // 将 dB 值转换回线性幅度进行累加可能更准确，但这里直接用 dB 平均值简化
-                        // 注意: dataArray 是 Float32Array of dB values
                         sum += dataArray[i];
                         count++;
                     }
@@ -272,35 +372,27 @@
                 analyserRef.current.getFloatFrequencyData(dataArray);
                 const sampleRate = audioContextRef.current.sampleRate;
 
-                // 1. 获取各频段能量
                 const e0 = getBandEnergy(dataArray, sampleRate, FREQ_0_START, FREQ_0_END);
                 const e1 = getBandEnergy(dataArray, sampleRate, FREQ_1_START, FREQ_1_END);
-                // 噪声参考: 8kHz - 9kHz (通常安静)
                 const noise = getBandEnergy(dataArray, sampleRate, 8000, 9000);
 
-                // 2. 更新历史记录 (滑动窗口)
                 const state = decoderState.current;
                 state.energy0History.push(e0);
                 state.energy1History.push(e1);
                 state.noiseHistory.push(noise);
                 
-                // 保持最近 10 帧的数据 (约 100-200ms)
                 if (state.energy0History.length > 10) state.energy0History.shift();
                 if (state.energy1History.length > 10) state.energy1History.shift();
                 if (state.noiseHistory.length > 10) state.noiseHistory.shift();
 
-                // 3. 计算平均能量
                 const avgE0 = state.energy0History.reduce((a,b)=>a+b,0) / state.energy0History.length;
                 const avgE1 = state.energy1History.reduce((a,b)=>a+b,0) / state.energy1History.length;
                 const avgNoise = state.noiseHistory.reduce((a,b)=>a+b,0) / state.noiseHistory.length;
 
-                // 4. 信号强度显示
                 const maxSignal = Math.max(avgE0, avgE1);
                 const strength = Math.max(0, Math.min(100, (maxSignal + 60) * 2)); 
                 setSignalStrength(strength);
 
-                // 5. 解码逻辑
-                // 阈值：信号必须比噪声高 10dB，且绝对值大于 -45dB
                 const isSignalValid = (maxSignal > -45) && (maxSignal - avgNoise > 10);
                 
                 let detected = null;
@@ -311,19 +403,13 @@
                     setDetectedBit(null);
                 }
 
-                // 简单的状态机解码
                 const now = Date.now();
                 if (detected !== null) {
-                    // 防抖：确保每个比特只处理一次
                     if (now - state.lastBitTime > BIT_DURATION_MS * 0.7) {
                         state.lastBitTime = now;
                         
                         if (state.syncState === 'IDLE' || state.syncState === 'SYNCING') {
-                            // 寻找前导码 101010...
-                            // 简单策略：只要连续收到交替的 1 和 0，就认为在同步
-                            // 这里简化：如果收到 1，期待下一个是 0
                             if (state.preambleCount < 5) {
-                                // 非常粗糙的同步检测：只要信号稳定出现，就开始尝试组装
                                 state.syncState = 'SYNCING';
                                 state.preambleCount++;
                             } else {
@@ -342,9 +428,7 @@
                                 if (charCode >= 32 && charCode <= 126) {
                                     const char = String.fromCharCode(charCode);
                                     setReceivedData(prev => prev + char);
-                                    addLog(`Decoded: '${char}' (${charCode})`);
-                                } else {
-                                    addLog(`Invalid Char: ${charCode}`);
+                                    addLog(`Decoded: '${char}'`);
                                 }
                                 state.bitCount = 0;
                                 state.currentByte = 0;
@@ -352,16 +436,13 @@
                         }
                     }
                 } else {
-                    // 信号丢失超时重置
                     if (now - state.lastBitTime > BIT_DURATION_MS * 3) {
                         state.syncState = 'IDLE';
                         state.preambleCount = 0;
                     }
                 }
 
-                // 绘制频谱
                 drawVisualizer(dataArray, sampleRate);
-
                 animationFrameRef.current = requestAnimationFrame(analyzeFrequencyLoop);
             };
 
@@ -372,10 +453,9 @@
                 const width = canvas.width;
                 const height = canvas.height;
                 
-                ctx.fillStyle = '#333';
+                ctx.fillStyle = '#000';
                 ctx.fillRect(0, 0, width, height);
                 
-                // 绘制 10kHz - 16kHz
                 const minFreq = 10000;
                 const maxFreq = 16000;
                 const binWidth = sampleRate / dataArray.length;
@@ -397,7 +477,6 @@
                 }
                 ctx.stroke();
 
-                // 标记区域
                 const markRange = (start, end, color, label) => {
                     const startBin = Math.floor(start / binWidth);
                     const endBin = Math.floor(end / binWidth);
@@ -408,6 +487,8 @@
                     ctx.globalAlpha = 0.3;
                     ctx.fillRect(x1, 0, x2 - x1, height);
                     ctx.globalAlpha = 1.0;
+                    ctx.fillStyle = '#fff';
+                    ctx.font = '10px Arial';
                     ctx.fillText(label, x1 + 5, 15);
                 };
                 
@@ -424,87 +505,104 @@
 
             return (
                 <div className="container">
-                    <Title level={3} style={{ textAlign: 'center' }}>
-                        <IconSound /> 声波文本传输 (Chirp 鲁棒版)
-                    </Title>
+                    <div className="header">
+                        <h2 style={{margin: 0}}>声波文本传输 (修复版)</h2>
+                        <p style={{color: '#666', fontSize: '14px'}}>Chirp 信号 + 能量积分解码</p>
+                    </div>
                     
-                    <Card bordered={false} className="card-shadow">
-                        <Tabs activeKey={activeTab} onChange={setActiveTab} centered>
-                            <TabPane tab="发送端" key="sender">
-                                <Space direction="vertical" style={{ width: '100%' }}>
-                                    <Input.TextArea 
-                                        rows={3} 
-                                        value={textToSend} 
-                                        onChange={(e) => setTextToSend(e.target.value)} 
-                                        placeholder="输入英文短文本 (如: Hi)"
-                                        maxLength={20}
-                                    />
-                                    
-                                    <Button 
-                                        type="primary" 
-                                        block 
-                                        icon={isSending ? <IconStop /> : <IconPlay />}
-                                        onClick={isSending ? null : startTransmission} // 防止重复点击
-                                        disabled={isSending}
-                                    >
-                                        {isSending ? '正在发送...' : '开始发送'}
-                                    </Button>
-                                    {isSending && <Progress percent={sendProgress} showInfo={false} />}
-                                    
-                                    <Row justify="space-between">
-                                        <Tag color="red">Bit 0: 12k-13k Chirp</Tag>
-                                        <Tag color="green">Bit 1: 14k-15k Chirp</Tag>
-                                    </Row>
-                                    <Text type="secondary" style={{fontSize: 12}}>
-                                        提示: 请将音量调至最大。Chirp 信号听起来像鸟叫声。
-                                    </Text>
-                                </Space>
-                            </TabPane>
+                    <div className="card">
+                        <div className="tabs">
+                            <div className={`tab ${activeTab === 'sender' ? 'active' : ''}`} onClick={() => setActiveTab('sender')}>发送端</div>
+                            <div className={`tab ${activeTab === 'receiver' ? 'active' : ''}`} onClick={() => setActiveTab('receiver')}>接收端</div>
+                        </div>
 
-                            <TabPane tab="接收端" key="receiver">
-                                <Space direction="vertical" style={{ width: '100%' }}>
-                                    {receiverError && <Alert message={receiverError} type="error" showIcon closable />}
-                                    
-                                    <Button 
-                                        type="primary" 
-                                        block 
-                                        icon={isReceiving ? <IconStop /> : <IconRecord />}
-                                        onClick={isReceiving ? stopReception : startReception}
-                                        danger={isReceiving}
-                                    >
-                                        {isReceiving ? '停止监听' : '开始监听'}
-                                    </Button>
+                        {activeTab === 'sender' && (
+                            <div>
+                                <textarea 
+                                    className="input-area"
+                                    rows={3} 
+                                    value={textToSend} 
+                                    onChange={(e) => setTextToSend(e.target.value)} 
+                                    placeholder="输入英文短文本 (如: Hi)"
+                                    maxLength={20}
+                                />
+                                
+                                <button 
+                                    className={`btn btn-primary btn-block ${isSending ? 'btn-danger' : ''}`}
+                                    onClick={isSending ? null : startTransmission}
+                                    disabled={isSending}
+                                    style={{opacity: isSending ? 0.7 : 1}}
+                                >
+                                    {isSending ? '正在发送...' : '开始发送'}
+                                </button>
+                                
+                                {isSending && (
+                                    <div className="progress-bar">
+                                        <div className="progress-fill" style={{width: `${sendProgress}%`}}></div>
+                                    </div>
+                                )}
+                                
+                                <div style={{marginTop: 15}}>
+                                    <span className="tag tag-red">Bit 0: 12k-13k</span>
+                                    <span className="tag tag-green">Bit 1: 14k-15k</span>
+                                </div>
+                                <p style={{fontSize: 12, color: '#999', marginTop: 10}}>
+                                    提示: 请将音量调至最大。声音类似鸟叫。
+                                </p>
+                            </div>
+                        )}
 
-                                    <Divider orientation="left">实时频谱 (10k-16k)</Divider>
+                        {activeTab === 'receiver' && (
+                            <div>
+                                {receiverError && <div className="alert-error">{receiverError}</div>}
+                                
+                                <button 
+                                    className={`btn btn-block ${isReceiving ? 'btn-danger' : 'btn-primary'}`}
+                                    onClick={isReceiving ? stopReception : startReception}
+                                >
+                                    {isReceiving ? '停止监听' : '开始监听'}
+                                </button>
+
+                                <div style={{marginTop: 20}}>
+                                    <div style={{fontSize: 14, fontWeight: 'bold', marginBottom: 5}}>实时频谱 (10k-16k)</div>
                                     <canvas id="spectrumCanvas" width={500} height={100}></canvas>
-                                    
-                                    <Row gutter={16} style={{marginTop: 10}}>
-                                        <Col span={12}>
-                                            <Statistic title="信号强度" value={signalStrength.toFixed(0)} suffix="%" valueStyle={{ fontSize: 16 }} />
-                                            <Progress percent={signalStrength} showInfo={false} strokeColor="#52c41a" size="small" />
-                                        </Col>
-                                        <Col span={12}>
-                                            <Statistic title="当前比特" value={detectedBit !== null ? detectedBit : '-'} valueStyle={{ fontSize: 16 }} />
-                                        </Col>
-                                    </Row>
-                                    
-                                    <Divider orientation="left">调试日志</Divider>
+                                </div>
+                                
+                                <div className="status-row">
+                                    <div className="status-item">
+                                        <div className="status-label">信号强度</div>
+                                        <div className="status-value" style={{color: signalStrength > 50 ? '#52c41a' : '#333'}}>{signalStrength.toFixed(0)}%</div>
+                                        <div className="progress-bar" style={{width: 80, margin: '5px auto 0'}}>
+                                            <div className="progress-fill" style={{width: `${signalStrength}%`, background: signalStrength > 50 ? '#52c41a' : '#1890ff'}}></div>
+                                        </div>
+                                    </div>
+                                    <div className="status-item">
+                                        <div className="status-label">当前比特</div>
+                                        <div className="status-value">{detectedBit !== null ? detectedBit : '-'}</div>
+                                    </div>
+                                </div>
+                                
+                                <div style={{marginTop: 20}}>
+                                    <div style={{fontSize: 14, fontWeight: 'bold', marginBottom: 5}}>调试日志</div>
                                     <div className="debug-panel">
                                         {debugLogs.map((log, i) => <div key={i}>{log}</div>)}
                                     </div>
+                                </div>
 
-                                    <Divider orientation="left">接收结果</Divider>
-                                    <Input.TextArea 
+                                <div style={{marginTop: 20}}>
+                                    <div style={{fontSize: 14, fontWeight: 'bold', marginBottom: 5}}>接收结果</div>
+                                    <textarea 
+                                        className="input-area"
                                         rows={4} 
                                         value={receivedData} 
                                         readOnly 
                                         placeholder="等待接收..." 
                                         style={{ backgroundColor: '#fafafa', fontFamily: 'monospace' }}
                                     />
-                                </Space>
-                            </TabPane>
-                        </Tabs>
-                    </Card>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             );
         };
@@ -512,9 +610,9 @@
         window.onload = function() {
             try {
                 const root = ReactDOM.createRoot(document.getElementById('root'));
-                root.render(<AcousticTransferApp />);
+                root.render(<App />);
             } catch (e) {
-                document.body.innerHTML = `<div style="color:red; padding:20px;">Error: ${e.message}</div>`;
+                document.body.innerHTML = `<div style="color:red; padding:20px;">Error: ${e.message}<br/>${e.stack}</div>`;
             }
         };
     </script>
