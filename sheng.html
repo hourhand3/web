@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acoustic Transfer - FSK Sync Demo</title>
+    <title>Acoustic Transfer - Preamble Sync Demo</title>
     <style>
         body { font-family: sans-serif; padding: 20px; background: #111; color: #eee; max-width: 800px; margin: 0 auto; }
         .card { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #333; }
@@ -33,7 +33,7 @@
 
     <h2>📡 发送端 (Sender)</h2>
     <div class="card">
-        <input type="text" id="sendText" value="Hi" />
+        <input type="text" id="sendText" value="hello" />
         <button class="btn-send" id="btnSend">发送文本</button>
         <div class="status">状态: <span id="sendStatus">等待操作</span></div>
         <div class="log-box" id="sendLog">等待初始化...</div>
@@ -43,9 +43,9 @@
     // ================= 核心配置 =================
     const FREQ_0 = 14000; 
     const FREQ_1 = 15000; 
-    const BIT_DURATION_MS = 60; // 稍微放宽到 60ms，给浏览器更多处理时间
+    const BIT_DURATION_MS = 60; 
     const ENERGY_THRESHOLD = -65; 
-    const MIN_BIT_INTERVAL_MS = 45; // 两个比特之间的最小锁定时间，防止重复采样
+    const PREAMBLE = '10101010'; // 前导码
 
     // ================= 调试日志工具 =================
     const recvLogEl = document.getElementById('recvLog');
@@ -58,7 +58,7 @@
         console.log(`[${type}] ${msg}`);
     };
 
-    // ================= 发送端逻辑 (带前导码) =================
+    // ================= 发送端逻辑 =================
     document.getElementById('btnSend').onclick = async () => {
         const text = document.getElementById('sendText').value;
         if (!text) return;
@@ -67,34 +67,26 @@
         sendStatus.innerText = "正在发送...";
         log('send', `开始发送文本: "${text}"`);
         
-        // 1. 文本转二进制字符串
         let bitStream = '';
         for (let i = 0; i < text.length; i++) {
             bitStream += text.charCodeAt(i).toString(2).padStart(8, '0');
         }
         
-        // 2. 添加前导码 (Preamble): 10101010，帮助接收端锁定节奏
-        const preamble = '10101010'; 
-        const fullStream = preamble + bitStream;
+        const fullStream = PREAMBLE + bitStream;
         log('send', `完整二进制流 (${fullStream.length} bits)`);
         
-        // 3. 初始化音频上下文
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         if (ctx.state === 'suspended') await ctx.resume();
         
-        // 4. 逐个比特播放 FSK 信号
         for (let i = 0; i < fullStream.length; i++) {
             const bit = fullStream[i];
             const freq = bit === '0' ? FREQ_0 : FREQ_1;
-            
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
             osc.frequency.value = freq;
             gain.gain.value = 1.0; 
-            
             osc.connect(gain);
             gain.connect(ctx.destination);
-            
             osc.start();
             await new Promise(resolve => setTimeout(resolve, BIT_DURATION_MS));
             osc.stop();
@@ -105,7 +97,7 @@
         log('send', "✅ 文本发送完毕");
     };
 
-    // ================= 接收端逻辑 (重构状态机) =================
+    // ================= 接收端逻辑 (带前导码同步) =================
     let recvAudioCtx = null;
     let recvAnalyser = null;
     let isListening = false;
@@ -113,7 +105,9 @@
     // 解码状态变量
     let currentBitBuffer = '';
     let receivedMessage = '';
-    let lastBitTimestamp = 0; // 记录上一次成功解码比特的时间
+    let preambleBuffer = ''; // 专门用于匹配前导码的缓冲区
+    let lastBitTimestamp = 0; 
+    let isSynced = false; // 是否已经成功匹配前导码
 
     document.getElementById('btnStartListen').onclick = async () => {
         if (isListening) return;
@@ -134,10 +128,12 @@
             isListening = true;
             receivedMessage = '';
             currentBitBuffer = '';
+            preambleBuffer = '';
+            isSynced = false;
             lastBitTimestamp = 0;
             document.getElementById('receivedText').innerText = '';
-            document.getElementById('recvStatus').innerText = "监听中...";
-            log('recv', "✅ 开始监听，等待前导码...");
+            document.getElementById('recvStatus').innerText = "监听中，等待前导码...";
+            log('recv', "✅ 开始监听，等待前导码 10101010...");
             
             analyzeLoop();
         } catch (e) {
@@ -158,7 +154,6 @@
         const dataArray = new Float32Array(recvAnalyser.frequencyBinCount);
         recvAnalyser.getFloatFrequencyData(dataArray);
         
-        // 计算 14kHz 和 15kHz 频段的能量
         const bin14k = Math.round(FREQ_0 * recvAnalyser.fftSize / recvAudioCtx.sampleRate);
         const bin15k = Math.round(FREQ_1 * recvAnalyser.fftSize / recvAudioCtx.sampleRate);
         
@@ -174,15 +169,14 @@
         
         document.getElementById('energyVal').innerText = maxEnergy.toFixed(2) + ' dB';
         
-        // 核心解码逻辑：能量阈值 + 最小时间间隔锁定
         const now = Date.now();
         if (maxEnergy > ENERGY_THRESHOLD) {
             let detectedBit = energy14k > energy15k ? '0' : '1';
             document.getElementById('currentBit').innerText = detectedBit;
             
-            // 如果距离上次成功解码的时间超过了 MIN_BIT_INTERVAL_MS，才认为是一个新比特
-            if (now - lastBitTimestamp > MIN_BIT_INTERVAL_MS) {
-                lastBitTimestamp = now; // 重置计时器
+            // 核心：时间间隔锁定，防止同一个符号被重复记录
+            if (now - lastBitTimestamp > 45) { 
+                lastBitTimestamp = now; 
                 processBit(detectedBit);
             }
         } else {
@@ -192,23 +186,36 @@
         requestAnimationFrame(analyzeLoop);
     }
 
-    // 比特组装逻辑
+    // 核心状态机：前导码匹配 + 数据接收
     function processBit(bit) {
-        currentBitBuffer += bit;
-        log('recv', `收到比特: ${bit} (Buffer: ${currentBitBuffer})`);
-        
-        // 凑齐 8 个比特，转换为字符
-        if (currentBitBuffer.length === 8) {
-            const charCode = parseInt(currentBitBuffer, 2);
-            // 过滤掉不可见字符和控制字符
-            if (charCode >= 32 && charCode <= 126) {
-                receivedMessage += String.fromCharCode(charCode);
-                document.getElementById('receivedText').innerText = receivedMessage;
-                log('recv', `🎉 解析出字符: "${String.fromCharCode(charCode)}"`);
-            } else {
-                log('recv', `⚠️ 忽略非打印字符: ASCII ${charCode}`);
+        if (!isSynced) {
+            // 阶段 1：等待并匹配前导码
+            preambleBuffer += bit;
+            // 只保留最后 8 位
+            if (preambleBuffer.length > 8) preambleBuffer = preambleBuffer.slice(-8);
+            
+            if (preambleBuffer === PREAMBLE) {
+                isSynced = true;
+                currentBitBuffer = '';
+                log('recv', "🎯 成功匹配前导码！开始接收数据...");
+                document.getElementById('recvStatus').innerText = "接收数据中...";
             }
-            currentBitBuffer = ''; 
+        } else {
+            // 阶段 2：接收真实数据
+            currentBitBuffer += bit;
+            log('recv', `收到比特: ${bit} (Buffer: ${currentBitBuffer})`);
+            
+            if (currentBitBuffer.length === 8) {
+                const charCode = parseInt(currentBitBuffer, 2);
+                if (charCode >= 32 && charCode <= 126) {
+                    receivedMessage += String.fromCharCode(charCode);
+                    document.getElementById('receivedText').innerText = receivedMessage;
+                    log('recv', `🎉 解析出字符: "${String.fromCharCode(charCode)}"`);
+                } else {
+                    log('recv', `⚠️ 忽略非打印字符: ASCII ${charCode}`);
+                }
+                currentBitBuffer = ''; 
+            }
         }
     }
 </script>
