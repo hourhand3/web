@@ -3,18 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acoustic Transfer - FSK Demo</title>
+    <title>Acoustic Transfer - FSK Sync Demo</title>
     <style>
         body { font-family: sans-serif; padding: 20px; background: #111; color: #eee; max-width: 800px; margin: 0 auto; }
         .card { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #333; }
         button { padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; font-weight: bold; }
         .btn-send { background: #4caf50; color: #fff; }
         .btn-recv { background: #2196f3; color: #fff; }
-        .btn-test { background: #ff9800; color: #fff; }
+        .btn-stop { background: #f44336; color: #fff; }
         input { padding: 8px; width: 200px; border-radius: 4px; border: 1px solid #555; background: #333; color: #fff; }
         .status { font-size: 14px; margin-top: 10px; color: #aaa; }
         .result-box { background: #000; padding: 15px; border-radius: 5px; font-family: monospace; font-size: 18px; min-height: 40px; margin-top: 10px; border: 1px solid #4caf50; color: #4caf50; word-break: break-all;}
-        .log-box { background: #000; padding: 10px; border-radius: 5px; font-family: monospace; font-size: 12px; height: 100px; overflow-y: auto; margin-top: 10px; border: 1px solid #333; color: #888; }
+        .log-box { background: #000; padding: 10px; border-radius: 5px; font-family: monospace; font-size: 12px; height: 120px; overflow-y: auto; margin-top: 10px; border: 1px solid #333; color: #888; }
     </style>
 </head>
 <body>
@@ -22,13 +22,12 @@
     <h2>🎙️ 接收端 (Receiver)</h2>
     <div class="card">
         <button class="btn-recv" id="btnStartListen">开始监听</button>
-        <button class="btn-test" id="btnStopListen" style="background:#f44336;">停止监听</button>
+        <button class="btn-stop" id="btnStopListen">停止监听</button>
         <div class="status">状态: <span id="recvStatus">等待操作</span></div>
         <div class="status">实时能量: <span id="energyVal">-100 dB</span> | 当前比特: <span id="currentBit">-</span></div>
         
         <div style="margin-top:10px; color:#aaa; font-size:12px;">👇 接收到的明文消息</div>
         <div class="result-box" id="receivedText">等待接收...</div>
-        
         <div class="log-box" id="recvLog">等待初始化...</div>
     </div>
 
@@ -42,10 +41,11 @@
 
 <script>
     // ================= 核心配置 =================
-    const FREQ_0 = 14000; // 代表比特 0
-    const FREQ_1 = 15000; // 代表比特 1
-    const BIT_DURATION_MS = 50; // 每个比特持续 50ms
-    const ENERGY_THRESHOLD = -65; // 信号判定阈值 (dB)
+    const FREQ_0 = 14000; 
+    const FREQ_1 = 15000; 
+    const BIT_DURATION_MS = 60; // 稍微放宽到 60ms，给浏览器更多处理时间
+    const ENERGY_THRESHOLD = -65; 
+    const MIN_BIT_INTERVAL_MS = 45; // 两个比特之间的最小锁定时间，防止重复采样
 
     // ================= 调试日志工具 =================
     const recvLogEl = document.getElementById('recvLog');
@@ -58,7 +58,7 @@
         console.log(`[${type}] ${msg}`);
     };
 
-    // ================= 发送端逻辑 (FSK 编码) =================
+    // ================= 发送端逻辑 (带前导码) =================
     document.getElementById('btnSend').onclick = async () => {
         const text = document.getElementById('sendText').value;
         if (!text) return;
@@ -72,27 +72,30 @@
         for (let i = 0; i < text.length; i++) {
             bitStream += text.charCodeAt(i).toString(2).padStart(8, '0');
         }
-        log('send', `二进制流 (${bitStream.length} bits): ${bitStream}`);
         
-        // 2. 初始化音频上下文
+        // 2. 添加前导码 (Preamble): 10101010，帮助接收端锁定节奏
+        const preamble = '10101010'; 
+        const fullStream = preamble + bitStream;
+        log('send', `完整二进制流 (${fullStream.length} bits)`);
+        
+        // 3. 初始化音频上下文
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         if (ctx.state === 'suspended') await ctx.resume();
         
-        // 3. 逐个比特播放 FSK 信号
-        for (let i = 0; i < bitStream.length; i++) {
-            const bit = bitStream[i];
+        // 4. 逐个比特播放 FSK 信号
+        for (let i = 0; i < fullStream.length; i++) {
+            const bit = fullStream[i];
             const freq = bit === '0' ? FREQ_0 : FREQ_1;
             
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
             osc.frequency.value = freq;
-            gain.gain.value = 1.0; // 最大音量
+            gain.gain.value = 1.0; 
             
             osc.connect(gain);
             gain.connect(ctx.destination);
             
             osc.start();
-            // 等待一个比特的时间
             await new Promise(resolve => setTimeout(resolve, BIT_DURATION_MS));
             osc.stop();
         }
@@ -102,12 +105,15 @@
         log('send', "✅ 文本发送完毕");
     };
 
-    // ================= 接收端逻辑 (FSK 解码) =================
+    // ================= 接收端逻辑 (重构状态机) =================
     let recvAudioCtx = null;
     let recvAnalyser = null;
     let isListening = false;
+    
+    // 解码状态变量
     let currentBitBuffer = '';
     let receivedMessage = '';
+    let lastBitTimestamp = 0; // 记录上一次成功解码比特的时间
 
     document.getElementById('btnStartListen').onclick = async () => {
         if (isListening) return;
@@ -128,9 +134,10 @@
             isListening = true;
             receivedMessage = '';
             currentBitBuffer = '';
+            lastBitTimestamp = 0;
             document.getElementById('receivedText').innerText = '';
             document.getElementById('recvStatus').innerText = "监听中...";
-            log('recv', "✅ 开始监听，等待 FSK 信号...");
+            log('recv', "✅ 开始监听，等待前导码...");
             
             analyzeLoop();
         } catch (e) {
@@ -155,7 +162,6 @@
         const bin14k = Math.round(FREQ_0 * recvAnalyser.fftSize / recvAudioCtx.sampleRate);
         const bin15k = Math.round(FREQ_1 * recvAnalyser.fftSize / recvAudioCtx.sampleRate);
         
-        // 取中心频率前后 3 个 bin 的平均值，增加容错率
         const getAvgEnergy = (centerBin) => {
             let sum = 0;
             for(let i = -3; i <= 3; i++) sum += dataArray[centerBin + i];
@@ -166,22 +172,19 @@
         const energy15k = getAvgEnergy(bin15k);
         const maxEnergy = Math.max(energy14k, energy15k);
         
-        // 更新 UI
         document.getElementById('energyVal').innerText = maxEnergy.toFixed(2) + ' dB';
         
-        // 只有当能量超过阈值时，才进行比特判定
+        // 核心解码逻辑：能量阈值 + 最小时间间隔锁定
+        const now = Date.now();
         if (maxEnergy > ENERGY_THRESHOLD) {
-            let detectedBit = '-';
-            if (energy14k > energy15k) {
-                detectedBit = '0';
-            } else {
-                detectedBit = '1';
-            }
+            let detectedBit = energy14k > energy15k ? '0' : '1';
             document.getElementById('currentBit').innerText = detectedBit;
             
-            // 简单的防抖：如果当前比特和上一个不同，或者刚启动，才追加到 buffer
-            // 实际工程中需要更复杂的时钟同步，这里用简单的定时器模拟
-            processBit(detectedBit);
+            // 如果距离上次成功解码的时间超过了 MIN_BIT_INTERVAL_MS，才认为是一个新比特
+            if (now - lastBitTimestamp > MIN_BIT_INTERVAL_MS) {
+                lastBitTimestamp = now; // 重置计时器
+                processBit(detectedBit);
+            }
         } else {
             document.getElementById('currentBit').innerText = '-';
         }
@@ -189,28 +192,23 @@
         requestAnimationFrame(analyzeLoop);
     }
 
-    // 简单的比特组装逻辑 (带防抖)
-    let lastBit = null;
-    let bitHoldTimer = null;
+    // 比特组装逻辑
     function processBit(bit) {
-        // 只有当检测到的比特发生变化，或者这是第一个有效比特时，才认为收到了一个新比特
-        // 这能防止同一个 50ms 的信号被记录为多个比特
-        if (bit !== lastBit) {
-            lastBit = bit;
-            currentBitBuffer += bit;
-            log('recv', `收到比特: ${bit} (Buffer: ${currentBitBuffer})`);
-            
-            // 如果凑齐了 8 个比特，转换为字符
-            if (currentBitBuffer.length === 8) {
-                const charCode = parseInt(currentBitBuffer, 2);
-                // 过滤掉不可见字符
-                if (charCode >= 32 && charCode <= 126) {
-                    receivedMessage += String.fromCharCode(charCode);
-                    document.getElementById('receivedText').innerText = receivedMessage;
-                    log('recv', `🎉 解析出字符: "${String.fromCharCode(charCode)}"`);
-                }
-                currentBitBuffer = ''; // 清空 buffer，准备接收下一个字符
+        currentBitBuffer += bit;
+        log('recv', `收到比特: ${bit} (Buffer: ${currentBitBuffer})`);
+        
+        // 凑齐 8 个比特，转换为字符
+        if (currentBitBuffer.length === 8) {
+            const charCode = parseInt(currentBitBuffer, 2);
+            // 过滤掉不可见字符和控制字符
+            if (charCode >= 32 && charCode <= 126) {
+                receivedMessage += String.fromCharCode(charCode);
+                document.getElementById('receivedText').innerText = receivedMessage;
+                log('recv', `🎉 解析出字符: "${String.fromCharCode(charCode)}"`);
+            } else {
+                log('recv', `⚠️ 忽略非打印字符: ASCII ${charCode}`);
             }
+            currentBitBuffer = ''; 
         }
     }
 </script>
