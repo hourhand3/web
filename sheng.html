@@ -42,58 +42,71 @@
             margin-right: 4px;
             fill: currentColor;
         }
+        .debug-info {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+        .error-boundary {
+            padding: 20px;
+            background: #fff2f0;
+            border: 1px solid #ffccc7;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        // 从全局变量中解构 React 和 Antd
-        const { useState, useEffect, useRef } = React;
+        // 全局错误捕获，防止 Script error 导致页面完全无响应
+        window.onerror = function(message, source, lineno, colno, error) {
+            console.error('Global Error:', message, source, lineno, colno, error);
+            const root = document.getElementById('root');
+            if (root) {
+                root.innerHTML = `
+                    <div class="error-boundary">
+                        <h3>发生错误</h3>
+                        <p><strong>信息:</strong> ${message}</p>
+                        <p><strong>建议:</strong> 请尝试使用 Chrome/Edge 浏览器，并通过本地服务器 (Live Server) 运行此文件，而不是直接双击打开。</p>
+                    </div>
+                `;
+            }
+            return true;
+        };
+
+        const { useState, useEffect, useRef, useCallback } = React;
         const { 
-            Card, Tabs, Input, Button, Space, Typography, Progress, Alert, Tag, Row, Col, Statistic, Divider 
+            Card, Tabs, Input, Button, Space, Typography, Progress, Alert, Tag, Row, Col, Statistic, Divider, Slider 
         } = antd;
 
         const { Title, Text } = Typography;
         const { TabPane } = Tabs;
 
-        // 简单 SVG 图标组件，替代 Ant Design Icons 以避免加载错误
-        const IconSound = () => (
-            <svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M704 448H584V328c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v120H392c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h120v120c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8V520h120c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM400 256c-132.5 0-240 107.5-240 240s107.5 240 240 240 240-107.5 240-240-107.5-240-240-240zm0 416c-97.2 0-176-78.8-176-176s78.8-176 176-176 176 78.8 176 176-78.8 176-176 176z"></path></svg>
-        );
-        const IconDesktop = () => (
-            <svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M832 128H160c-35.3 0-64 28.7-64 64v448c0 35.3 28.7 64 64 64h224v64H256c-17.7 0-32 14.3-32 32v32c0 17.7 14.3 32 32 32h480c17.7 0 32-14.3 32-32v-32c0-17.7-14.3-32-32-32H608v-64h224c35.3 0 64-28.7 64-64V192c0-35.3-28.7-64-64-64zm-32 512H192V192h608v448z"></path></svg>
-        );
-        const IconMobile = () => (
-            <svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M712 128H288c-35.3 0-64 28.7-64 64v608c0 35.3 28.7 64 64 64h424c35.3 0 64-28.7 64-64V192c0-35.3-28.7-64-64-64zm-32 672H320V192h360v608zm-180-48c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32z"></path></svg>
-        );
-        const IconPlay = () => (
-            <svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M724 218.3V141c0-6.7-7.7-10.4-12.9-6.3L260.3 486.8a31.86 31.86 0 000 50.3l450.8 352.1c5.3 4.1 12.9.4 12.9-6.3v-77.3c0-4.9-2.3-9.6-6.1-12.6l-360-281 360-281.1c3.8-3 6.1-7.7 6.1-12.6z"></path></svg>
-        );
-        const IconPause = () => (
-            <svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M656 192H544c-17.7 0-32 14.3-32 32v448c0 17.7 14.3 32 32 32h112c17.7 0 32-14.3 32-32V224c0-17.7-14.3-32-32-32zM352 192H240c-17.7 0-32 14.3-32 32v448c0 17.7 14.3 32 32 32h112c17.7 0 32-14.3 32-32V224c0-17.7-14.3-32-32-32z"></path></svg>
-        );
-        const IconRecord = () => (
-            <svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M448 744c163.5 0 296-132.5 296-296S611.5 152 448 152 152 284.5 152 448s132.5 296 296 296z"></path></svg>
-        );
-        const IconStop = () => (
-            <svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M720 160H176c-8.8 0-16 7.2-16 16v544c0 8.8 7.2 16 16 16h544c8.8 0 16-7.2 16-16V176c0-8.8-7.2-16-16-16z"></path></svg>
-        );
+        // 简单 SVG 图标组件
+        const IconSound = () => (<svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M704 448H584V328c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v120H392c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h120v120c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8V520h120c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM400 256c-132.5 0-240 107.5-240 240s107.5 240 240 240 240-107.5 240-240-107.5-240-240-240zm0 416c-97.2 0-176-78.8-176-176s78.8-176 176-176 176 78.8 176 176-78.8 176-176 176z"></path></svg>);
+        const IconDesktop = () => (<svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M832 128H160c-35.3 0-64 28.7-64 64v448c0 35.3 28.7 64 64 64h224v64H256c-17.7 0-32 14.3-32 32v32c0 17.7 14.3 32 32 32h480c17.7 0 32-14.3 32-32v-32c0-17.7-14.3-32-32-32H608v-64h224c35.3 0 64-28.7 64-64V192c0-35.3-28.7-64-64-64zm-32 512H192V192h608v448z"></path></svg>);
+        const IconMobile = () => (<svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M712 128H288c-35.3 0-64 28.7-64 64v608c0 35.3 28.7 64 64 64h424c35.3 0 64-28.7 64-64V192c0-35.3-28.7-64-64-64zm-32 672H320V192h360v608zm-180-48c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32z"></path></svg>);
+        const IconPlay = () => (<svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M724 218.3V141c0-6.7-7.7-10.4-12.9-6.3L260.3 486.8a31.86 31.86 0 000 50.3l450.8 352.1c5.3 4.1 12.9.4 12.9-6.3v-77.3c0-4.9-2.3-9.6-6.1-12.6l-360-281 360-281.1c3.8-3 6.1-7.7 6.1-12.6z"></path></svg>);
+        const IconPause = () => (<svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M656 192H544c-17.7 0-32 14.3-32 32v448c0 17.7 14.3 32 32 32h112c17.7 0 32-14.3 32-32V224c0-17.7-14.3-32-32-32zM352 192H240c-17.7 0-32 14.3-32 32v448c0 17.7 14.3 32 32 32h112c17.7 0 32-14.3 32-32V224c0-17.7-14.3-32-32-32z"></path></svg>);
+        const IconRecord = () => (<svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M448 744c163.5 0 296-132.5 296-296S611.5 152 448 152 152 284.5 152 448s132.5 296 296 296z"></path></svg>);
+        const IconStop = () => (<svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M720 160H176c-8.8 0-16 7.2-16 16v544c0 8.8 7.2 16 16 16h544c8.8 0 16-7.2 16-16V176c0-8.8-7.2-16-16-16z"></path></svg>);
 
         // --- 核心参数配置 ---
         const SAMPLE_RATE = 48000;
         const FREQ_0 = 18000; 
         const FREQ_1 = 19000; 
-        const BIT_DURATION_MS = 60; 
-        const THRESHOLD_DB = -50; 
-
+        const BIT_DURATION_MS = 80; 
+        
         const AcousticTransferApp = () => {
             const [activeTab, setActiveTab] = useState('sender');
             
             // Sender State
-            const [textToSend, setTextToSend] = useState('Hi Phone!');
+            const [textToSend, setTextToSend] = useState('Hello');
             const [isSending, setIsSending] = useState(false);
             const [sendProgress, setSendProgress] = useState(0);
+            const [volume, setVolume] = useState(1.0); 
             
             // Receiver State
             const [isReceiving, setIsReceiving] = useState(false);
@@ -101,6 +114,10 @@
             const [signalStrength, setSignalStrength] = useState(0);
             const [detectedBit, setDetectedBit] = useState(null);
             const [receiverError, setReceiverError] = useState('');
+            
+            // Debug State
+            const [debugEnergy0, setDebugEnergy0] = useState(-100);
+            const [debugEnergy1, setDebugEnergy1] = useState(-100);
             
             // Audio Refs
             const audioContextRef = useRef(null);
@@ -119,9 +136,14 @@
 
             const initAudioContext = async () => {
                 if (!audioContextRef.current) {
-                    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
-                        sampleRate: SAMPLE_RATE,
-                    });
+                    try {
+                        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
+                            sampleRate: SAMPLE_RATE,
+                        });
+                    } catch (e) {
+                        console.error("AudioContext init failed", e);
+                        throw new Error("浏览器不支持 Web Audio API");
+                    }
                 }
                 if (audioContextRef.current.state === 'suspended') {
                     await audioContextRef.current.resume();
@@ -130,59 +152,84 @@
             };
 
             // --- Sender Logic ---
+            const playTestTone = async () => {
+                try {
+                    const ctx = await initAudioContext();
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.value = FREQ_1; 
+                    gain.gain.value = volume;
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start();
+                    setTimeout(() => {
+                        osc.stop();
+                        osc.disconnect();
+                    }, 500);
+                } catch (e) {
+                    alert("音频初始化失败: " + e.message);
+                }
+            };
+
             const startTransmission = async () => {
                 if (!textToSend) return;
-                const ctx = await initAudioContext();
-                
-                const oscillator = ctx.createOscillator();
-                const gainNode = ctx.createGain();
-                
-                oscillator.type = 'sine';
-                oscillator.frequency.value = FREQ_0;
-                gainNode.gain.value = 0.8; 
-                
-                oscillator.connect(gainNode);
-                gainNode.connect(ctx.destination);
-                
-                oscillatorRef.current = oscillator;
-                gainNodeRef.current = gainNode;
-                
-                oscillator.start();
-                setIsSending(true);
-                setSendProgress(0);
+                try {
+                    const ctx = await initAudioContext();
+                    
+                    const oscillator = ctx.createOscillator();
+                    const gainNode = ctx.createGain();
+                    
+                    oscillator.type = 'sine';
+                    oscillator.frequency.value = FREQ_0;
+                    gainNode.gain.value = volume; 
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(ctx.destination);
+                    
+                    oscillatorRef.current = oscillator;
+                    gainNodeRef.current = gainNode;
+                    
+                    oscillator.start();
+                    setIsSending(true);
+                    setSendProgress(0);
 
-                const bits = [];
-                for (let i = 0; i < textToSend.length; i++) {
-                    const charCode = textToSend.charCodeAt(i);
-                    for (let j = 7; j >= 0; j--) {
-                        bits.push((charCode >> j) & 1);
+                    const bits = [];
+                    for (let i = 0; i < textToSend.length; i++) {
+                        const charCode = textToSend.charCodeAt(i);
+                        for (let j = 7; j >= 0; j--) {
+                            bits.push((charCode >> j) & 1);
+                        }
                     }
+                    
+                    const preamble = [1, 0, 1, 0, 1, 0, 1, 0, 1, 0];
+                    const payload = [...preamble, ...bits, 0, 0, 0, 0];
+                    
+                    let currentBitIndex = 0;
+                    const totalBits = payload.length;
+                    
+                    const sendNextBit = () => {
+                        if (currentBitIndex >= totalBits) {
+                            stopTransmission();
+                            setSendProgress(100);
+                            return;
+                        }
+                        
+                        const bit = payload[currentBitIndex];
+                        const freq = bit === 0 ? FREQ_0 : FREQ_1;
+                        
+                        oscillator.frequency.setValueAtTime(freq, ctx.currentTime);
+                        
+                        currentBitIndex++;
+                        setSendProgress(Math.floor((currentBitIndex / totalBits) * 100));
+                    };
+
+                    sendNextBit();
+                    sendIntervalRef.current = setInterval(sendNextBit, BIT_DURATION_MS);
+                } catch (e) {
+                    alert("发送失败: " + e.message);
+                    setIsSending(false);
                 }
-                
-                const preamble = [1, 0, 1, 0, 1, 0, 1, 0];
-                const payload = [...preamble, ...bits, 0, 0, 0, 0];
-                
-                let currentBitIndex = 0;
-                const totalBits = payload.length;
-                
-                const sendNextBit = () => {
-                    if (currentBitIndex >= totalBits) {
-                        stopTransmission();
-                        setSendProgress(100);
-                        return;
-                    }
-                    
-                    const bit = payload[currentBitIndex];
-                    const freq = bit === 0 ? FREQ_0 : FREQ_1;
-                    
-                    oscillator.frequency.setTargetAtTime(freq, ctx.currentTime, 0.005);
-                    
-                    currentBitIndex++;
-                    setSendProgress(Math.floor((currentBitIndex / totalBits) * 100));
-                };
-
-                sendNextBit();
-                sendIntervalRef.current = setInterval(sendNextBit, BIT_DURATION_MS);
             };
 
             const stopTransmission = () => {
@@ -213,8 +260,14 @@
                 bitCountRef.current = 0;
                 currentByteRef.current = 0;
                 
-                const ctx = await initAudioContext();
                 try {
+                    const ctx = await initAudioContext();
+                    
+                    // 检查浏览器是否支持 getUserMedia
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                        throw new Error("当前浏览器不支持麦克风访问，请使用 Chrome/Edge/Firefox 最新版本。");
+                    }
+
                     const stream = await navigator.mediaDevices.getUserMedia({ 
                         audio: {
                             echoCancellation: false,
@@ -227,8 +280,8 @@
                     
                     const source = ctx.createMediaStreamSource(stream);
                     analyserRef.current = ctx.createAnalyser();
-                    analyserRef.current.fftSize = 8192; 
-                    analyserRef.current.smoothingTimeConstant = 0.1; 
+                    analyserRef.current.fftSize = 16384; 
+                    analyserRef.current.smoothingTimeConstant = 0.2; 
                     
                     source.connect(analyserRef.current);
                     setIsReceiving(true);
@@ -236,7 +289,17 @@
                     analyzeFrequency();
                 } catch (error) {
                     console.error('Reception error:', error);
-                    setReceiverError('麦克风访问失败。请确保使用 HTTPS/localhost 并已授权。如果是本地文件，请尝试使用 Firefox 或 Live Server。');
+                    let errorMsg = '麦克风访问失败。';
+                    if (error.name === 'NotAllowedError') {
+                        errorMsg = '您拒绝了麦克风权限。请在浏览器地址栏左侧点击锁图标，允许麦克风访问。';
+                    } else if (error.name === 'NotFoundError') {
+                        errorMsg = '未检测到麦克风设备。';
+                    } else if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+                        errorMsg = '安全限制：麦克风访问通常需要 HTTPS 或 localhost 环境。请尝试使用 Live Server 插件运行此文件。';
+                    } else {
+                        errorMsg += error.message;
+                    }
+                    setReceiverError(errorMsg);
                     setIsReceiving(false);
                 }
             };
@@ -261,7 +324,7 @@
                 
                 const getEnergy = (freq) => {
                     const centerBin = Math.floor(freq / binWidth);
-                    const range = 8; 
+                    const range = 12; 
                     let sum = 0;
                     let count = 0;
                     for (let i = centerBin - range; i <= centerBin + range; i++) {
@@ -275,18 +338,28 @@
 
                 const energy18k = getEnergy(FREQ_0);
                 const energy19k = getEnergy(FREQ_1);
-                const maxEnergy = Math.max(energy18k, energy19k);
                 
-                const strength = Math.max(0, Math.min(100, (maxEnergy + 80) * 2)); 
+                setDebugEnergy0(energy18k.toFixed(1));
+                setDebugEnergy1(energy19k.toFixed(1));
+
+                const maxEnergy = Math.max(energy18k, energy19k);
+                const minEnergy = Math.min(energy18k, energy19k);
+                
+                const threshold = -60; 
+                const diffThreshold = 8; 
+
+                const isSignalPresent = maxEnergy > threshold && (maxEnergy - minEnergy) > diffThreshold;
+                
+                const strength = Math.max(0, Math.min(100, (maxEnergy + 70) * 2)); 
                 setSignalStrength(strength);
 
                 const now = Date.now();
                 
-                if (maxEnergy > THRESHOLD_DB) {
+                if (isSignalPresent) {
                     const detected = energy19k > energy18k ? 1 : 0;
                     setDetectedBit(detected);
                     
-                    if (now - lastBitTimeRef.current > BIT_DURATION_MS * 0.7) {
+                    if (now - lastBitTimeRef.current > BIT_DURATION_MS * 0.6) {
                         lastBitTimeRef.current = now;
                         
                         if (syncStateRef.current === 'IDLE' || syncStateRef.current === 'SYNCING') {
@@ -311,7 +384,7 @@
                     }
                 } else {
                     setDetectedBit(null);
-                    if (now - lastBitTimeRef.current > BIT_DURATION_MS * 3) {
+                    if (now - lastBitTimeRef.current > BIT_DURATION_MS * 4) {
                         syncStateRef.current = 'IDLE';
                         bitCountRef.current = 0;
                     }
@@ -333,10 +406,10 @@
             return (
                 <div className="container">
                     <Title level={3} style={{ textAlign: 'center', marginBottom: 10 }}>
-                        <IconSound /> 声波文本传输
+                        <IconSound /> 声波文本传输 (稳定版)
                     </Title>
                     <Text type="secondary" style={{ display: 'block', textAlign: 'center', marginBottom: 20 }}>
-                        适用于电脑与手机间的极短文本传输
+                        请确保电脑音量调大，手机靠近扬声器
                     </Text>
                     
                     <Card bordered={false} className="card-shadow">
@@ -350,6 +423,25 @@
                                         placeholder="输入英文短文本..."
                                         maxLength={20}
                                     />
+                                    
+                                    <Row gutter={16}>
+                                        <Col span={18}>
+                                            <Text>音量增益:</Text>
+                                            <Slider 
+                                                min={0.1} 
+                                                max={1.0} 
+                                                step={0.1} 
+                                                value={volume} 
+                                                onChange={setVolume} 
+                                            />
+                                        </Col>
+                                        <Col span={6}>
+                                            <Button onClick={playTestTone} size="small">
+                                                测试音
+                                            </Button>
+                                        </Col>
+                                    </Row>
+
                                     <Button 
                                         type="primary" 
                                         block 
@@ -381,7 +473,7 @@
                                         {isReceiving ? '停止监听' : '开始监听'}
                                     </Button>
                                     
-                                    <Divider orientation="left">信号监测</Divider>
+                                    <Divider orientation="left">信号监测 (调试用)</Divider>
                                     <Row gutter={16}>
                                         <Col span={12}>
                                             <Statistic title="强度" value={signalStrength.toFixed(0)} suffix="%" valueStyle={{ fontSize: 16 }} />
@@ -391,6 +483,12 @@
                                             <Statistic title="当前比特" value={detectedBit !== null ? detectedBit : '-'} valueStyle={{ fontSize: 16 }} />
                                         </Col>
                                     </Row>
+                                    
+                                    <div className="debug-info">
+                                        <div>18kHz 能量: {debugEnergy0} dB</div>
+                                        <div>19kHz 能量: {debugEnergy1} dB</div>
+                                        <div>阈值: > -60 dB 且差值 > 8 dB</div>
+                                    </div>
 
                                     <Divider orientation="left">接收结果</Divider>
                                     <Input.TextArea 
@@ -406,7 +504,7 @@
                     </Card>
                     
                     <Alert 
-                        message="提示：请在安静环境下测试。将手机麦克风靠近电脑扬声器可获得最佳效果。" 
+                        message="提示：如果点击按钮无反应或报错，请检查浏览器控制台 (F12)。建议使用 VS Code 的 Live Server 插件运行此文件。" 
                         type="info" 
                         showIcon 
                         style={{ marginTop: 20 }} 
