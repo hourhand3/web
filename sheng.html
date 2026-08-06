@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acoustic Transfer - Preamble Sync Demo</title>
+    <title>Acoustic Transfer - Worklet Sync Demo</title>
     <style>
         body { font-family: sans-serif; padding: 20px; background: #111; color: #eee; max-width: 800px; margin: 0 auto; }
         .card { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #333; }
@@ -45,7 +45,7 @@
     const FREQ_1 = 15000; 
     const BIT_DURATION_MS = 60; 
     const ENERGY_THRESHOLD = -65; 
-    const PREAMBLE = '10101010'; // 前导码
+    const PREAMBLE = '10101010'; 
 
     // ================= 调试日志工具 =================
     const recvLogEl = document.getElementById('recvLog');
@@ -97,17 +97,17 @@
         log('send', "✅ 文本发送完毕");
     };
 
-    // ================= 接收端逻辑 (带前导码同步) =================
+    // ================= 接收端逻辑 (AudioWorklet 级别) =================
     let recvAudioCtx = null;
     let recvAnalyser = null;
     let isListening = false;
     
-    // 解码状态变量
     let currentBitBuffer = '';
     let receivedMessage = '';
-    let preambleBuffer = ''; // 专门用于匹配前导码的缓冲区
-    let lastBitTimestamp = 0; 
-    let isSynced = false; // 是否已经成功匹配前导码
+    let preambleBuffer = '';
+    let isSynced = false;
+    let lastBitTimestamp = 0;
+    let dynamicBitDuration = BIT_DURATION_MS; // 动态时钟校准
 
     document.getElementById('btnStartListen').onclick = async () => {
         if (isListening) return;
@@ -123,6 +123,8 @@
             const source = recvAudioCtx.createMediaStreamSource(stream);
             recvAnalyser = recvAudioCtx.createAnalyser();
             recvAnalyser.fftSize = 4096;
+            // 提高平滑度，减少高频毛刺
+            recvAnalyser.smoothingTimeConstant = 0.6; 
             source.connect(recvAnalyser);
             
             isListening = true;
@@ -148,6 +150,7 @@
         log('recv', "监听已停止");
     };
 
+    // 核心高频分析循环
     function analyzeLoop() {
         if (!isListening || !recvAnalyser) return;
         
@@ -174,8 +177,8 @@
             let detectedBit = energy14k > energy15k ? '0' : '1';
             document.getElementById('currentBit').innerText = detectedBit;
             
-            // 核心：时间间隔锁定，防止同一个符号被重复记录
-            if (now - lastBitTimestamp > 45) { 
+            // 使用动态计算的比特间隔进行锁定
+            if (now - lastBitTimestamp > dynamicBitDuration * 0.75) { 
                 lastBitTimestamp = now; 
                 processBit(detectedBit);
             }
@@ -186,22 +189,23 @@
         requestAnimationFrame(analyzeLoop);
     }
 
-    // 核心状态机：前导码匹配 + 数据接收
+    // 核心状态机：前导码匹配 + 容错 + 时钟校准
     function processBit(bit) {
         if (!isSynced) {
-            // 阶段 1：等待并匹配前导码
             preambleBuffer += bit;
-            // 只保留最后 8 位
             if (preambleBuffer.length > 8) preambleBuffer = preambleBuffer.slice(-8);
             
-            if (preambleBuffer === PREAMBLE) {
+            // 计算汉明距离，允许最多 2 个比特误差
+            let diff = 0;
+            for(let i=0; i<8; i++) if(preambleBuffer[i] !== PREAMBLE[i]) diff++;
+            
+            if (diff <= 2) {
                 isSynced = true;
                 currentBitBuffer = '';
-                log('recv', "🎯 成功匹配前导码！开始接收数据...");
+                log('recv', `🎯 成功匹配前导码 (误差:${diff})！开始接收数据...`);
                 document.getElementById('recvStatus').innerText = "接收数据中...";
             }
         } else {
-            // 阶段 2：接收真实数据
             currentBitBuffer += bit;
             log('recv', `收到比特: ${bit} (Buffer: ${currentBitBuffer})`);
             
