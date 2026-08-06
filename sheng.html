@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acoustic Transfer - Frame Protocol Demo</title>
+    <title>Acoustic Transfer - Anti-False-Terminator Demo</title>
     <style>
         body { font-family: sans-serif; padding: 20px; background: #111; color: #eee; max-width: 800px; margin: 0 auto; }
         .card { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #333; }
@@ -45,7 +45,7 @@
     const BIT_DURATION_MS = 60; 
     const ENERGY_THRESHOLD = -65; 
     const PREAMBLE = '10101010'; 
-    const TERMINATOR = '11111111'; // 结束符
+    const TERMINATOR = '10101011'; // 更换为带跳变的结束符，防止纯1误匹配
 
     // ================= 调试日志工具 =================
     const recvLogEl = document.getElementById('recvLog');
@@ -75,7 +75,7 @@
         bytes.push(crc);
         
         // 长度头 (1字节) + 数据 + CRC(1字节)
-        let frameBytes = [bytes.length - 1, ...bytes]; // length 不包含自身和CRC
+        let frameBytes = [bytes.length - 1, ...bytes]; 
         let bits = frameBytes.map(b => b.toString(2).padStart(8, '0')).join('');
         
         // 简单交织
@@ -121,7 +121,7 @@
         
         const payloadBits = buildFrame(text);
         const fullStream = PREAMBLE + payloadBits;
-        log('send', `完整二进制流 (${fullStream.length} bits, 含帧头/尾与CRC)`);
+        log('send', `完整二进制流 (${fullStream.length} bits)`);
         
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         if (ctx.state === 'suspended') await ctx.resume();
@@ -139,6 +139,9 @@
             await new Promise(resolve => setTimeout(resolve, BIT_DURATION_MS));
             osc.stop();
         }
+        
+        // 发送完毕后静音 200ms，作为物理边界
+        await new Promise(resolve => setTimeout(resolve, 200));
         
         ctx.close();
         sendStatus.innerText = "发送完成";
@@ -216,9 +219,14 @@
         } else {
             currentBitBuffer += bit;
             
-            // 检查是否收到结束符
-            if (currentBitBuffer.length >= 8 && currentBitBuffer.slice(-8) === TERMINATOR) {
-                let frameBits = currentBitBuffer.slice(0, -8); // 去掉结束符
+            // 核心修复：检查结束符，并且必须满足最小长度限制
+            // 假设最少发送 1 个字节，1(长度)+1(数据)+1(CRC) = 3 bytes = 24 bits
+            const MIN_FRAME_BITS = 24; 
+            
+            if (currentBitBuffer.length >= MIN_FRAME_BITS && 
+                currentBitBuffer.slice(-8) === TERMINATOR) {
+                
+                let frameBits = currentBitBuffer.slice(0, -8); 
                 log('recv', `📦 收到完整数据帧 (${frameBits.length} bits)，正在解析...`);
                 
                 let decoded = parseFrame(frameBits);
@@ -227,7 +235,6 @@
                     log('recv', `🎉 成功解析明文: "${decoded}"`);
                 }
                 
-                // 重置状态，准备接收下一包
                 isSynced = false; 
                 currentBitBuffer = '';
                 document.getElementById('recvStatus').innerText = "监听中，等待前导码...";
