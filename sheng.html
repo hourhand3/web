@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- 防止浏览器缓存，确保每次刷新都是最新代码 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>Acoustic Transfer - Wideband Capture Demo</title>
+    <title>Acoustic Transfer - Noise Calibration Demo</title>
     <style>
         body { font-family: sans-serif; padding: 20px; background: #111; color: #eee; max-width: 800px; margin: 0 auto; }
         .version-tag { display: inline-block; background: #f44336; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; margin-bottom: 15px; }
@@ -24,9 +23,8 @@
 </head>
 <body>
 
-    <!-- 🌟 核心改动：增加醒目的版本号标识 🌟 -->
     <h2>🎙️ 接收端 (Receiver)</h2>
-    <div class="version-tag">DEBUG VERSION: v1.0</div>
+    <div class="version-tag">DEBUG VERSION: v1.1</div>
 
     <div class="card">
         <button class="btn-recv" id="btnStartListen">开始监听</button>
@@ -55,6 +53,7 @@
     const PREAMBLE = '10101010'; 
     const TERMINATOR = '10101011'; 
     const SIGNAL_MARGIN_DB = 15; 
+    const CALIBRATION_DURATION_MS = 1000; // 底噪校准时间：1秒
 
     // ================= 调试日志工具 =================
     const recvLogEl = document.getElementById('recvLog');
@@ -157,7 +156,8 @@
     // ================= 接收端逻辑 =================
     let recvAudioCtx = null, recvAnalyser = null, isListening = false;
     let isSignalActive = false, currentBitBuffer = '', preambleBuffer = '', isSynced = false, activeStartTime = 0;
-    let noiseFloor = -100; 
+    let noiseFloor = -70; // 提高初始底噪，防止启动误触发
+    let isCalibrating = false; // 是否正在校准底噪
 
     document.getElementById('btnStartListen').onclick = async () => {
         if (isListening) return;
@@ -175,9 +175,18 @@
             isListening = true;
             isSignalActive = false; currentBitBuffer = ''; preambleBuffer = ''; isSynced = false;
             document.getElementById('receivedText').innerText = '';
-            document.getElementById('recvStatus').innerText = "监听中...";
-            log('recv', "✅ 开始监听...");
+            document.getElementById('recvStatus').innerText = "正在校准环境底噪 (1秒)...";
+            log('recv', "✅ 开始监听，请保持安静，正在校准底噪...");
+            
+            // 进入校准模式，1秒内只计算底噪，不处理信号
+            isCalibrating = true;
             analyzeLoop();
+            setTimeout(() => {
+                isCalibrating = false;
+                log('recv', `🎯 底噪校准完成！当前环境底噪: ${noiseFloor.toFixed(2)} dB`);
+                document.getElementById('recvStatus').innerText = "监听中...";
+            }, CALIBRATION_DURATION_MS);
+            
         } catch (e) { log('recv', `❌ 麦克风初始化失败: ${e.message}`); }
     };
 
@@ -201,64 +210,5 @@
             for(let i = -15; i <= 15; i++) sum += dataArray[centerBin + i];
             return sum / 31;
         };
-        
-        const energy14k = getBandEnergy(bin14k);
-        const energy15k = getBandEnergy(bin15k);
-        const maxEnergy = Math.max(energy14k, energy15k);
-        
-        if (maxEnergy < noiseFloor + 5) {
-            noiseFloor = noiseFloor * 0.95 + maxEnergy * 0.05;
-        }
-        
-        document.getElementById('energyVal').innerText = maxEnergy.toFixed(2) + ' dB';
-        document.getElementById('noiseVal').innerText = noiseFloor.toFixed(2) + ' dB';
-        
-        const now = Date.now();
-        const isAboveThreshold = maxEnergy > (noiseFloor + SIGNAL_MARGIN_DB);
-        
-        if (isAboveThreshold && !isSignalActive) {
-            isSignalActive = true;
-            activeStartTime = now;
-            let detectedBit = energy14k > energy15k ? '0' : '1';
-            processBit(detectedBit);
-        } else if (!isAboveThreshold && isSignalActive) {
-            isSignalActive = false;
-        } else if (isSignalActive && (now - activeStartTime > 150)) {
-            isSignalActive = false;
-            log('recv', "⚠️ 信号超时，强制复位状态机");
-            isSynced = false; currentBitBuffer = ''; preambleBuffer = '';
-        }
-        
-        requestAnimationFrame(analyzeLoop);
-    }
 
-    function processBit(bit) {
-        if (!isSynced) {
-            preambleBuffer += bit;
-            if (preambleBuffer.length > 8) preambleBuffer = preambleBuffer.slice(-8);
-            let diff = 0;
-            for(let i=0; i<8; i++) if(preambleBuffer[i] !== PREAMBLE[i]) diff++;
-            if (diff <= 2) {
-                isSynced = true; currentBitBuffer = '';
-                log('recv', `🎯 成功匹配前导码！开始接收数据帧...`);
-                document.getElementById('recvStatus').innerText = "接收数据帧中...";
-            }
-        } else {
-            currentBitBuffer += bit;
-            const MIN_FRAME_BITS = 24; 
-            if (currentBitBuffer.length >= MIN_FRAME_BITS && currentBitBuffer.slice(-8) === TERMINATOR) {
-                let frameBits = currentBitBuffer.slice(0, -8); 
-                log('recv', `📦 收到完整数据帧 (${frameBits.length} bits)，正在解析...`);
-                let decoded = parseFrame(frameBits);
-                if (decoded) {
-                    document.getElementById('receivedText').innerText = decoded;
-                    log('recv', `🎉 成功解析明文: "${decoded}"`);
-                }
-                isSynced = false; currentBitBuffer = '';
-                document.getElementById('recvStatus').innerText = "监听中...";
-            }
-        }
-    }
-</script>
-</body>
-</html>
+
