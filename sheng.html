@@ -3,28 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>声学数据传输测试 (单文件版)</title>
+    <title>声波数据传输 (稳定版)</title>
     
-    <!-- 引入 React 和 ReactDOM -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- 引入 React -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
-    <!-- 引入 Babel 用于在浏览器中编译 JSX -->
+    <!-- 引入 Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <!-- 引入 Ant Design 样式和组件库 -->
+    <!-- 引入 Ant Design CSS -->
     <link rel="stylesheet" href="https://unpkg.com/antd@5.12.0/dist/reset.css">
-    <script crossorigin src="https://unpkg.com/dayjs@1/dayjs.min.js"></script>
-    <script crossorigin src="https://unpkg.com/antd@5.12.0/dist/antd.min.js"></script>
     
-    <!-- 引入 Ant Design 图标 -->
-    <script crossorigin src="https://unpkg.com/@ant-design/icons@5.2.6/dist/index.umd.js"></script>
+    <!-- 引入 Day.js (Antd 依赖) -->
+    <script src="https://unpkg.com/dayjs@1/dayjs.min.js"></script>
+    
+    <!-- 引入 Ant Design JS -->
+    <script crossorigin src="https://unpkg.com/antd@5.12.0/dist/antd.min.js"></script>
 
     <style>
         body {
             background-color: #f0f2f5;
             padding: 20px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
         .container {
             max-width: 600px;
@@ -33,28 +34,58 @@
         .card-shadow {
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
+        .icon-placeholder {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            vertical-align: middle;
+            margin-right: 4px;
+            fill: currentColor;
+        }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
+        // 从全局变量中解构 React 和 Antd
         const { useState, useEffect, useRef } = React;
-        const { Card, Tabs, Input, Button, Space, Typography, Progress, Alert, Tag, Row, Col, Statistic, Divider } = antd;
         const { 
-            PlayCircleOutlined, PauseCircleOutlined, RecordOutlined, StopOutlined, 
-            SoundOutlined, MobileOutlined, DesktopOutlined 
-        } = icons;
+            Card, Tabs, Input, Button, Space, Typography, Progress, Alert, Tag, Row, Col, Statistic, Divider 
+        } = antd;
 
         const { Title, Text } = Typography;
         const { TabPane } = Tabs;
 
+        // 简单 SVG 图标组件，替代 Ant Design Icons 以避免加载错误
+        const IconSound = () => (
+            <svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M704 448H584V328c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v120H392c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h120v120c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8V520h120c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM400 256c-132.5 0-240 107.5-240 240s107.5 240 240 240 240-107.5 240-240-107.5-240-240-240zm0 416c-97.2 0-176-78.8-176-176s78.8-176 176-176 176 78.8 176 176-78.8 176-176 176z"></path></svg>
+        );
+        const IconDesktop = () => (
+            <svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M832 128H160c-35.3 0-64 28.7-64 64v448c0 35.3 28.7 64 64 64h224v64H256c-17.7 0-32 14.3-32 32v32c0 17.7 14.3 32 32 32h480c17.7 0 32-14.3 32-32v-32c0-17.7-14.3-32-32-32H608v-64h224c35.3 0 64-28.7 64-64V192c0-35.3-28.7-64-64-64zm-32 512H192V192h608v448z"></path></svg>
+        );
+        const IconMobile = () => (
+            <svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M712 128H288c-35.3 0-64 28.7-64 64v608c0 35.3 28.7 64 64 64h424c35.3 0 64-28.7 64-64V192c0-35.3-28.7-64-64-64zm-32 672H320V192h360v608zm-180-48c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32z"></path></svg>
+        );
+        const IconPlay = () => (
+            <svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M724 218.3V141c0-6.7-7.7-10.4-12.9-6.3L260.3 486.8a31.86 31.86 0 000 50.3l450.8 352.1c5.3 4.1 12.9.4 12.9-6.3v-77.3c0-4.9-2.3-9.6-6.1-12.6l-360-281 360-281.1c3.8-3 6.1-7.7 6.1-12.6z"></path></svg>
+        );
+        const IconPause = () => (
+            <svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M656 192H544c-17.7 0-32 14.3-32 32v448c0 17.7 14.3 32 32 32h112c17.7 0 32-14.3 32-32V224c0-17.7-14.3-32-32-32zM352 192H240c-17.7 0-32 14.3-32 32v448c0 17.7 14.3 32 32 32h112c17.7 0 32-14.3 32-32V224c0-17.7-14.3-32-32-32z"></path></svg>
+        );
+        const IconRecord = () => (
+            <svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M448 744c163.5 0 296-132.5 296-296S611.5 152 448 152 152 284.5 152 448s132.5 296 296 296z"></path></svg>
+        );
+        const IconStop = () => (
+            <svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M720 160H176c-8.8 0-16 7.2-16 16v544c0 8.8 7.2 16 16 16h544c8.8 0 16-7.2 16-16V176c0-8.8-7.2-16-16-16z"></path></svg>
+        );
+
         // --- 核心参数配置 ---
         const SAMPLE_RATE = 48000;
-        const FREQ_0 = 18000; // 代表比特 0
-        const FREQ_1 = 19000; // 代表比特 1
-        const BIT_DURATION_MS = 60; // 每个比特持续 60ms
-        const THRESHOLD_DB = -50; // 信号检测阈值
+        const FREQ_0 = 18000; 
+        const FREQ_1 = 19000; 
+        const BIT_DURATION_MS = 60; 
+        const THRESHOLD_DB = -50; 
 
         const AcousticTransferApp = () => {
             const [activeTab, setActiveTab] = useState('sender');
@@ -302,7 +333,7 @@
             return (
                 <div className="container">
                     <Title level={3} style={{ textAlign: 'center', marginBottom: 10 }}>
-                        <SoundOutlined /> 声波文本传输
+                        <IconSound /> 声波文本传输
                     </Title>
                     <Text type="secondary" style={{ display: 'block', textAlign: 'center', marginBottom: 20 }}>
                         适用于电脑与手机间的极短文本传输
@@ -310,7 +341,7 @@
                     
                     <Card bordered={false} className="card-shadow">
                         <Tabs activeKey={activeTab} onChange={setActiveTab} centered>
-                            <TabPane tab={<span><DesktopOutlined />发送端</span>} key="sender">
+                            <TabPane tab={<span><IconDesktop /> 发送端</span>} key="sender">
                                 <Space direction="vertical" style={{ width: '100%' }}>
                                     <Input.TextArea 
                                         rows={3} 
@@ -322,7 +353,7 @@
                                     <Button 
                                         type="primary" 
                                         block 
-                                        icon={isSending ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
+                                        icon={isSending ? <IconPause /> : <IconPlay />}
                                         onClick={isSending ? stopTransmission : startTransmission}
                                         danger={isSending}
                                     >
@@ -336,14 +367,14 @@
                                 </Space>
                             </TabPane>
 
-                            <TabPane tab={<span><MobileOutlined />接收端</span>} key="receiver">
+                            <TabPane tab={<span><IconMobile /> 接收端</span>} key="receiver">
                                 <Space direction="vertical" style={{ width: '100%' }}>
                                     {receiverError && <Alert message={receiverError} type="error" showIcon />}
                                     
                                     <Button 
                                         type="primary" 
                                         block 
-                                        icon={isReceiving ? <StopOutlined /> : <RecordOutlined />}
+                                        icon={isReceiving ? <IconStop /> : <IconRecord />}
                                         onClick={isReceiving ? stopReception : startReception}
                                         danger={isReceiving}
                                     >
