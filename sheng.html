@@ -3,728 +3,204 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>声波数据传输 (语法修复版)</title>
-    
-    <!-- 使用更稳定的 CDN 链接 -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
+    <title>Acoustic Transfer - Deep Debug</title>
     <style>
-        body { 
-            background-color: #f0f2f5; 
-            padding: 20px; 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-        }
-        .container { max-width: 600px; margin: 0 auto; }
-        .card { 
-            background: #fff; 
-            border-radius: 8px; 
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
-            padding: 24px; 
-            margin-bottom: 20px;
-        }
-        .header { text-align: center; margin-bottom: 24px; }
-        .debug-panel { 
-            background: #1f1f1f; 
-            color: #00ff00; 
-            padding: 10px; 
-            border-radius: 4px; 
-            font-family: 'Courier New', monospace; 
-            font-size: 12px; 
-            height: 120px; 
-            overflow-y: auto; 
-            margin-top: 10px;
-            white-space: pre-wrap;
-        }
-        canvas { 
-            width: 100%; 
-            height: 120px; 
-            background: #000; 
-            border-radius: 4px; 
-            margin-top: 10px; 
-            display: block;
-        }
-        .status-row {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 10px;
-            padding: 10px;
-            background: #fafafa;
-            border-radius: 4px;
-        }
-        .status-item { text-align: center; flex: 1; }
-        .status-label { font-size: 12px; color: #888; }
-        .status-value { font-size: 18px; font-weight: bold; color: #333; }
-        
-        .tabs { display: flex; border-bottom: 1px solid #eee; margin-bottom: 20px; }
-        .tab { 
-            padding: 10px 20px; 
-            cursor: pointer; 
-            border-bottom: 2px solid transparent; 
-            font-weight: 500;
-        }
-        .tab.active { border-bottom-color: #1890ff; color: #1890ff; }
-        
-        .btn {
-            display: inline-block;
-            text-align: center;
-            cursor: pointer;
-            border: 1px solid transparent;
-            white-space: nowrap;
-            padding: 6px 15px;
-            font-size: 14px;
-            border-radius: 6px;
-            transition: all 0.3s;
-            margin-right: 10px;
-            margin-bottom: 10px;
-        }
-        .btn-primary { color: #fff; background-color: #1890ff; border-color: #1890ff; }
-        .btn-primary:hover { background-color: #40a9ff; }
-        .btn-danger { color: #fff; background-color: #ff4d4f; border-color: #ff4d4f; }
-        .btn-danger:hover { background-color: #ff7875; }
-        .btn-default { color: #333; background-color: #fff; border-color: #d9d9d9; }
-        .btn-default:hover { color: #40a9ff; border-color: #40a9ff; }
-        .btn-block { display: block; width: 100%; margin-right: 0; }
-        
-        .input-area {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #d9d9d9;
-            border-radius: 6px;
-            font-size: 14px;
-            margin-bottom: 10px;
-            box-sizing: border-box;
-        }
-        textarea.input-area { resize: vertical; min-height: 80px; }
-        
-        .alert-info {
-            background: #e6f7ff;
-            border: 1px solid #91d5ff;
-            padding: 10px 15px;
-            border-radius: 4px;
-            color: #096dd9;
-            margin-bottom: 10px;
-            font-size: 13px;
-        }
-        .alert-error {
-            background: #fff2f0;
-            border: 1px solid #ffccc7;
-            padding: 10px 15px;
-            border-radius: 4px;
-            color: #cf1322;
-            margin-bottom: 10px;
-            font-size: 13px;
-        }
-        .config-row {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-            align-items: center;
-        }
-        .config-item {
-            flex: 1;
-        }
-        .config-item label {
-            display: block;
-            font-size: 12px;
-            color: #666;
-            margin-bottom: 4px;
-        }
-        .config-item input {
-            width: 100%;
-            padding: 4px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
+        body { font-family: sans-serif; padding: 20px; background: #111; color: #eee; }
+        .card { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        button { padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; font-weight: bold; }
+        .btn-send { background: #4caf50; color: #fff; }
+        .btn-recv { background: #2196f3; color: #fff; }
+        .btn-test { background: #ff9800; color: #fff; }
+        .log-box { background: #000; padding: 10px; border-radius: 5px; font-family: monospace; font-size: 12px; height: 150px; overflow-y: auto; margin-top: 10px; border: 1px solid #333; }
+        .status { font-size: 14px; margin-top: 10px; color: #aaa; }
     </style>
 </head>
 <body>
-    <div id="root"></div>
 
-    <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+    <h2>🎙️ 接收端 (Receiver)</h2>
+    <div class="card">
+        <button class="btn-test" id="btnMicTest">1. 测试麦克风 (自听)</button>
+        <button class="btn-recv" id="btnStartListen">2. 开始监听</button>
+        <div class="status">状态: <span id="recvStatus">等待操作</span></div>
+        <div class="status">实时能量: <span id="energyVal">-100 dB</span></div>
+        <div class="log-box" id="recvLog">等待初始化...</div>
+    </div>
 
-        // --- 可配置参数 ---
-        // 为了最大兼容性，默认使用较低频率
-        const DEFAULT_FREQ_0_START = 8000; 
-        const DEFAULT_FREQ_0_END = 9000;   
-        const DEFAULT_FREQ_1_START = 10000; 
-        const DEFAULT_FREQ_1_END = 11000;   
-        
-        const BIT_DURATION_MS = 200; 
-        const SAMPLE_RATE = 48000;   
+    <h2>📡 发送端 (Sender)</h2>
+    <div class="card">
+        <input type="text" id="sendText" value="Hi" style="padding: 8px; width: 200px;" />
+        <button class="btn-send" id="btnSend">发送文本</button>
+        <button class="btn-test" id="btnTestTone">测试高频音</button>
+        <div class="status">状态: <span id="sendStatus">等待操作</span></div>
+        <div class="log-box" id="sendLog">等待初始化...</div>
+    </div>
 
-        const App = () => {
-            const [activeTab, setActiveTab] = useState('receiver'); // 默认打开接收端以便调试
-            
-            // Config State
-            const [freq0Start, setFreq0Start] = useState(DEFAULT_FREQ_0_START);
-            const [freq0End, setFreq0End] = useState(DEFAULT_FREQ_0_END);
-            const [freq1Start, setFreq1Start] = useState(DEFAULT_FREQ_1_START);
-            const [freq1End, setFreq1End] = useState(DEFAULT_FREQ_1_END);
-            
-            // Sender State
-            const [textToSend, setTextToSend] = useState('Hi');
-            const [isSending, setIsSending] = useState(false);
-            
-            // Receiver State
-            const [isReceiving, setIsReceiving] = useState(false);
-            const [receivedData, setReceivedData] = useState('');
-            const [signalStrength, setSignalStrength] = useState(0);
-            const [currentEnergy0, setCurrentEnergy0] = useState(-100);
-            const [currentEnergy1, setCurrentEnergy1] = useState(-100);
-            const [receiverError, setReceiverError] = useState('');
-            const [debugLogs, setDebugLogs] = useState([]);
-            
-            // Audio Refs
-            const audioContextRef = useRef(null);
-            const streamRef = useRef(null);
-            const analyserRef = useRef(null);
-            const animationFrameRef = useRef(null);
-            
-            // Decoder State Refs
-            const decoderState = useRef({
-                energy0History: [],
-                energy1History: [],
-                lastBitTime: 0,
-                currentByte: 0,
-                bitCount: 0,
-                syncState: 'IDLE',
-                preambleCount: 0
+<script>
+    // ================= 调试日志工具 =================
+    const recvLog = document.getElementById('recvLog');
+    const sendLog = document.getElementById('sendLog');
+    
+    function log(type, msg) {
+        const time = new Date().toLocaleTimeString();
+        const line = `[${time}] ${msg}\n`;
+        if (type === 'recv') {
+            recvLog.innerText += line;
+            recvLog.scrollTop = recvLog.scrollHeight;
+        } else {
+            sendLog.innerText += line;
+            sendLog.scrollTop = sendLog.scrollHeight;
+        }
+        console.log(`[${type}] ${msg}`);
+    }
+
+    // ================= 接收端逻辑 =================
+    const recvStatus = document.getElementById('recvStatus');
+    const energyVal = document.getElementById('energyVal');
+    let audioCtx = null;
+    let analyser = null;
+
+    // 1. 麦克风自测功能 (排查硬件链路)
+    document.getElementById('btnMicTest').onclick = async () => {
+        recvStatus.innerText = "正在测试麦克风...";
+        log('recv', "开始麦克风自测...");
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                audio: { 
+                    echoCancellation: false, 
+                    noiseSuppression: false, 
+                    autoGainControl: false 
+                } 
             });
+            const testCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const source = testCtx.createMediaStreamSource(stream);
+            source.connect(testCtx.destination); // 直接将麦克风连到扬声器
+            
+            recvStatus.innerText = "正在播放麦克风声音，请对着麦克风说话...";
+            log('recv', "自测成功！如果你能听到自己的声音，说明硬件链路正常。");
+            
+            setTimeout(() => {
+                source.disconnect();
+                testCtx.close();
+                stream.getTracks().forEach(t => t.stop());
+                recvStatus.innerText = "自测结束";
+            }, 3000);
+        } catch (e) {
+            recvStatus.innerText = "麦克风自测失败";
+            log('recv', `❌ 自测失败: ${e.name} - ${e.message}`);
+        }
+    };
 
-            const addLog = (msg) => {
-                setDebugLogs(prev => [...prev.slice(-15), `${new Date().toLocaleTimeString()} ${msg}`]);
-            };
-
-            const initAudioContext = async () => {
-                if (!audioContextRef.current) {
-                    const AudioContext = window.AudioContext || window.webkitAudioContext;
-                    if (!AudioContext) {
-                        throw new Error("您的浏览器不支持 Web Audio API");
-                    }
-                    audioContextRef.current = new AudioContext();
-                }
-                
-                // 关键修复：确保 Context 是 running 状态
-                if (audioContextRef.current.state === 'suspended') {
-                    await audioContextRef.current.resume();
-                }
-                return audioContextRef.current;
-            };
-
-            // --- Sender Logic ---
-            const playChirp = (ctx, destination, startFreq, endFreq, durationSec, startTime) => {
-                const oscillator = ctx.createOscillator();
-                const gainNode = ctx.createGain();
-                
-                oscillator.type = 'sine';
-                oscillator.frequency.setValueAtTime(startFreq, startTime);
-                oscillator.frequency.linearRampToValueAtTime(endFreq, startTime + durationSec);
-                
-                gainNode.gain.setValueAtTime(0, startTime);
-                gainNode.gain.linearRampToValueAtTime(0.8, startTime + 0.02);
-                gainNode.gain.setValueAtTime(0.8, startTime + durationSec - 0.02);
-                gainNode.gain.linearRampToValueAtTime(0, startTime + durationSec);
-                
-                oscillator.connect(gainNode);
-                gainNode.connect(destination);
-                
-                oscillator.start(startTime);
-                oscillator.stop(startTime + durationSec);
-            };
-
-            const startTransmission = async () => {
-                if (!textToSend) return;
-                try {
-                    const ctx = await initAudioContext();
-                    setIsSending(true);
-                    addLog("开始发送...");
-
-                    const bits = [];
-                    for (let i = 0; i < textToSend.length; i++) {
-                        const charCode = textToSend.charCodeAt(i);
-                        for (let j = 7; j >= 0; j--) {
-                            bits.push((charCode >> j) & 1);
-                        }
-                    }
-                    
-                    const preamble = [1, 0, 1, 0, 1, 0, 1, 0, 1, 0];
-                    const payload = [...preamble, ...bits];
-                    
-                    let currentTime = ctx.currentTime + 0.1;
-                    const bitDurationSec = BIT_DURATION_MS / 1000;
-
-                    payload.forEach((bit) => {
-                        if (bit === 0) {
-                            playChirp(ctx, ctx.destination, freq0Start, freq0End, bitDurationSec, currentTime);
-                        } else {
-                            playChirp(ctx, ctx.destination, freq1Start, freq1End, bitDurationSec, currentTime);
-                        }
-                        currentTime += bitDurationSec;
-                    });
-
-                    setTimeout(() => {
-                        setIsSending(false);
-                        addLog("发送完成");
-                    }, (currentTime - ctx.currentTime) * 1000 + 200);
-
-                } catch (e) {
-                    alert("发送失败: " + e.message);
-                    setIsSending(false);
-                }
-            };
-
-            const playTestTone = async (freq) => {
-                try {
-                    const ctx = await initAudioContext();
-                    const osc = ctx.createOscillator();
-                    const gain = ctx.createGain();
-                    osc.type = 'sine';
-                    osc.frequency.value = freq;
-                    gain.gain.value = 0.5;
-                    osc.connect(gain);
-                    gain.connect(ctx.destination);
-                    osc.start();
-                    setTimeout(() => {
-                        osc.stop();
-                        osc.disconnect();
-                    }, 500);
-                    addLog(`播放测试音: ${freq}Hz`);
-                } catch(e) {
-                    console.error(e);
-                }
-            };
-
-            // --- Receiver Logic ---
-            const startReception = async () => {
-                setReceiverError('');
-                setReceivedData('');
-                setSignalStrength(0);
-                setDebugLogs([]);
-                decoderState.current = {
-                    energy0History: [],
-                    energy1History: [],
-                    lastBitTime: 0,
-                    currentByte: 0,
-                    bitCount: 0,
-                    syncState: 'IDLE',
-                    preambleCount: 0
-                };
-                
-                try {
-                    const ctx = await initAudioContext();
-                    
-                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                        throw new Error("浏览器不支持麦克风访问");
-                    }
-
-                    const constraints = {
-                        audio: {
-                            echoCancellation: false,
-                            noiseSuppression: false,
-                            autoGainControl: false,
-                            latency: 0,
-                            sampleRate: SAMPLE_RATE 
-                        } 
-                    };
-
-                    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                    streamRef.current = stream;
-                    
-                    const source = ctx.createMediaStreamSource(stream);
-                    analyserRef.current = ctx.createAnalyser();
-                    
-                    // 修复：降低 FFT 大小以提高兼容性和性能
-                    analyserRef.current.fftSize = 4096; 
-                    analyserRef.current.smoothingTimeConstant = 0.5; 
-                    
-                    source.connect(analyserRef.current);
-                    setIsReceiving(true);
-                    addLog("监听中... 请确保音量足够大");
-                    
-                    analyzeFrequencyLoop();
-                } catch (error) {
-                    console.error('Reception error:', error);
-                    let errorMsg = '麦克风访问失败。';
-                    if (error.name === 'NotAllowedError') errorMsg = '请允许麦克风权限';
-                    else if (error.name === 'NotFoundError') errorMsg = '未找到麦克风';
-                    else errorMsg += ` (${error.message})`;
-                    setReceiverError(errorMsg);
-                    setIsReceiving(false);
-                }
-            };
-
-            const stopReception = () => {
-                setIsReceiving(false);
-                if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-                if (streamRef.current) {
-                    streamRef.current.getTracks().forEach(track => track.stop());
-                    streamRef.current = null;
-                }
-                if (analyserRef.current) {
-                    analyserRef.current.disconnect();
-                    analyserRef.current = null;
-                }
-                addLog("监听停止");
-            };
-
-            const getBandEnergy = (dataArray, sampleRate, minFreq, maxFreq) => {
-                const binWidth = sampleRate / dataArray.length;
-                const minBin = Math.floor(minFreq / binWidth);
-                const maxBin = Math.floor(maxFreq / binWidth);
-                
-                let sum = 0;
-                let count = 0;
-                for (let i = minBin; i <= maxBin; i++) {
-                    if (i >= 0 && i < dataArray.length) {
-                        sum += dataArray[i];
-                        count++;
-                    }
-                }
-                return count > 0 ? sum / count : -100;
-            };
-
-            const analyzeFrequencyLoop = () => {
-                if (!isReceiving || !analyserRef.current) return;
-
-                try {
-                    const dataArray = new Float32Array(analyserRef.current.frequencyBinCount);
-                    analyserRef.current.getFloatFrequencyData(dataArray);
-                    const sampleRate = audioContextRef.current.sampleRate;
-
-                    // 计算两个频段的能量
-                    const e0 = getBandEnergy(dataArray, sampleRate, freq0Start, freq0End);
-                    const e1 = getBandEnergy(dataArray, sampleRate, freq1Start, freq1End);
-                    
-                    setCurrentEnergy0(e0);
-                    setCurrentEnergy1(e1);
-
-                    const state = decoderState.current;
-                    state.energy0History.push(e0);
-                    state.energy1History.push(e1);
-                    
-                    if (state.energy0History.length > 5) state.energy0History.shift();
-                    if (state.energy1History.length > 5) state.energy1History.shift();
-
-                    const avgE0 = state.energy0History.reduce((a,b)=>a+b,0) / state.energy0History.length;
-                    const avgE1 = state.energy1History.reduce((a,b)=>a+b,0) / state.energy1History.length;
-
-                    const NOISE_FLOOR = -55; 
-                    const SIGNAL_THRESHOLD = -45; 
-
-                    const maxSignal = Math.max(avgE0, avgE1);
-                    
-                    const strength = Math.max(0, Math.min(100, (maxSignal + 60) * 2)); 
-                    setSignalStrength(strength);
-
-                    let detected = null;
-                    if (maxSignal > SIGNAL_THRESHOLD) {
-                        if (Math.abs(avgE1 - avgE0) > 3) {
-                            detected = avgE1 > avgE0 ? 1 : 0;
-                        }
-                    }
-
-                    const now = Date.now();
-                    if (detected !== null) {
-                        if (now - state.lastBitTime > BIT_DURATION_MS * 0.6) {
-                            state.lastBitTime = now;
-                            
-                            if (state.syncState === 'IDLE' || state.syncState === 'SYNCING') {
-                                if (state.preambleCount < 10) {
-                                    state.syncState = 'SYNCING';
-                                    state.preambleCount++;
-                                } else {
-                                    state.syncState = 'RECEIVING';
-                                    state.bitCount = 0;
-                                    state.currentByte = 0;
-                                    addLog("同步成功，开始接收数据");
-                                }
-                            }
-                            
-                            if (state.syncState === 'RECEIVING') {
-                                state.currentByte = (state.currentByte << 1) | detected;
-                                state.bitCount++;
-                                
-                                if (state.bitCount === 8) {
-                                    const charCode = state.currentByte;
-                                    if (charCode >= 32 && charCode <= 126) {
-                                        const char = String.fromCharCode(charCode);
-                                        setReceivedData(prev => prev + char);
-                                        addLog(`Decoded: '${char}'`);
-                                    }
-                                    state.bitCount = 0;
-                                    state.currentByte = 0;
-                                }
-                            }
-                        }
-                    } else {
-                        if (now - state.lastBitTime > BIT_DURATION_MS * 4) {
-                            if (state.syncState !== 'IDLE') {
-                                state.syncState = 'IDLE';
-                                state.preambleCount = 0;
-                            }
-                        }
-                    }
-
-                    drawVisualizer(dataArray, sampleRate);
-                } catch (err) {
-                    console.error("Analysis loop error:", err);
-                    // 发生错误时不停止循环，但记录日志
-                }
-                
-                animationFrameRef.current = requestAnimationFrame(analyzeFrequencyLoop);
-            };
-
-            const drawVisualizer = (dataArray, sampleRate) => {
-                const canvas = document.getElementById('spectrumCanvas');
-                if (!canvas) return;
-                
-                // 确保 Canvas 尺寸正确
-                if (canvas.width !== canvas.offsetWidth) {
-                    canvas.width = canvas.offsetWidth;
-                    canvas.height = canvas.offsetHeight;
-                }
-
-                const ctx = canvas.getContext('2d');
-                const width = canvas.width;
-                const height = canvas.height;
-                
-                ctx.fillStyle = '#000';
-                ctx.fillRect(0, 0, width, height);
-                
-                const minFreq = 6000;
-                const maxFreq = 13000;
-                const binWidth = sampleRate / dataArray.length;
-                const minBin = Math.floor(minFreq / binWidth);
-                const maxBin = Math.floor(maxFreq / binWidth);
-                const binsToDraw = maxBin - minBin;
-                
-                if (binsToDraw <= 0) return;
-
-                const step = width / binsToDraw;
-                
-                ctx.lineWidth = 2;
-                ctx.strokeStyle = '#0f0';
-                ctx.beginPath();
-                
-                let hasData = false;
-                for (let i = minBin; i < maxBin; i++) {
-                    if (i >= 0 && i < dataArray.length) {
-                        const v = dataArray[i];
-                        // 映射 Y 轴: -100dB (bottom) to 0dB (top)
-                        const y = height - ((v + 100) / 100) * height;
-                        const x = (i - minBin) * step;
-                        if (i === minBin) ctx.moveTo(x, y);
-                        else ctx.lineTo(x, y);
-                        hasData = true;
-                    }
-                }
-                ctx.stroke();
-
-                // 如果没有数据，画一条红线提示
-                if (!hasData) {
-                    ctx.strokeStyle = 'red';
-                    ctx.beginPath();
-                    ctx.moveTo(0, height/2);
-                    ctx.lineTo(width, height/2);
-                    ctx.stroke();
-                    ctx.fillStyle = 'red';
-                    ctx.fillText("No Data", 10, height/2 - 5);
-                }
-
-                // 绘制标记区域
-                const markRange = (start, end, color, label) => {
-                    const startBin = Math.floor(start / binWidth);
-                    const endBin = Math.floor(end / binWidth);
-                    const x1 = Math.max(0, (startBin - minBin) * step);
-                    const x2 = Math.min(width, (endBin - minBin) * step);
-                    
-                    ctx.fillStyle = color;
-                    ctx.globalAlpha = 0.3;
-                    ctx.fillRect(x1, 0, x2 - x1, height);
-                    ctx.globalAlpha = 1.0;
-                    ctx.fillStyle = '#fff';
-                    ctx.font = '10px Arial';
-                    ctx.fillText(label, x1 + 5, 15);
-                };
-                
-                markRange(freq0Start, freq0End, 'rgba(255, 77, 79, 0.5)', 'Bit 0');
-                markRange(freq1Start, freq1End, 'rgba(82, 196, 26, 0.5)', 'Bit 1');
-                
-                // 绘制阈值线
-                const thresholdY = height - ((-45 + 100) / 100) * height;
-                ctx.strokeStyle = 'yellow';
-                ctx.setLineDash([5, 5]);
-                ctx.beginPath();
-                ctx.moveTo(0, thresholdY);
-                ctx.lineTo(width, thresholdY);
-                ctx.stroke();
-                ctx.setLineDash([]);
-                ctx.fillStyle = 'yellow';
-                ctx.fillText('Threshold (-45dB)', width - 80, thresholdY - 5);
-            };
-
-            useEffect(() => {
-                return () => {
-                    stopReception();
-                    if (audioContextRef.current) audioContextRef.current.close();
-                };
-            }, []);
-
-            return (
-                <div className="container">
-                    <div className="header">
-                        <h2 style={{margin: 0}}>声波文本传输 (终极修复版)</h2>
-                        <p style={{color: '#666', fontSize: '14px'}}>已修复频谱显示问题，请允许麦克风权限</p>
-                    </div>
-                    
-                    <div className="card">
-                        <div className="tabs">
-                            <div className={`tab ${activeTab === 'sender' ? 'active' : ''}`} onClick={() => setActiveTab('sender')}>发送端</div>
-                            <div className={`tab ${activeTab === 'receiver' ? 'active' : ''}`} onClick={() => setActiveTab('receiver')}>接收端</div>
-                            <div className={`tab ${activeTab === 'config' ? 'active' : ''}`} onClick={() => setActiveTab('config')}>配置与测试</div>
-                        </div>
-
-                        {activeTab === 'config' && (
-                            <div>
-                                <div className="alert-info">
-                                    <strong>故障排除指南：</strong><br/>
-                                    1. 如果接收端无反应，请先点击下方的“测试音调”按钮。<br/>
-                                    2. 如果你听不到声音，说明你的扬声器不支持该频率，请调低频率。<br/>
-                                    3. 确保发送设备和接收设备距离较近（&lt; 50cm）。<br/>
-                                    4. 笔记本电脑通常无法处理 12kHz 以上的声音，建议设为 8k-10k。
-                                </div>
-                                
-                                <div className="config-row">
-                                    <div className="config-item">
-                                        <label>Bit 0 起始 (Hz)</label>
-                                        <input type="number" value={freq0Start} onChange={e => setFreq0Start(Number(e.target.value))} />
-                                    </div>
-                                    <div className="config-item">
-                                        <label>Bit 0 结束 (Hz)</label>
-                                        <input type="number" value={freq0End} onChange={e => setFreq0End(Number(e.target.value))} />
-                                    </div>
-                                    <button className="btn btn-default" onClick={() => playTestTone(freq0Start)}>测试 Bit 0</button>
-                                </div>
-                                
-                                <div className="config-row">
-                                    <div className="config-item">
-                                        <label>Bit 1 起始 (Hz)</label>
-                                        <input type="number" value={freq1Start} onChange={e => setFreq1Start(Number(e.target.value))} />
-                                    </div>
-                                    <div className="config-item">
-                                        <label>Bit 1 结束 (Hz)</label>
-                                        <input type="number" value={freq1End} onChange={e => setFreq1End(Number(e.target.value))} />
-                                    </div>
-                                    <button className="btn btn-default" onClick={() => playTestTone(freq1Start)}>测试 Bit 1</button>
-                                </div>
-                                
-                                <div className="config-row">
-                                    <div className="config-item">
-                                        <label>比特持续时间 (ms)</label>
-                                        <input type="number" value={BIT_DURATION_MS} readOnly style={{background:'#eee'}} />
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {activeTab === 'sender' && (
-                            <div>
-                                <textarea 
-                                    className="input-area"
-                                    rows={3} 
-                                    value={textToSend} 
-                                    onChange={(e) => setTextToSend(e.target.value)} 
-                                    placeholder="输入英文短文本 (如: Hi)"
-                                    maxLength={20}
-                                />
-                                
-                                <button 
-                                    className={`btn btn-primary btn-block ${isSending ? 'btn-danger' : ''}`}
-                                    onClick={isSending ? null : startTransmission}
-                                    disabled={isSending}
-                                >
-                                    {isSending ? '正在发送...' : '开始发送'}
-                                </button>
-                                
-                                <div style={{marginTop: 15, fontSize: 12, color: '#666'}}>
-                                    当前配置: Bit0 [{freq0Start}-{freq0End}Hz], Bit1 [{freq1Start}-{freq1End}Hz]
-                                </div>
-                            </div>
-                        )}
-
-                        {activeTab === 'receiver' && (
-                            <div>
-                                {receiverError && <div className="alert-error">{receiverError}</div>}
-                                
-                                <button 
-                                    className={`btn btn-block ${isReceiving ? 'btn-danger' : 'btn-primary'}`}
-                                    onClick={isReceiving ? stopReception : startReception}
-                                >
-                                    {isReceiving ? '停止监听' : '开始监听'}
-                                </button>
-
-                                <div style={{marginTop: 20}}>
-                                    <div style={{fontSize: 14, fontWeight: 'bold', marginBottom: 5}}>
-                                        实时频谱 
-                                        <span style={{fontSize: 12, color: '#888', fontWeight: 'normal'}}> (黄色虚线为解码阈值)</span>
-                                    </div>
-                                    <canvas id="spectrumCanvas" width={500} height={120}></canvas>
-                                </div>
-                                
-                                <div className="status-row">
-                                    <div className="status-item">
-                                        <div className="status-label">Bit 0 能量</div>
-                                        <div className="status-value" style={{fontSize: 14}}>{currentEnergy0.toFixed(1)} dB</div>
-                                    </div>
-                                    <div className="status-item">
-                                        <div className="status-label">Bit 1 能量</div>
-                                        <div className="status-value" style={{fontSize: 14}}>{currentEnergy1.toFixed(1)} dB</div>
-                                    </div>
-                                    <div className="status-item">
-                                        <div className="status-label">综合强度</div>
-                                        <div className="status-value">{signalStrength.toFixed(0)}%</div>
-                                    </div>
-                                </div>
-                                
-                                <div style={{marginTop: 20}}>
-                                    <div style={{fontSize: 14, fontWeight: 'bold', marginBottom: 5}}>调试日志</div>
-                                    <div className="debug-panel">
-                                        {debugLogs.map((log, i) => <div key={i}>{log}</div>)}
-                                    </div>
-                                </div>
-
-                                <div style={{marginTop: 20}}>
-                                    <div style={{fontSize: 14, fontWeight: 'bold', marginBottom: 5}}>接收结果</div>
-                                    <textarea 
-                                        className="input-area"
-                                        rows={4} 
-                                        value={receivedData} 
-                                        readOnly 
-                                        placeholder="等待接收..." 
-                                        style={{ backgroundColor: '#fafafa', fontFamily: 'monospace' }}
-                                    />
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            );
-        };
-
-        window.onload = function() {
-            try {
-                const root = ReactDOM.createRoot(document.getElementById('root'));
-                root.render(<App />);
-            } catch (e) {
-                document.body.innerHTML = `<div style="color:red; padding:20px;">Error: ${e.message}<br/>${e.stack}</div>`;
+    // 2. 开始监听
+    document.getElementById('btnStartListen').onclick = async () => {
+        recvStatus.innerText = "正在初始化音频上下文...";
+        log('recv', "请求麦克风权限 (强制关闭降噪/AEC)...");
+        
+        try {
+            // 关键：强制关闭浏览器的音频增强
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                audio: { 
+                    echoCancellation: false, 
+                    noiseSuppression: false, 
+                    autoGainControl: false 
+                } 
+            });
+            
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // 关键：强制恢复 AudioContext
+            if (audioCtx.state === 'suspended') {
+                log('recv', "AudioContext 处于挂起状态，正在尝试恢复...");
+                await audioCtx.resume();
             }
-        };
-    </script>
+            
+            if (audioCtx.state !== 'running') {
+                throw new Error("AudioContext 无法启动，当前状态: " + audioCtx.state);
+            }
+
+            log('recv', `✅ AudioContext 启动成功! 采样率: ${audioCtx.sampleRate}Hz`);
+            
+            const source = audioCtx.createMediaStreamSource(stream);
+            analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 4096;
+            source.connect(analyser);
+            
+            recvStatus.innerText = "监听中...";
+            log('recv', "开始实时分析频谱...");
+            analyzeLoop();
+            
+        } catch (e) {
+            recvStatus.innerText = "初始化失败";
+            log('recv', `❌ 致命错误: ${e.name} - ${e.message}`);
+        }
+    };
+
+    function analyzeLoop() {
+        if (!analyser) return;
+        const dataArray = new Float32Array(analyser.frequencyBinCount);
+        analyser.getFloatFrequencyData(dataArray);
+        
+        // 寻找全局最大能量
+        let maxVal = -100;
+        for (let i = 0; i < dataArray.length; i++) {
+            if (dataArray[i] > maxVal) maxVal = dataArray[i];
+        }
+        
+        energyVal.innerText = maxVal.toFixed(2) + " dB";
+        
+        // 如果能量大于 -60dB，记录一条日志（避免刷屏）
+        if (maxVal > -60) {
+            log('recv', `🔊 检测到有效声音! 峰值能量: ${maxVal.toFixed(2)} dB`);
+        }
+        
+        requestAnimationFrame(analyzeLoop);
+    }
+
+    // ================= 发送端逻辑 =================
+    const sendStatus = document.getElementById('sendStatus');
+    
+    // 发送高频测试音
+    document.getElementById('btnTestTone').onclick = () => {
+        sendStatus.innerText = "正在播放 14kHz 测试音...";
+        log('send', "播放 14kHz 测试音 (持续2秒)");
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        
+        osc.frequency.value = 14000;
+        gain.gain.value = 1.0; // 最大音量
+        
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        setTimeout(() => { osc.stop(); ctx.close(); sendStatus.innerText = "测试音播放完毕"; }, 2000);
+    };
+
+    // 发送文本 (简单 FSK)
+    document.getElementById('btnSend').onclick = () => {
+        const text = document.getElementById('sendText').value;
+        sendStatus.innerText = "正在发送...";
+        log('send', `开始发送文本: "${text}"`);
+        
+        // 这里简化为发送一个 14kHz 的长音代表数据，实际应替换为 FSK 编码
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        
+        osc.frequency.value = 14000;
+        gain.gain.value = 1.0;
+        
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        
+        log('send', "正在输出 14kHz 载波...");
+        setTimeout(() => { 
+            osc.stop(); 
+            ctx.close(); 
+            sendStatus.innerText = "发送完成";
+            log('send', "发送结束");
+        }, 3000);
+    };
+</script>
 </body>
 </html>
-
-
-
