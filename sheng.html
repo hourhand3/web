@@ -1,0 +1,360 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Card, Tabs, Input, Button, Space, Typography, Progress, Alert, Tag, Row, Col, Statistic } from 'antd';
+import { PlayCircleOutlined, PauseCircleOutlined, RecordOutlined, StopOutlined, SoundOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
+
+const { Title, Text } = Typography;
+const { TabPane } = Tabs;
+
+// --- 常量定义 ---
+const SAMPLE_RATE = 48000;
+const FREQ_0 = 18000; // 代表比特 0
+const FREQ_1 = 19000; // 代表比特 1
+const BIT_DURATION_MS = 50; // 每个比特持续 50ms (20 bps)
+const THRESHOLD_DB = -60; // 信号检测阈值 (dB)
+
+const AcousticTransferApp = () => {
+  const [activeTab, setActiveTab] = useState('sender');
+  
+  // Sender State
+  const [textToSend, setTextToSend] = useState('Hi');
+  const [isSending, setIsSending] = useState(false);
+  const [sendProgress, setSendProgress] = useState(0);
+  
+  // Receiver State
+  const [isReceiving, setIsReceiving] = useState(false);
+  const [receivedData, setReceivedData] = useState('');
+  const [signalStrength, setSignalStrength] = useState(0);
+  const [detectedBit, setDetectedBit] = useState(null);
+  const [receiverError, setReceiverError] = useState('');
+  const [bitBuffer, setBitBuffer] = useState([]); // 用于组装字节
+
+  // Audio Context Refs
+  const audioContextRef = useRef(null);
+  const oscillatorRef = useRef(null);
+  const gainNodeRef = useRef(null);
+  const analyserRef = useRef(null);
+  const streamRef = useRef(null);
+  const animationFrameRef = useRef(null);
+  const sendIntervalRef = useRef(null);
+  
+  // Decoder State Refs (避免闭包陷阱)
+  const lastBitTimeRef = useRef(0);
+  const currentByteRef = useRef(0);
+  const bitCountRef = useRef(0);
+
+  // Initialize Audio Context
+  const initAudioContext = async () => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
+        sampleRate: SAMPLE_RATE,
+      });
+    }
+    if (audioContextRef.current.state === 'suspended') {
+      await audioContextRef.current.resume();
+    }
+    return audioContextRef.current;
+  };
+
+  // --- Sender Logic ---
+  const startTransmission = async () => {
+    if (!textToSend) return;
+    const ctx = await initAudioContext();
+    
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    
+    oscillator.type = 'sine';
+    oscillator.frequency.value = FREQ_0;
+    gainNode.gain.value = 0.5; 
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    
+    oscillatorRef.current = oscillator;
+    gainNodeRef.current = gainNode;
+    
+    oscillator.start();
+    setIsSending(true);
+    setSendProgress(0);
+
+    const bits = [];
+    for (let i = 0; i < textToSend.length; i++) {
+      const charCode = textToSend.charCodeAt(i);
+      for (let j = 7; j >= 0; j--) {
+        bits.push((charCode >> j) & 1);
+      }
+    }
+    
+    // 添加同步头: 10101010 (前导码) + 数据 + 0000 (结束码)
+    const preamble = [1, 0, 1, 0, 1, 0, 1, 0];
+    const payload = [...preamble, ...bits, 0, 0, 0, 0];
+    
+    let currentBitIndex = 0;
+    const totalBits = payload.length;
+    
+    const sendNextBit = () => {
+      if (currentBitIndex >= totalBits) {
+        stopTransmission();
+        setSendProgress(100);
+        return;
+      }
+      
+      const bit = payload[currentBitIndex];
+      const freq = bit === 0 ? FREQ_0 : FREQ_1;
+      
+      oscillator.frequency.setTargetAtTime(freq, ctx.currentTime, 0.005);
+      
+      currentBitIndex++;
+      const progress = Math.floor((currentBitIndex / totalBits) * 100);
+      setSendProgress(progress);
+    };
+
+    sendNextBit();
+    sendIntervalRef.current = setInterval(sendNextBit, BIT_DURATION_MS);
+  };
+
+  const stopTransmission = () => {
+    if (sendIntervalRef.current) {
+      clearInterval(sendIntervalRef.current);
+      sendIntervalRef.current = null;
+    }
+    if (oscillatorRef.current) {
+      try {
+        oscillatorRef.current.stop();
+        oscillatorRef.current.disconnect();
+      } catch (e) {}
+      oscillatorRef.current = null;
+    }
+    if (gainNodeRef.current) {
+      gainNodeRef.current.disconnect();
+      gainNodeRef.current = null;
+    }
+    setIsSending(false);
+  };
+
+  // --- Receiver Logic ---
+  const startReception = async () => {
+    setReceiverError('');
+    setReceivedData('');
+    setBitBuffer([]);
+    currentByteRef.current = 0;
+    bitCountRef.current = 0;
+    
+    const ctx = await initAudioContext();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          latency: 0
+        } 
+      });
+      streamRef.current = stream;
+      
+      const source = ctx.createMediaStreamSource(stream);
+      analyserRef.current = ctx.createAnalyser();
+      analyserRef.current.fftSize = 8192; // 高分辨率
+      analyserRef.current.smoothingTimeConstant = 0.2; // 低平滑度以提高响应速度
+      
+      source.connect(analyserRef.current);
+      setIsReceiving(true);
+      
+      analyzeFrequency();
+    } catch (error) {
+      console.error('Reception error:', error);
+      setReceiverError('无法访问麦克风。请确保：1. 使用 HTTPS 或 localhost；2. 已允许麦克风权限。');
+      setIsReceiving(false);
+    }
+  };
+
+  const stopReception = () => {
+    setIsReceiving(false);
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+    }
+  };
+
+  const analyzeFrequency = () => {
+    if (!isReceiving || !analyserRef.current) return;
+
+    const dataArray = new Float32Array(analyserRef.current.frequencyBinCount);
+    analyserRef.current.getFloatFrequencyData(dataArray);
+
+    const binWidth = SAMPLE_RATE / analyserRef.current.fftSize;
+    
+    // 计算 18kHz 和 19kHz 附近的能量总和
+    const getEnergy = (freq) => {
+      const centerBin = Math.floor(freq / binWidth);
+      const range = 5; // 检查周围 5 个 bin
+      let sum = 0;
+      for (let i = centerBin - range; i <= centerBin + range; i++) {
+        if (i >= 0 && i < dataArray.length) {
+          sum += dataArray[i];
+        }
+      }
+      return sum / (range * 2 + 1); // 平均能量
+    };
+
+    const energy18k = getEnergy(FREQ_0);
+    const energy19k = getEnergy(FREQ_1);
+    
+    // 归一化显示强度 (dB 通常在 -100 到 0 之间)
+    const maxEnergy = Math.max(energy18k, energy19k);
+    const strength = Math.max(0, Math.min(100, (maxEnergy + 80) * 2)); 
+    setSignalStrength(strength);
+
+    const now = Date.now();
+    
+    // 简单的解码状态机
+    if (maxEnergy > THRESHOLD_DB) {
+      const detected = energy19k > energy18k ? 1 : 0;
+      setDetectedBit(detected);
+      
+      // 只有当比特状态改变或经过足够时间才处理，避免重复计数
+      // 这里简化处理：每 BIT_DURATION_MS 采样一次
+      if (now - lastBitTimeRef.current > BIT_DURATION_MS * 0.8) {
+        lastBitTimeRef.current = now;
+        
+        // 简单的位组装逻辑
+        const byte = currentByteRef.current;
+        const newByte = (byte << 1) | detected;
+        currentByteRef.current = newByte;
+        bitCountRef.current++;
+        
+        if (bitCountRef.current === 8) {
+          const char = String.fromCharCode(currentByteRef.current);
+          // 过滤不可见字符
+          if (char.match(/[a-zA-Z0-9\s\.\,\!\?]/)) {
+             setReceivedData(prev => prev + char);
+          }
+          currentByteRef.current = 0;
+          bitCountRef.current = 0;
+        }
+      }
+    } else {
+      setDetectedBit(null);
+    }
+
+    animationFrameRef.current = requestAnimationFrame(analyzeFrequency);
+  };
+
+  useEffect(() => {
+    return () => {
+      stopTransmission();
+      stopReception();
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+    };
+  }, []);
+
+  return (
+    <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
+      <Title level={2} style={{ textAlign: 'center' }}>
+        <SoundOutlined /> 声学数据传输原型 (FSK)
+      </Title>
+      
+      <Alert 
+        message="注意：此演示使用 18kHz/19kHz 高频声波。请确保设备扬声器和麦克风支持此频段，并在安静环境下测试。" 
+        type="warning" 
+        showIcon 
+        style={{ marginBottom: '20px' }} 
+      />
+
+      <Card>
+        <Tabs activeKey={activeTab} onChange={setActiveTab}>
+          <TabPane tab="发送端 (Sender)" key="sender">
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Text strong>输入要传输的文本：</Text>
+              <Input.TextArea 
+                rows={4} 
+                value={textToSend} 
+                onChange={(e) => setTextToSend(e.target.value)} 
+                placeholder="在此输入短文本 (建议英文)..."
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text type="secondary">速率: ~20 bps | 预计时间: ~{(textToSend.length * 8 * BIT_DURATION_MS / 1000).toFixed(2)} 秒</Text>
+                {!isSending ? (
+                  <Button type="primary" icon={<PlayCircleOutlined />} onClick={startTransmission}>
+                    开始发送
+                  </Button>
+                ) : (
+                  <Button danger icon={<PauseCircleOutlined />} onClick={stopTransmission}>
+                    停止发送
+                  </Button>
+                )}
+              </div>
+              {isSending && <Progress percent={sendProgress} status="active" />}
+              <Row gutter={[8, 8]}>
+                <Col><Tag color="blue">调制: FSK</Tag></Col>
+                <Col><Tag color="green">0: 18kHz</Tag></Col>
+                <Col><Tag color="green">1: 19kHz</Tag></Col>
+              </Row>
+            </Space>
+          </TabPane>
+
+          <TabPane tab="接收端 (Receiver)" key="receiver">
+            <Space direction="vertical" style={{ width: '100%' }}>
+              {receiverError && (
+                <Alert message={receiverError} type="error" showIcon closable onClose={() => setReceiverError('')} />
+              )}
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text strong>麦克风状态:</Text>
+                {!isReceiving ? (
+                  <Button type="primary" icon={<RecordOutlined />} onClick={startReception}>
+                    开始监听
+                  </Button>
+                ) : (
+                  <Button danger icon={<StopOutlined />} onClick={stopReception}>
+                    停止监听
+                  </Button>
+                )}
+              </div>
+              
+              <Card size="small" title="信号监测">
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <Statistic title="信号强度" value={signalStrength.toFixed(0)} suffix="%" valueStyle={{ color: signalStrength > 50 ? '#3f8600' : '#cf1322' }} />
+                    <Progress percent={signalStrength} showInfo={false} strokeColor={signalStrength > 50 ? '#52c41a' : '#ff4d4f'} />
+                  </Col>
+                  <Col span={12}>
+                    <Statistic title="当前检测比特" value={detectedBit !== null ? detectedBit : '-'} />
+                    <div style={{ marginTop: 5 }}>
+                      {detectedBit === 1 && <Tag color="green">19kHz (1)</Tag>}
+                      {detectedBit === 0 && <Tag color="blue">18kHz (0)</Tag>}
+                      {detectedBit === null && <Tag>无信号</Tag>}
+                    </div>
+                  </Col>
+                </Row>
+              </Card>
+
+              <Text strong>接收到的数据:</Text>
+              <Input.TextArea 
+                rows={6} 
+                value={receivedData} 
+                readOnly 
+                placeholder="等待接收数据... (请靠近发送设备)" 
+                style={{ backgroundColor: '#f5f5f5', fontFamily: 'monospace' }}
+              />
+              <Alert 
+                message="提示：解码算法正在实时运行。由于环境噪音影响，可能会出现乱码。建议传输极短文本测试。" 
+                type="info" 
+                showIcon 
+              />
+            </Space>
+          </TabPane>
+        </Tabs>
+      </Card>
+    </div>
+  );
+};
+
+export default AcousticTransferApp;
+
+
+
