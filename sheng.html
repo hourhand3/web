@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>声波数据传输 (GitHub兼容版)</title>
+    <title>声波数据传输 (高频兼容优化版)</title>
     
     <!-- 引入 React -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -15,136 +15,48 @@
     <!-- 引入 Ant Design CSS -->
     <link rel="stylesheet" href="https://unpkg.com/antd@5.12.0/dist/reset.css">
     
-    <!-- 引入 Day.js (Antd 依赖) -->
-    <script crossorigin src="https://unpkg.com/dayjs@1/dayjs.min.js"></script>
-    
     <!-- 引入 Ant Design JS -->
     <script crossorigin src="https://unpkg.com/antd@5.12.0/dist/antd.min.js"></script>
 
     <style>
-        body {
-            background-color: #f0f2f5;
-            padding: 20px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        }
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-        }
-        .card-shadow {
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-        .icon-placeholder {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            vertical-align: middle;
-            margin-right: 4px;
-            fill: currentColor;
-        }
-        .debug-info {
-            font-size: 12px;
-            color: #888;
-            margin-top: 5px;
-            background: #f9f9f9;
-            padding: 8px;
-            border-radius: 4px;
-            border: 1px solid #eee;
-        }
-        .status-badge {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            margin-right: 5px;
-        }
-        .status-ok { background-color: #52c41a; }
-        .status-error { background-color: #ff4d4f; }
-        .status-waiting { background-color: #faad14; }
-        /* 错误弹窗样式 */
-        .error-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.8);
-            color: white;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-            padding: 20px;
-            text-align: center;
-        }
-        .error-box {
-            background: #333;
-            padding: 20px;
-            border-radius: 8px;
-            max-width: 500px;
-            border: 1px solid #ff4d4f;
-        }
+        body { background-color: #f0f2f5; padding: 20px; font-family: sans-serif; }
+        .container { max-width: 600px; margin: 0 auto; }
+        .card-shadow { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .debug-panel { background: #222; color: #0f0; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; margin-top: 10px; }
+        canvas { width: 100%; height: 60px; background: #333; margin-top: 5px; }
+        .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
+        .bg-green { background: #52c41a; }
+        .bg-red { background: #ff4d4f; }
+        .bg-gray { background: #ccc; }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
-    <!-- 全局错误捕获脚本 -->
-    <script>
-        window.onerror = function(message, source, lineno, colno, error) {
-            console.error("Global Error Caught:", message, source, lineno, colno, error);
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'error-overlay';
-            errorDiv.innerHTML = `
-                <div class="error-box">
-                    <h2 style="color:#ff4d4f">应用运行错误</h2>
-                    <p><strong>错误信息:</strong> ${message}</p>
-                    <p><strong>位置:</strong> ${source} : ${lineno}:${colno}</p>
-                    <p>请截图反馈给开发者。</p>
-                    <button onclick="this.parentElement.parentElement.remove()" style="padding:5px 10px; cursor:pointer;">关闭</button>
-                </div>
-            `;
-            document.body.appendChild(errorDiv);
-            return true; // 阻止默认错误处理
-        };
-
-        window.addEventListener('unhandledrejection', function(event) {
-            console.error("Unhandled Promise Rejection:", event.reason);
-            alert("程序发生未处理的异步错误: " + event.reason);
-        });
-    </script>
-
     <script type="text/babel">
         const { useState, useEffect, useRef, useCallback } = React;
-        const { 
-            Card, Tabs, Input, Button, Space, Typography, Progress, Alert, Tag, Row, Col, Statistic, Divider, Slider, message 
-        } = antd;
-
+        const { Card, Tabs, Input, Button, Space, Typography, Progress, Alert, Tag, Row, Col, Statistic, Divider, Slider, message, Switch } = antd;
         const { Title, Text } = Typography;
         const { TabPane } = Tabs;
 
-        // 简单 SVG 图标组件
-        const IconSound = () => (<svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M704 448H584V328c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v120H392c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h120v120c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8V520h120c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM400 256c-132.5 0-240 107.5-240 240s107.5 240 240 240 240-107.5 240-240-107.5-240-240-240zm0 416c-97.2 0-176-78.8-176-176s78.8-176 176-176 176 78.8 176 176-78.8 176-176 176z"></path></svg>);
-        const IconDesktop = () => (<svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M832 128H160c-35.3 0-64 28.7-64 64v448c0 35.3 28.7 64 64 64h224v64H256c-17.7 0-32 14.3-32 32v32c0 17.7 14.3 32 32 32h480c17.7 0 32-14.3 32-32v-32c0-17.7-14.3-32-32-32H608v-64h224c35.3 0 64-28.7 64-64V192c0-35.3-28.7-64-64-64zm-32 512H192V192h608v448z"></path></svg>);
-        const IconMobile = () => (<svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M712 128H288c-35.3 0-64 28.7-64 64v608c0 35.3 28.7 64 64 64h424c35.3 0 64-28.7 64-64V192c0-35.3-28.7-64-64-64zm-32 672H320V192h360v608zm-180-48c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32z"></path></svg>);
-        const IconPlay = () => (<svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M724 218.3V141c0-6.7-7.7-10.4-12.9-6.3L260.3 486.8a31.86 31.86 0 000 50.3l450.8 352.1c5.3 4.1 12.9.4 12.9-6.3v-77.3c0-4.9-2.3-9.6-6.1-12.6l-360-281 360-281.1c3.8-3 6.1-7.7 6.1-12.6z"></path></svg>);
-        const IconPause = () => (<svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M656 192H544c-17.7 0-32 14.3-32 32v448c0 17.7 14.3 32 32 32h112c17.7 0 32-14.3 32-32V224c0-17.7-14.3-32-32-32zM352 192H240c-17.7 0-32 14.3-32 32v448c0 17.7 14.3 32 32 32h112c17.7 0 32-14.3 32-32V224c0-17.7-14.3-32-32-32z"></path></svg>);
-        const IconRecord = () => (<svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M448 744c163.5 0 296-132.5 296-296S611.5 152 448 152 152 284.5 152 448s132.5 296 296 296z"></path></svg>);
-        const IconStop = () => (<svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor" className="icon-placeholder"><path d="M720 160H176c-8.8 0-16 7.2-16 16v544c0 8.8 7.2 16 16 16h544c8.8 0 16-7.2 16-16V176c0-8.8-7.2-16-16-16z"></path></svg>);
-
-        // --- 核心参数配置 ---
-        const FREQ_0 = 18000; 
-        const FREQ_1 = 19000; 
-        const BIT_DURATION_MS = 80; 
+        // --- 核心参数配置 (已优化为兼容性更好的频率) ---
+        const FREQ_0 = 14000; // 14 kHz (Bit 0) - 兼容性更好
+        const FREQ_1 = 15000; // 15 kHz (Bit 1) - 兼容性更好
+        const BIT_DURATION_MS = 100; // 每个比特持续时间 (毫秒) - 稍长一点更稳定
         
+        // 简单的 SVG 图标
+        const IconSound = () => (<svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor"><path d="M704 448H584V328c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v120H392c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h120v120c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8V520h120c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM400 256c-132.5 0-240 107.5-240 240s107.5 240 240 240 240-107.5 240-240-107.5-240-240-240zm0 416c-97.2 0-176-78.8-176-176s78.8-176 176-176 176 78.8 176 176-78.8 176-176 176z"></path></svg>);
+        const IconPlay = () => (<svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor"><path d="M724 218.3V141c0-6.7-7.7-10.4-12.9-6.3L260.3 486.8a31.86 31.86 0 000 50.3l450.8 352.1c5.3 4.1 12.9.4 12.9-6.3v-77.3c0-4.9-2.3-9.6-6.1-12.6l-360-281 360-281.1c3.8-3 6.1-7.7 6.1-12.6z"></path></svg>);
+        const IconRecord = () => (<svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor"><path d="M448 744c163.5 0 296-132.5 296-296S611.5 152 448 152 152 284.5 152 448s132.5 296 296 296z"></path></svg>);
+        const IconStop = () => (<svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor"><path d="M720 160H176c-8.8 0-16 7.2-16 16v544c0 8.8 7.2 16 16 16h544c8.8 0 16-7.2 16-16V176c0-8.8-7.2-16-16-16z"></path></svg>);
+
         const AcousticTransferApp = () => {
             const [activeTab, setActiveTab] = useState('sender');
             
             // Sender State
-            const [textToSend, setTextToSend] = useState('Hello');
+            const [textToSend, setTextToSend] = useState('Hi');
             const [isSending, setIsSending] = useState(false);
             const [sendProgress, setSendProgress] = useState(0);
-            const [volume, setVolume] = useState(1.0); 
             
             // Receiver State
             const [isReceiving, setIsReceiving] = useState(false);
@@ -152,11 +64,10 @@
             const [signalStrength, setSignalStrength] = useState(0);
             const [detectedBit, setDetectedBit] = useState(null);
             const [receiverError, setReceiverError] = useState('');
-            const [systemStatus, setSystemStatus] = useState({ secure: false, micSupported: false });
             
-            // Debug State
-            const [debugEnergy0, setDebugEnergy0] = useState(-100);
-            const [debugEnergy1, setDebugEnergy1] = useState(-100);
+            // Debug/Visualizer State
+            const [debugInfo, setDebugInfo] = useState({ e0: -100, e1: -100, noise: -100 });
+            const canvasRef = useRef(null);
             
             // Audio Refs
             const audioContextRef = useRef(null);
@@ -171,29 +82,13 @@
             const lastBitTimeRef = useRef(0);
             const currentByteRef = useRef(0);
             const bitCountRef = useRef(0);
-            const syncStateRef = useRef('IDLE');
+            const syncStateRef = useRef('IDLE'); // IDLE, SYNCING, RECEIVING
 
-            // 检查环境安全性
-            useEffect(() => {
-                try {
-                    const isSecure = window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost';
-                    const hasMic = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-                    setSystemStatus({ secure: isSecure, micSupported: hasMic });
-                } catch (e) {
-                    console.error("Environment check failed", e);
-                }
-            }, []);
-
+            // 初始化 AudioContext
             const initAudioContext = async () => {
                 if (!audioContextRef.current) {
-                    try {
-                        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-                    } catch (e) {
-                        console.error("AudioContext init failed", e);
-                        throw new Error("浏览器不支持 Web Audio API");
-                    }
+                    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
                 }
-                
                 if (audioContextRef.current.state === 'suspended') {
                     await audioContextRef.current.resume();
                 }
@@ -201,27 +96,6 @@
             };
 
             // --- Sender Logic ---
-            const playTestTone = async () => {
-                try {
-                    const ctx = await initAudioContext();
-                    const osc = ctx.createOscillator();
-                    const gain = ctx.createGain();
-                    osc.type = 'sine';
-                    osc.frequency.value = FREQ_1; 
-                    gain.gain.value = volume;
-                    osc.connect(gain);
-                    gain.connect(ctx.destination);
-                    osc.start();
-                    setTimeout(() => {
-                        osc.stop();
-                        osc.disconnect();
-                    }, 500);
-                    message.success("测试音已播放");
-                } catch (e) {
-                    message.error("音频初始化失败: " + e.message);
-                }
-            };
-
             const startTransmission = async () => {
                 if (!textToSend) return;
                 try {
@@ -232,7 +106,9 @@
                     
                     oscillator.type = 'sine';
                     oscillator.frequency.value = FREQ_0;
-                    gainNode.gain.value = volume; 
+                    
+                    // 初始音量为0，避免爆音
+                    gainNode.gain.setValueAtTime(0, ctx.currentTime);
                     
                     oscillator.connect(gainNode);
                     gainNode.connect(ctx.destination);
@@ -241,9 +117,13 @@
                     gainNodeRef.current = gainNode;
                     
                     oscillator.start();
+                    // 快速淡入
+                    gainNode.gain.linearRampToValueAtTime(1.0, ctx.currentTime + 0.1);
+                    
                     setIsSending(true);
                     setSendProgress(0);
 
+                    // 准备数据
                     const bits = [];
                     for (let i = 0; i < textToSend.length; i++) {
                         const charCode = textToSend.charCodeAt(i);
@@ -252,8 +132,9 @@
                         }
                     }
                     
+                    // 添加前导码 (Preamble) 用于同步: 1010101010
                     const preamble = [1, 0, 1, 0, 1, 0, 1, 0, 1, 0];
-                    const payload = [...preamble, ...bits, 0, 0, 0, 0];
+                    const payload = [...preamble, ...bits, 0, 0, 0, 0]; // 尾部补零
                     
                     let currentBitIndex = 0;
                     const totalBits = payload.length;
@@ -262,19 +143,23 @@
                         if (currentBitIndex >= totalBits) {
                             stopTransmission();
                             setSendProgress(100);
+                            message.success("发送完成");
                             return;
                         }
                         
                         const bit = payload[currentBitIndex];
                         const freq = bit === 0 ? FREQ_0 : FREQ_1;
                         
-                        oscillator.frequency.setValueAtTime(freq, ctx.currentTime);
+                        // 平滑切换频率
+                        oscillator.frequency.setTargetAtTime(freq, ctx.currentTime, 0.01);
                         
                         currentBitIndex++;
                         setSendProgress(Math.floor((currentBitIndex / totalBits) * 100));
                     };
 
+                    // 立即发送第一个比特
                     sendNextBit();
+                    // 之后每隔 BIT_DURATION_MS 发送下一个
                     sendIntervalRef.current = setInterval(sendNextBit, BIT_DURATION_MS);
                 } catch (e) {
                     alert("发送失败: " + e.message);
@@ -287,16 +172,20 @@
                     clearInterval(sendIntervalRef.current);
                     sendIntervalRef.current = null;
                 }
-                if (oscillatorRef.current) {
-                    try {
-                        oscillatorRef.current.stop();
-                        oscillatorRef.current.disconnect();
-                    } catch (e) {}
-                    oscillatorRef.current = null;
-                }
-                if (gainNodeRef.current) {
-                    gainNodeRef.current.disconnect();
-                    gainNodeRef.current = null;
+                if (gainNodeRef.current && audioContextRef.current) {
+                    // 淡出
+                    gainNodeRef.current.gain.setTargetAtTime(0, audioContextRef.current.currentTime, 0.1);
+                    setTimeout(() => {
+                        if (oscillatorRef.current) {
+                            try { oscillatorRef.current.stop(); } catch(e){}
+                            oscillatorRef.current.disconnect();
+                            oscillatorRef.current = null;
+                        }
+                        if (gainNodeRef.current) {
+                            gainNodeRef.current.disconnect();
+                            gainNodeRef.current = null;
+                        }
+                    }, 200);
                 }
                 setIsSending(false);
             };
@@ -314,14 +203,14 @@
                     const ctx = await initAudioContext();
                     
                     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                        throw new Error("当前浏览器不支持麦克风访问。");
+                        throw new Error("浏览器不支持麦克风访问");
                     }
 
                     const stream = await navigator.mediaDevices.getUserMedia({ 
                         audio: {
                             echoCancellation: false,
-                            noiseSuppression: false,
-                            autoGainControl: false,
+                            noiseSuppression: false, // 关闭降噪，保留原始高频信号
+                            autoGainControl: false, // 关闭自动增益，防止信号忽大忽小
                             latency: 0,
                             sampleRate: 48000 
                         } 
@@ -330,28 +219,21 @@
                     
                     const source = ctx.createMediaStreamSource(stream);
                     analyserRef.current = ctx.createAnalyser();
+                    // 增加 FFT 大小以提高频率分辨率
                     analyserRef.current.fftSize = 32768; 
-                    analyserRef.current.smoothingTimeConstant = 0.1; 
+                    analyserRef.current.smoothingTimeConstant = 0.5; 
                     
                     source.connect(analyserRef.current);
                     setIsReceiving(true);
-                    message.success("麦克风已启动，正在监听...");
+                    message.success("监听中... 请靠近扬声器");
                     
                     analyzeFrequency();
                 } catch (error) {
                     console.error('Reception error:', error);
                     let errorMsg = '麦克风访问失败。';
-                    if (error.name === 'NotAllowedError') {
-                        errorMsg = '您拒绝了麦克风权限。请在浏览器地址栏左侧点击锁图标，重置权限并允许。';
-                    } else if (error.name === 'NotFoundError') {
-                        errorMsg = '未检测到麦克风设备。请检查硬件连接。';
-                    } else if (error.name === 'NotReadableError') {
-                        errorMsg = '麦克风被其他应用占用。请关闭其他录音软件。';
-                    } else if (!systemStatus.secure) {
-                        errorMsg = '安全限制：麦克风访问需要 HTTPS 环境。当前协议: ' + location.protocol;
-                    } else {
-                        errorMsg += ` (${error.name}: ${error.message})`;
-                    }
+                    if (error.name === 'NotAllowedError') errorMsg = '请允许麦克风权限';
+                    else if (error.name === 'NotFoundError') errorMsg = '未找到麦克风';
+                    else errorMsg += ` (${error.message})`;
                     setReceiverError(errorMsg);
                     setIsReceiving(false);
                 }
@@ -359,9 +241,7 @@
 
             const stopReception = () => {
                 setIsReceiving(false);
-                if (animationFrameRef.current) {
-                    cancelAnimationFrame(animationFrameRef.current);
-                }
+                if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
                 if (streamRef.current) {
                     streamRef.current.getTracks().forEach(track => track.stop());
                     streamRef.current = null;
@@ -381,9 +261,11 @@
                 const actualSampleRate = audioContextRef.current.sampleRate;
                 const binWidth = actualSampleRate / analyserRef.current.fftSize;
                 
+                // 计算特定频率的能量
                 const getEnergy = (freq) => {
                     const centerBin = Math.floor(freq / binWidth);
-                    const range = Math.max(5, Math.floor(actualSampleRate / 2000)); 
+                    // 搜索范围 +/- 100Hz
+                    const range = Math.floor(100 / binWidth); 
                     let sum = 0;
                     let count = 0;
                     for (let i = centerBin - range; i <= centerBin + range; i++) {
@@ -395,55 +277,76 @@
                     return count > 0 ? sum / count : -100;
                 };
 
-                const energy18k = getEnergy(FREQ_0);
-                const energy19k = getEnergy(FREQ_1);
+                const energy14k = getEnergy(FREQ_0);
+                const energy15k = getEnergy(FREQ_1);
                 
-                setDebugEnergy0(energy18k.toFixed(1));
-                setDebugEnergy1(energy19k.toFixed(1));
+                // 估算背景噪声 (取 10kHz 处的能量作为参考)
+                const noiseFloor = getEnergy(10000);
 
-                const maxEnergy = Math.max(energy18k, energy19k);
-                const minEnergy = Math.min(energy18k, energy19k);
-                
-                const threshold = -65; 
-                const diffThreshold = 6; 
+                setDebugInfo({ 
+                    e0: energy14k.toFixed(1), 
+                    e1: energy15k.toFixed(1),
+                    noise: noiseFloor.toFixed(1)
+                });
 
-                const isSignalPresent = maxEnergy > threshold && (maxEnergy - minEnergy) > diffThreshold;
+                // 绘制频谱可视化
+                drawVisualizer(dataArray, actualSampleRate);
+
+                // 解码逻辑
+                // 阈值设定：信号必须比噪声高 15dB 以上，且绝对值大于 -50dB
+                const thresholdAbsolute = -50; 
+                const thresholdRelative = 15; 
+
+                const isSignalPresent = (energy14k > thresholdAbsolute || energy15k > thresholdAbsolute) &&
+                                        (Math.max(energy14k, energy15k) - noiseFloor > thresholdRelative);
                 
-                const strength = Math.max(0, Math.min(100, (maxEnergy + 80) * 2)); 
+                // 信号强度归一化用于显示
+                const maxE = Math.max(energy14k, energy15k);
+                const strength = Math.max(0, Math.min(100, (maxE + 60) * 2)); 
                 setSignalStrength(strength);
 
                 const now = Date.now();
                 
                 if (isSignalPresent) {
-                    const detected = energy19k > energy18k ? 1 : 0;
+                    // 判断是 0 还是 1
+                    const detected = energy15k > energy14k ? 1 : 0;
                     setDetectedBit(detected);
                     
-                    if (now - lastBitTimeRef.current > BIT_DURATION_MS * 0.5) {
+                    // 简单的时序控制：防止一个比特被重复读取多次
+                    if (now - lastBitTimeRef.current > BIT_DURATION_MS * 0.6) {
                         lastBitTimeRef.current = now;
                         
-                        if (syncStateRef.current === 'IDLE' || syncStateRef.current === 'SYNCING') {
-                           syncStateRef.current = 'RECEIVING';
+                        // 状态机
+                        if (syncStateRef.current === 'IDLE') {
+                            syncStateRef.current = 'SYNCING';
                         }
 
-                        if (syncStateRef.current === 'RECEIVING') {
+                        if (syncStateRef.current === 'SYNCING' || syncStateRef.current === 'RECEIVING') {
                             const byte = currentByteRef.current;
                             const newByte = (byte << 1) | detected;
                             currentByteRef.current = newByte;
                             bitCountRef.current++;
                             
+                            // 如果收齐了8位
                             if (bitCountRef.current === 8) {
                                 const charCode = currentByteRef.current;
-                                if (charCode >= 32 && charCode <= 126) {
-                                    setReceivedData(prev => prev + String.fromCharCode(charCode));
+                                // 简单校验：如果是可打印字符或常见控制符
+                                if ((charCode >= 32 && charCode <= 126) || charCode === 0) {
+                                    if (charCode !== 0) {
+                                        setReceivedData(prev => prev + String.fromCharCode(charCode));
+                                    }
                                 }
+                                // 重置
                                 currentByteRef.current = 0;
                                 bitCountRef.current = 0;
+                                syncStateRef.current = 'RECEIVING';
                             }
                         }
                     }
                 } else {
                     setDetectedBit(null);
-                    if (now - lastBitTimeRef.current > BIT_DURATION_MS * 4) {
+                    // 如果长时间没有信号，重置同步状态
+                    if (now - lastBitTimeRef.current > BIT_DURATION_MS * 5) {
                         syncStateRef.current = 'IDLE';
                         bitCountRef.current = 0;
                     }
@@ -452,81 +355,103 @@
                 animationFrameRef.current = requestAnimationFrame(analyzeFrequency);
             };
 
+            const drawVisualizer = (dataArray, sampleRate) => {
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                ctx.fillStyle = '#333';
+                ctx.fillRect(0, 0, width, height);
+                
+                // 只绘制 10kHz 到 20kHz 的部分
+                const minFreq = 10000;
+                const maxFreq = 20000;
+                const minBin = Math.floor(minFreq / (sampleRate / dataArray.length));
+                const maxBin = Math.floor(maxFreq / (sampleRate / dataArray.length));
+                const binsToDraw = maxBin - minBin;
+                const step = width / binsToDraw;
+                
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#0f0';
+                ctx.beginPath();
+                
+                for (let i = minBin; i < maxBin; i++) {
+                    const v = dataArray[i]; // dB value
+                    // Map -100dB..0dB to height
+                    const y = height - ((v + 100) / 100) * height;
+                    const x = (i - minBin) * step;
+                    if (i === minBin) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+
+                // 标记目标频率
+                const markFreq = (freq, color, label) => {
+                    const bin = Math.floor(freq / (sampleRate / dataArray.length));
+                    const x = (bin - minBin) * step;
+                    ctx.strokeStyle = color;
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, height);
+                    ctx.stroke();
+                    ctx.fillStyle = color;
+                    ctx.fillText(label, x + 2, 10);
+                };
+                
+                markFreq(FREQ_0, '#ff4d4f', '0');
+                markFreq(FREQ_1, '#52c41a', '1');
+            };
+
             useEffect(() => {
                 return () => {
                     stopTransmission();
                     stopReception();
-                    if (audioContextRef.current) {
-                        audioContextRef.current.close();
-                    }
+                    if (audioContextRef.current) audioContextRef.current.close();
                 };
             }, []);
 
             return (
                 <div className="container">
-                    <Title level={3} style={{ textAlign: 'center', marginBottom: 10 }}>
-                        <IconSound /> 声波文本传输 (GitHub兼容版)
+                    <Title level={3} style={{ textAlign: 'center' }}>
+                        <IconSound /> 声波文本传输 (14k/15kHz 优化版)
                     </Title>
                     
-                    <Row justify="center" gutter={16} style={{ marginBottom: 15 }}>
-                        <Col>
-                            <span className={`status-badge ${systemStatus.secure ? 'status-ok' : 'status-error'}`}></span>
-                            <Text type="secondary">HTTPS: {systemStatus.secure ? 'OK' : 'Fail'}</Text>
-                        </Col>
-                        <Col>
-                            <span className={`status-badge ${systemStatus.micSupported ? 'status-ok' : 'status-error'}`}></span>
-                            <Text type="secondary">Mic API: {systemStatus.micSupported ? 'OK' : 'Fail'}</Text>
-                        </Col>
-                    </Row>
-
                     <Card bordered={false} className="card-shadow">
                         <Tabs activeKey={activeTab} onChange={setActiveTab} centered>
-                            <TabPane tab={<span><IconDesktop /> 发送端</span>} key="sender">
+                            <TabPane tab="发送端" key="sender">
                                 <Space direction="vertical" style={{ width: '100%' }}>
                                     <Input.TextArea 
                                         rows={3} 
                                         value={textToSend} 
                                         onChange={(e) => setTextToSend(e.target.value)} 
-                                        placeholder="输入英文短文本..."
+                                        placeholder="输入英文短文本 (如: Hi)"
                                         maxLength={20}
                                     />
                                     
-                                    <Row gutter={16}>
-                                        <Col span={18}>
-                                            <Text>音量增益:</Text>
-                                            <Slider 
-                                                min={0.1} 
-                                                max={1.0} 
-                                                step={0.1} 
-                                                value={volume} 
-                                                onChange={setVolume} 
-                                            />
-                                        </Col>
-                                        <Col span={6}>
-                                            <Button onClick={playTestTone} size="small">
-                                                测试音
-                                            </Button>
-                                        </Col>
-                                    </Row>
-
                                     <Button 
                                         type="primary" 
                                         block 
-                                        icon={isSending ? <IconPause /> : <IconPlay />}
+                                        icon={isSending ? <IconStop /> : <IconPlay />}
                                         onClick={isSending ? stopTransmission : startTransmission}
                                         danger={isSending}
                                     >
                                         {isSending ? '停止发送' : '开始发送'}
                                     </Button>
                                     {isSending && <Progress percent={sendProgress} showInfo={false} />}
+                                    
                                     <Row justify="space-between">
-                                        <Tag color="blue">0: 18kHz</Tag>
-                                        <Tag color="green">1: 19kHz</Tag>
+                                        <Tag color="red">0: 14kHz</Tag>
+                                        <Tag color="green">1: 15kHz</Tag>
                                     </Row>
+                                    <Text type="secondary" style={{fontSize: 12}}>
+                                        提示: 请将手机/电脑音量调至最大，并靠近接收设备。
+                                    </Text>
                                 </Space>
                             </TabPane>
 
-                            <TabPane tab={<span><IconMobile /> 接收端</span>} key="receiver">
+                            <TabPane tab="接收端" key="receiver">
                                 <Space direction="vertical" style={{ width: '100%' }}>
                                     {receiverError && <Alert message={receiverError} type="error" showIcon closable />}
                                     
@@ -536,24 +461,16 @@
                                         icon={isReceiving ? <IconStop /> : <IconRecord />}
                                         onClick={isReceiving ? stopReception : startReception}
                                         danger={isReceiving}
-                                        disabled={!systemStatus.secure || !systemStatus.micSupported}
                                     >
                                         {isReceiving ? '停止监听' : '开始监听'}
                                     </Button>
-                                    
-                                    {!systemStatus.secure && (
-                                        <Alert 
-                                            message="非安全环境" 
-                                            description="麦克风访问需要 HTTPS 或 localhost。如果您在 GitHub Pages 上，请确保网址以 https:// 开头。" 
-                                            type="warning" 
-                                            showIcon 
-                                        />
-                                    )}
 
-                                    <Divider orientation="left">信号监测 (调试用)</Divider>
-                                    <Row gutter={16}>
+                                    <Divider orientation="left">实时频谱 (10k-20k)</Divider>
+                                    <canvas ref={canvasRef} width={500} height={100}></canvas>
+                                    
+                                    <Row gutter={16} style={{marginTop: 10}}>
                                         <Col span={12}>
-                                            <Statistic title="强度" value={signalStrength.toFixed(0)} suffix="%" valueStyle={{ fontSize: 16 }} />
+                                            <Statistic title="信号强度" value={signalStrength.toFixed(0)} suffix="%" valueStyle={{ fontSize: 16 }} />
                                             <Progress percent={signalStrength} showInfo={false} strokeColor="#52c41a" size="small" />
                                         </Col>
                                         <Col span={12}>
@@ -561,12 +478,11 @@
                                         </Col>
                                     </Row>
                                     
-                                    <div className="debug-info">
-                                        <div>采样率: {audioContextRef.current ? audioContextRef.current.sampleRate : '未初始化'} Hz</div>
-                                        <div>18kHz 能量: {debugEnergy0} dB</div>
-                                        <div>19kHz 能量: {debugEnergy1} dB</div>
-                                        {/* 修复点：使用 HTML 实体 &gt; 替代 > 以避免 JSX 解析歧义 */}
-                                        <div>{"阈值: > -65 dB 且差值 > 6 dB"}</div>
+                                    <div className="debug-panel">
+                                        <div>14kHz (Bit 0): {debugInfo.e0} dB</div>
+                                        <div>15kHz (Bit 1): {debugInfo.e1} dB</div>
+                                        <div>Noise Floor: {debugInfo.noise} dB</div>
+                                        <div>Sync State: {syncStateRef.current}</div>
                                     </div>
 
                                     <Divider orientation="left">接收结果</Divider>
@@ -585,14 +501,12 @@
             );
         };
 
-        // 确保 DOM 和库都加载完成后再渲染
         window.onload = function() {
             try {
                 const root = ReactDOM.createRoot(document.getElementById('root'));
                 root.render(<AcousticTransferApp />);
             } catch (e) {
-                console.error("Render failed", e);
-                document.body.innerHTML = `<div style="color:red; padding:20px;">渲染失败: ${e.message}</div>`;
+                document.body.innerHTML = `<div style="color:red; padding:20px;">Error: ${e.message}</div>`;
             }
         };
     </script>
