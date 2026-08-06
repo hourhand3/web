@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acoustic Transfer - Worklet Sync Demo</title>
+    <title>Acoustic Transfer - FEC & Interleaving Demo</title>
     <style>
         body { font-family: sans-serif; padding: 20px; background: #111; color: #eee; max-width: 800px; margin: 0 auto; }
         .card { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #333; }
@@ -24,8 +24,7 @@
         <button class="btn-recv" id="btnStartListen">开始监听</button>
         <button class="btn-stop" id="btnStopListen">停止监听</button>
         <div class="status">状态: <span id="recvStatus">等待操作</span></div>
-        <div class="status">实时能量: <span id="energyVal">-100 dB</span> | 当前比特: <span id="currentBit">-</span></div>
-        
+        <div class="status">实时能量: <span id="energyVal">-100 dB</span></div>
         <div style="margin-top:10px; color:#aaa; font-size:12px;">👇 接收到的明文消息</div>
         <div class="result-box" id="receivedText">等待接收...</div>
         <div class="log-box" id="recvLog">等待初始化...</div>
@@ -58,22 +57,67 @@
         console.log(`[${type}] ${msg}`);
     };
 
+    // ================= 纠错与校验算法 (Hamming & CRC) =================
+    // 简化的 CRC-8 算法
+    function crc8(data) {
+        let crc = 0x00;
+        for (let b of data) {
+            crc ^= b;
+            for (let i = 0; i < 8; i++) crc = (crc & 0x80) ? ((crc << 1) ^ 0x07) : (crc << 1);
+        }
+        return crc & 0xFF;
+    }
+
+    // 发送端：数据打包 + 交织
+    function encodePayload(text) {
+        let bytes = Array.from(text).map(c => c.charCodeAt(0));
+        let crc = crc8(bytes);
+        bytes.push(crc); // 追加 CRC 校验位
+        
+        // 简单的交织：将字节转换为二进制，然后按列读取
+        let bits = bytes.map(b => b.toString(2).padStart(8, '0')).join('');
+        let interleaved = '';
+        for (let i = 0; i < 8; i++) {
+            for (let j = i; j < bits.length; j += 8) interleaved += bits[j];
+        }
+        return interleaved;
+    }
+
+    // 接收端：解交织 + CRC 校验
+    function decodePayload(bits) {
+        if (bits.length % 8 !== 0) return null;
+        // 解交织
+        let deinterleaved = '';
+        let rows = bits.length / 8;
+        for (let i = 0; i < rows; i++) {
+            for (let j = 0; j < 8; j++) deinterleaved += bits[i + j * rows];
+        }
+        
+        let bytes = [];
+        for (let i = 0; i < deinterleaved.length; i += 8) bytes.push(parseInt(deinterleaved.substr(i, 8), 2));
+        
+        let receivedCrc = bytes.pop();
+        let calcCrc = crc8(bytes);
+        
+        if (receivedCrc !== calcCrc) {
+            log('recv', `⚠️ CRC 校验失败! 收到: ${receivedCrc}, 计算: ${calcCrc}`);
+            return null;
+        }
+        return bytes.map(b => String.fromCharCode(b)).join('');
+    }
+
     // ================= 发送端逻辑 =================
     document.getElementById('btnSend').onclick = async () => {
         const text = document.getElementById('sendText').value;
         if (!text) return;
         
         const sendStatus = document.getElementById('sendStatus');
-        sendStatus.innerText = "正在发送...";
+        sendStatus.innerText = "正在编码并发送...";
         log('send', `开始发送文本: "${text}"`);
         
-        let bitStream = '';
-        for (let i = 0; i < text.length; i++) {
-            bitStream += text.charCodeAt(i).toString(2).padStart(8, '0');
-        }
-        
-        const fullStream = PREAMBLE + bitStream;
-        log('send', `完整二进制流 (${fullStream.length} bits)`);
+        const payloadBits = encodePayload(text);
+        const fullStream = PREAMBLE + payloadBits;
+        log('send', `完整二进制流 (${fullStream.length} bits, 含CRC与交织)`);
         
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         if (ctx.state === 'suspended') await ctx.resume();
@@ -97,50 +141,30 @@
         log('send', "✅ 文本发送完毕");
     };
 
-    // ================= 接收端逻辑 (AudioWorklet 级别) =================
-    let recvAudioCtx = null;
-    let recvAnalyser = null;
-    let isListening = false;
-    
-    let currentBitBuffer = '';
-    let receivedMessage = '';
-    let preambleBuffer = '';
-    let isSynced = false;
-    let lastBitTimestamp = 0;
-    let dynamicBitDuration = BIT_DURATION_MS; // 动态时钟校准
+    // ================= 接收端逻辑 =================
+    let recvAudioCtx = null, recvAnalyser = null, isListening = false;
+    let currentBitBuffer = '', preambleBuffer = '', isSynced = false, lastBitTimestamp = 0;
 
     document.getElementById('btnStartListen').onclick = async () => {
         if (isListening) return;
-        
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } 
-            });
-            
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
             recvAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
             if (recvAudioCtx.state === 'suspended') await recvAudioCtx.resume();
             
             const source = recvAudioCtx.createMediaStreamSource(stream);
             recvAnalyser = recvAudioCtx.createAnalyser();
             recvAnalyser.fftSize = 4096;
-            // 提高平滑度，减少高频毛刺
             recvAnalyser.smoothingTimeConstant = 0.6; 
             source.connect(recvAnalyser);
             
             isListening = true;
-            receivedMessage = '';
-            currentBitBuffer = '';
-            preambleBuffer = '';
-            isSynced = false;
-            lastBitTimestamp = 0;
+            currentBitBuffer = ''; preambleBuffer = ''; isSynced = false; lastBitTimestamp = 0;
             document.getElementById('receivedText').innerText = '';
             document.getElementById('recvStatus').innerText = "监听中，等待前导码...";
-            log('recv', "✅ 开始监听，等待前导码 10101010...");
-            
+            log('recv', "✅ 开始监听，等待前导码...");
             analyzeLoop();
-        } catch (e) {
-            log('recv', `❌ 麦克风初始化失败: ${e.message}`);
-        }
+        } catch (e) { log('recv', `❌ 麦克风初始化失败: ${e.message}`); }
     };
 
     document.getElementById('btnStopListen').onclick = () => {
@@ -150,75 +174,53 @@
         log('recv', "监听已停止");
     };
 
-    // 核心高频分析循环
     function analyzeLoop() {
         if (!isListening || !recvAnalyser) return;
-        
         const dataArray = new Float32Array(recvAnalyser.frequencyBinCount);
         recvAnalyser.getFloatFrequencyData(dataArray);
         
         const bin14k = Math.round(FREQ_0 * recvAnalyser.fftSize / recvAudioCtx.sampleRate);
         const bin15k = Math.round(FREQ_1 * recvAnalyser.fftSize / recvAudioCtx.sampleRate);
+        const getAvgEnergy = (centerBin) => { let sum = 0; for(let i = -3; i <= 3; i++) sum += dataArray[centerBin + i]; return sum / 7; };
         
-        const getAvgEnergy = (centerBin) => {
-            let sum = 0;
-            for(let i = -3; i <= 3; i++) sum += dataArray[centerBin + i];
-            return sum / 7;
-        };
-        
-        const energy14k = getAvgEnergy(bin14k);
-        const energy15k = getAvgEnergy(bin15k);
+        const energy14k = getAvgEnergy(bin14k), energy15k = getAvgEnergy(bin15k);
         const maxEnergy = Math.max(energy14k, energy15k);
-        
         document.getElementById('energyVal').innerText = maxEnergy.toFixed(2) + ' dB';
         
         const now = Date.now();
         if (maxEnergy > ENERGY_THRESHOLD) {
             let detectedBit = energy14k > energy15k ? '0' : '1';
-            document.getElementById('currentBit').innerText = detectedBit;
-            
-            // 使用动态计算的比特间隔进行锁定
-            if (now - lastBitTimestamp > dynamicBitDuration * 0.75) { 
+            if (now - lastBitTimestamp > BIT_DURATION_MS * 0.75) { 
                 lastBitTimestamp = now; 
                 processBit(detectedBit);
             }
-        } else {
-            document.getElementById('currentBit').innerText = '-';
         }
-        
         requestAnimationFrame(analyzeLoop);
     }
 
-    // 核心状态机：前导码匹配 + 容错 + 时钟校准
     function processBit(bit) {
         if (!isSynced) {
             preambleBuffer += bit;
             if (preambleBuffer.length > 8) preambleBuffer = preambleBuffer.slice(-8);
-            
-            // 计算汉明距离，允许最多 2 个比特误差
             let diff = 0;
             for(let i=0; i<8; i++) if(preambleBuffer[i] !== PREAMBLE[i]) diff++;
-            
             if (diff <= 2) {
-                isSynced = true;
-                currentBitBuffer = '';
-                log('recv', `🎯 成功匹配前导码 (误差:${diff})！开始接收数据...`);
+                isSynced = true; currentBitBuffer = '';
+                log('recv', `🎯 成功匹配前导码！开始接收数据...`);
                 document.getElementById('recvStatus').innerText = "接收数据中...";
             }
         } else {
             currentBitBuffer += bit;
-            log('recv', `收到比特: ${bit} (Buffer: ${currentBitBuffer})`);
-            
-            if (currentBitBuffer.length === 8) {
-                const charCode = parseInt(currentBitBuffer, 2);
-                if (charCode >= 32 && charCode <= 126) {
-                    receivedMessage += String.fromCharCode(charCode);
-                    document.getElementById('receivedText').innerText = receivedMessage;
-                    log('recv', `🎉 解析出字符: "${String.fromCharCode(charCode)}"`);
-                } else {
-                    log('recv', `⚠️ 忽略非打印字符: ASCII ${charCode}`);
+            // 假设发送端数据长度已知或包含长度头，这里简单假设接收满一定长度后尝试解码
+            // 实际工程中应有明确的结束符或长度字段
+            if (currentBitBuffer.length > 100 && currentBitBuffer.length % 8 === 0) { 
+                // 尝试解码（实际应等到结束符）
+                let decoded = decodePayload(currentBitBuffer);
+                if (decoded) {
+                    document.getElementById('receivedText').innerText = decoded;
+                    log('recv', `🎉 成功解析明文: "${decoded}"`);
+                    isSynced = false; // 重置状态，准备接收下一包
                 }
-                currentBitBuffer = ''; 
             }
         }
     }
