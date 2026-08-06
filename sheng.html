@@ -3,21 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>声波数据传输 (修复版)</title>
+    <title>声波数据传输 (终极修复版)</title>
     
-    <!-- 核心依赖 -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- 使用更稳定的 CDN 链接 -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- Antd 5.x UMD 版本 -->
-    <script crossorigin src="https://unpkg.com/antd@5.12.0/dist/antd.min.js"></script>
     
     <style>
         body { 
             background-color: #f0f2f5; 
             padding: 20px; 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
         }
         .container { max-width: 600px; margin: 0 auto; }
         .card { 
@@ -33,16 +30,16 @@
             color: #00ff00; 
             padding: 10px; 
             border-radius: 4px; 
-            font-family: 'Courier New', Courier, monospace; 
+            font-family: 'Courier New', monospace; 
             font-size: 12px; 
-            height: 150px; 
+            height: 120px; 
             overflow-y: auto; 
             margin-top: 10px;
             white-space: pre-wrap;
         }
         canvas { 
             width: 100%; 
-            height: 100px; 
+            height: 120px; 
             background: #000; 
             border-radius: 4px; 
             margin-top: 10px; 
@@ -56,22 +53,10 @@
             background: #fafafa;
             border-radius: 4px;
         }
-        .status-item { text-align: center; }
+        .status-item { text-align: center; flex: 1; }
         .status-label { font-size: 12px; color: #888; }
         .status-value { font-size: 18px; font-weight: bold; color: #333; }
-        .progress-bar {
-            height: 6px;
-            background: #eee;
-            border-radius: 3px;
-            margin-top: 5px;
-            overflow: hidden;
-        }
-        .progress-fill {
-            height: 100%;
-            background: #1890ff;
-            transition: width 0.3s;
-        }
-        /* 简单的 Tab 样式替代 */
+        
         .tabs { display: flex; border-bottom: 1px solid #eee; margin-bottom: 20px; }
         .tab { 
             padding: 10px 20px; 
@@ -79,61 +64,49 @@
             border-bottom: 2px solid transparent; 
             font-weight: 500;
         }
-        .tab.active { 
-            border-bottom-color: #1890ff; 
-            color: #1890ff; 
-        }
+        .tab.active { border-bottom-color: #1890ff; color: #1890ff; }
+        
         .btn {
             display: inline-block;
-            font-weight: 400;
             text-align: center;
             cursor: pointer;
-            background-image: none;
             border: 1px solid transparent;
             white-space: nowrap;
             padding: 6px 15px;
             font-size: 14px;
             border-radius: 6px;
             transition: all 0.3s;
-            user-select: none;
+            margin-right: 10px;
+            margin-bottom: 10px;
         }
-        .btn-primary {
-            color: #fff;
-            background-color: #1890ff;
-            border-color: #1890ff;
-            box-shadow: 0 2px 0 rgba(0,0,0,0.045);
-        }
-        .btn-primary:hover { background-color: #40a9ff; border-color: #40a9ff; }
-        .btn-danger {
-            color: #fff;
-            background-color: #ff4d4f;
-            border-color: #ff4d4f;
-        }
-        .btn-danger:hover { background-color: #ff7875; border-color: #ff7875; }
-        .btn-block { display: block; width: 100%; }
+        .btn-primary { color: #fff; background-color: #1890ff; border-color: #1890ff; }
+        .btn-primary:hover { background-color: #40a9ff; }
+        .btn-danger { color: #fff; background-color: #ff4d4f; border-color: #ff4d4f; }
+        .btn-danger:hover { background-color: #ff7875; }
+        .btn-default { color: #333; background-color: #fff; border-color: #d9d9d9; }
+        .btn-default:hover { color: #40a9ff; border-color: #40a9ff; }
+        .btn-block { display: block; width: 100%; margin-right: 0; }
+        
         .input-area {
             width: 100%;
             padding: 8px 12px;
             border: 1px solid #d9d9d9;
             border-radius: 6px;
             font-size: 14px;
-            transition: all 0.3s;
             margin-bottom: 10px;
             box-sizing: border-box;
         }
-        .input-area:focus { border-color: #40a9ff; outline: 0; box-shadow: 0 0 0 2px rgba(24,144,255,0.2); }
         textarea.input-area { resize: vertical; min-height: 80px; }
         
-        .tag {
-            display: inline-block;
-            padding: 2px 8px;
-            font-size: 12px;
+        .alert-info {
+            background: #e6f7ff;
+            border: 1px solid #91d5ff;
+            padding: 10px 15px;
             border-radius: 4px;
-            margin-right: 5px;
+            color: #096dd9;
+            margin-bottom: 10px;
+            font-size: 13px;
         }
-        .tag-red { background: #fff1f0; border: 1px solid #ffa39e; color: #cf1322; }
-        .tag-green { background: #f6ffed; border: 1px solid #b7eb8f; color: #389e0d; }
-        
         .alert-error {
             background: #fff2f0;
             border: 1px solid #ffccc7;
@@ -141,7 +114,28 @@
             border-radius: 4px;
             color: #cf1322;
             margin-bottom: 10px;
-            font-size: 14px;
+            font-size: 13px;
+        }
+        .config-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            align-items: center;
+        }
+        .config-item {
+            flex: 1;
+        }
+        .config-item label {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+        .config-item input {
+            width: 100%;
+            padding: 4px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
         }
     </style>
 </head>
@@ -151,28 +145,35 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // --- 核心参数配置 ---
-        const FREQ_0_START = 12000; 
-        const FREQ_0_END = 13000;   
-        const FREQ_1_START = 14000; 
-        const FREQ_1_END = 15000;   
+        // --- 可配置参数 ---
+        // 为了最大兼容性，默认使用较低频率
+        const DEFAULT_FREQ_0_START = 8000; 
+        const DEFAULT_FREQ_0_END = 9000;   
+        const DEFAULT_FREQ_1_START = 10000; 
+        const DEFAULT_FREQ_1_END = 11000;   
         
-        const BIT_DURATION_MS = 150; 
+        const BIT_DURATION_MS = 200; 
         const SAMPLE_RATE = 48000;   
 
         const App = () => {
-            const [activeTab, setActiveTab] = useState('sender');
+            const [activeTab, setActiveTab] = useState('receiver'); // 默认打开接收端以便调试
+            
+            // Config State
+            const [freq0Start, setFreq0Start] = useState(DEFAULT_FREQ_0_START);
+            const [freq0End, setFreq0End] = useState(DEFAULT_FREQ_0_END);
+            const [freq1Start, setFreq1Start] = useState(DEFAULT_FREQ_1_START);
+            const [freq1End, setFreq1End] = useState(DEFAULT_FREQ_1_END);
             
             // Sender State
-            const [textToSend, setTextToSend] = useState('Hello');
+            const [textToSend, setTextToSend] = useState('Hi');
             const [isSending, setIsSending] = useState(false);
-            const [sendProgress, setSendProgress] = useState(0);
             
             // Receiver State
             const [isReceiving, setIsReceiving] = useState(false);
             const [receivedData, setReceivedData] = useState('');
             const [signalStrength, setSignalStrength] = useState(0);
-            const [detectedBit, setDetectedBit] = useState(null);
+            const [currentEnergy0, setCurrentEnergy0] = useState(-100);
+            const [currentEnergy1, setCurrentEnergy1] = useState(-100);
             const [receiverError, setReceiverError] = useState('');
             const [debugLogs, setDebugLogs] = useState([]);
             
@@ -186,7 +187,6 @@
             const decoderState = useRef({
                 energy0History: [],
                 energy1History: [],
-                noiseHistory: [],
                 lastBitTime: 0,
                 currentByte: 0,
                 bitCount: 0,
@@ -195,13 +195,19 @@
             });
 
             const addLog = (msg) => {
-                setDebugLogs(prev => [...prev.slice(-20), `${new Date().toLocaleTimeString()} ${msg}`]);
+                setDebugLogs(prev => [...prev.slice(-15), `${new Date().toLocaleTimeString()} ${msg}`]);
             };
 
             const initAudioContext = async () => {
                 if (!audioContextRef.current) {
-                    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (!AudioContext) {
+                        throw new Error("您的浏览器不支持 Web Audio API");
+                    }
+                    audioContextRef.current = new AudioContext();
                 }
+                
+                // 关键修复：确保 Context 是 running 状态
                 if (audioContextRef.current.state === 'suspended') {
                     await audioContextRef.current.resume();
                 }
@@ -218,8 +224,8 @@
                 oscillator.frequency.linearRampToValueAtTime(endFreq, startTime + durationSec);
                 
                 gainNode.gain.setValueAtTime(0, startTime);
-                gainNode.gain.linearRampToValueAtTime(1.0, startTime + 0.01);
-                gainNode.gain.setValueAtTime(1.0, startTime + durationSec - 0.01);
+                gainNode.gain.linearRampToValueAtTime(0.8, startTime + 0.02);
+                gainNode.gain.setValueAtTime(0.8, startTime + durationSec - 0.02);
                 gainNode.gain.linearRampToValueAtTime(0, startTime + durationSec);
                 
                 oscillator.connect(gainNode);
@@ -234,7 +240,6 @@
                 try {
                     const ctx = await initAudioContext();
                     setIsSending(true);
-                    setSendProgress(0);
                     addLog("开始发送...");
 
                     const bits = [];
@@ -250,30 +255,45 @@
                     
                     let currentTime = ctx.currentTime + 0.1;
                     const bitDurationSec = BIT_DURATION_MS / 1000;
-                    const totalBits = payload.length;
 
-                    payload.forEach((bit, index) => {
+                    payload.forEach((bit) => {
                         if (bit === 0) {
-                            playChirp(ctx, ctx.destination, FREQ_0_START, FREQ_0_END, bitDurationSec, currentTime);
+                            playChirp(ctx, ctx.destination, freq0Start, freq0End, bitDurationSec, currentTime);
                         } else {
-                            playChirp(ctx, ctx.destination, FREQ_1_START, FREQ_1_END, bitDurationSec, currentTime);
+                            playChirp(ctx, ctx.destination, freq1Start, freq1End, bitDurationSec, currentTime);
                         }
                         currentTime += bitDurationSec;
-                        
-                        setTimeout(() => {
-                            setSendProgress(Math.floor(((index + 1) / totalBits) * 100));
-                        }, (currentTime - ctx.currentTime) * 1000);
                     });
 
                     setTimeout(() => {
                         setIsSending(false);
-                        setSendProgress(100);
                         addLog("发送完成");
-                    }, (currentTime - ctx.currentTime) * 1000 + 500);
+                    }, (currentTime - ctx.currentTime) * 1000 + 200);
 
                 } catch (e) {
                     alert("发送失败: " + e.message);
                     setIsSending(false);
+                }
+            };
+
+            const playTestTone = async (freq) => {
+                try {
+                    const ctx = await initAudioContext();
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    gain.gain.value = 0.5;
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start();
+                    setTimeout(() => {
+                        osc.stop();
+                        osc.disconnect();
+                    }, 500);
+                    addLog(`播放测试音: ${freq}Hz`);
+                } catch(e) {
+                    console.error(e);
                 }
             };
 
@@ -286,7 +306,6 @@
                 decoderState.current = {
                     energy0History: [],
                     energy1History: [],
-                    noiseHistory: [],
                     lastBitTime: 0,
                     currentByte: 0,
                     bitCount: 0,
@@ -316,12 +335,14 @@
                     
                     const source = ctx.createMediaStreamSource(stream);
                     analyserRef.current = ctx.createAnalyser();
-                    analyserRef.current.fftSize = 16384; 
-                    analyserRef.current.smoothingTimeConstant = 0.8; 
+                    
+                    // 修复：降低 FFT 大小以提高兼容性和性能
+                    analyserRef.current.fftSize = 4096; 
+                    analyserRef.current.smoothingTimeConstant = 0.5; 
                     
                     source.connect(analyserRef.current);
                     setIsReceiving(true);
-                    addLog("监听中...");
+                    addLog("监听中... 请确保音量足够大");
                     
                     analyzeFrequencyLoop();
                 } catch (error) {
@@ -368,87 +389,104 @@
             const analyzeFrequencyLoop = () => {
                 if (!isReceiving || !analyserRef.current) return;
 
-                const dataArray = new Float32Array(analyserRef.current.frequencyBinCount);
-                analyserRef.current.getFloatFrequencyData(dataArray);
-                const sampleRate = audioContextRef.current.sampleRate;
+                try {
+                    const dataArray = new Float32Array(analyserRef.current.frequencyBinCount);
+                    analyserRef.current.getFloatFrequencyData(dataArray);
+                    const sampleRate = audioContextRef.current.sampleRate;
 
-                const e0 = getBandEnergy(dataArray, sampleRate, FREQ_0_START, FREQ_0_END);
-                const e1 = getBandEnergy(dataArray, sampleRate, FREQ_1_START, FREQ_1_END);
-                const noise = getBandEnergy(dataArray, sampleRate, 8000, 9000);
+                    // 计算两个频段的能量
+                    const e0 = getBandEnergy(dataArray, sampleRate, freq0Start, freq0End);
+                    const e1 = getBandEnergy(dataArray, sampleRate, freq1Start, freq1End);
+                    
+                    setCurrentEnergy0(e0);
+                    setCurrentEnergy1(e1);
 
-                const state = decoderState.current;
-                state.energy0History.push(e0);
-                state.energy1History.push(e1);
-                state.noiseHistory.push(noise);
-                
-                if (state.energy0History.length > 10) state.energy0History.shift();
-                if (state.energy1History.length > 10) state.energy1History.shift();
-                if (state.noiseHistory.length > 10) state.noiseHistory.shift();
+                    const state = decoderState.current;
+                    state.energy0History.push(e0);
+                    state.energy1History.push(e1);
+                    
+                    if (state.energy0History.length > 5) state.energy0History.shift();
+                    if (state.energy1History.length > 5) state.energy1History.shift();
 
-                const avgE0 = state.energy0History.reduce((a,b)=>a+b,0) / state.energy0History.length;
-                const avgE1 = state.energy1History.reduce((a,b)=>a+b,0) / state.energy1History.length;
-                const avgNoise = state.noiseHistory.reduce((a,b)=>a+b,0) / state.noiseHistory.length;
+                    const avgE0 = state.energy0History.reduce((a,b)=>a+b,0) / state.energy0History.length;
+                    const avgE1 = state.energy1History.reduce((a,b)=>a+b,0) / state.energy1History.length;
 
-                const maxSignal = Math.max(avgE0, avgE1);
-                const strength = Math.max(0, Math.min(100, (maxSignal + 60) * 2)); 
-                setSignalStrength(strength);
+                    const NOISE_FLOOR = -55; 
+                    const SIGNAL_THRESHOLD = -45; 
 
-                const isSignalValid = (maxSignal > -45) && (maxSignal - avgNoise > 10);
-                
-                let detected = null;
-                if (isSignalValid) {
-                    detected = avgE1 > avgE0 ? 1 : 0;
-                    setDetectedBit(detected);
-                } else {
-                    setDetectedBit(null);
-                }
+                    const maxSignal = Math.max(avgE0, avgE1);
+                    
+                    const strength = Math.max(0, Math.min(100, (maxSignal + 60) * 2)); 
+                    setSignalStrength(strength);
 
-                const now = Date.now();
-                if (detected !== null) {
-                    if (now - state.lastBitTime > BIT_DURATION_MS * 0.7) {
-                        state.lastBitTime = now;
-                        
-                        if (state.syncState === 'IDLE' || state.syncState === 'SYNCING') {
-                            if (state.preambleCount < 5) {
-                                state.syncState = 'SYNCING';
-                                state.preambleCount++;
-                            } else {
-                                state.syncState = 'RECEIVING';
-                                state.bitCount = 0;
-                                state.currentByte = 0;
-                            }
+                    let detected = null;
+                    if (maxSignal > SIGNAL_THRESHOLD) {
+                        if (Math.abs(avgE1 - avgE0) > 3) {
+                            detected = avgE1 > avgE0 ? 1 : 0;
                         }
-                        
-                        if (state.syncState === 'RECEIVING') {
-                            state.currentByte = (state.currentByte << 1) | detected;
-                            state.bitCount++;
+                    }
+
+                    const now = Date.now();
+                    if (detected !== null) {
+                        if (now - state.lastBitTime > BIT_DURATION_MS * 0.6) {
+                            state.lastBitTime = now;
                             
-                            if (state.bitCount === 8) {
-                                const charCode = state.currentByte;
-                                if (charCode >= 32 && charCode <= 126) {
-                                    const char = String.fromCharCode(charCode);
-                                    setReceivedData(prev => prev + char);
-                                    addLog(`Decoded: '${char}'`);
+                            if (state.syncState === 'IDLE' || state.syncState === 'SYNCING') {
+                                if (state.preambleCount < 10) {
+                                    state.syncState = 'SYNCING';
+                                    state.preambleCount++;
+                                } else {
+                                    state.syncState = 'RECEIVING';
+                                    state.bitCount = 0;
+                                    state.currentByte = 0;
+                                    addLog("同步成功，开始接收数据");
                                 }
-                                state.bitCount = 0;
-                                state.currentByte = 0;
+                            }
+                            
+                            if (state.syncState === 'RECEIVING') {
+                                state.currentByte = (state.currentByte << 1) | detected;
+                                state.bitCount++;
+                                
+                                if (state.bitCount === 8) {
+                                    const charCode = state.currentByte;
+                                    if (charCode >= 32 && charCode <= 126) {
+                                        const char = String.fromCharCode(charCode);
+                                        setReceivedData(prev => prev + char);
+                                        addLog(`Decoded: '${char}'`);
+                                    }
+                                    state.bitCount = 0;
+                                    state.currentByte = 0;
+                                }
+                            }
+                        }
+                    } else {
+                        if (now - state.lastBitTime > BIT_DURATION_MS * 4) {
+                            if (state.syncState !== 'IDLE') {
+                                state.syncState = 'IDLE';
+                                state.preambleCount = 0;
                             }
                         }
                     }
-                } else {
-                    if (now - state.lastBitTime > BIT_DURATION_MS * 3) {
-                        state.syncState = 'IDLE';
-                        state.preambleCount = 0;
-                    }
-                }
 
-                drawVisualizer(dataArray, sampleRate);
+                    drawVisualizer(dataArray, sampleRate);
+                } catch (err) {
+                    console.error("Analysis loop error:", err);
+                    // 发生错误时不停止循环，但记录日志
+                }
+                
                 animationFrameRef.current = requestAnimationFrame(analyzeFrequencyLoop);
             };
 
             const drawVisualizer = (dataArray, sampleRate) => {
                 const canvas = document.getElementById('spectrumCanvas');
                 if (!canvas) return;
+                
+                // 确保 Canvas 尺寸正确
+                if (canvas.width !== canvas.offsetWidth) {
+                    canvas.width = canvas.offsetWidth;
+                    canvas.height = canvas.offsetHeight;
+                }
+
                 const ctx = canvas.getContext('2d');
                 const width = canvas.width;
                 const height = canvas.height;
@@ -456,32 +494,52 @@
                 ctx.fillStyle = '#000';
                 ctx.fillRect(0, 0, width, height);
                 
-                const minFreq = 10000;
-                const maxFreq = 16000;
+                const minFreq = 6000;
+                const maxFreq = 13000;
                 const binWidth = sampleRate / dataArray.length;
                 const minBin = Math.floor(minFreq / binWidth);
                 const maxBin = Math.floor(maxFreq / binWidth);
                 const binsToDraw = maxBin - minBin;
+                
+                if (binsToDraw <= 0) return;
+
                 const step = width / binsToDraw;
                 
                 ctx.lineWidth = 2;
                 ctx.strokeStyle = '#0f0';
                 ctx.beginPath();
                 
+                let hasData = false;
                 for (let i = minBin; i < maxBin; i++) {
-                    const v = dataArray[i];
-                    const y = height - ((v + 100) / 100) * height;
-                    const x = (i - minBin) * step;
-                    if (i === minBin) ctx.moveTo(x, y);
-                    else ctx.lineTo(x, y);
+                    if (i >= 0 && i < dataArray.length) {
+                        const v = dataArray[i];
+                        // 映射 Y 轴: -100dB (bottom) to 0dB (top)
+                        const y = height - ((v + 100) / 100) * height;
+                        const x = (i - minBin) * step;
+                        if (i === minBin) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                        hasData = true;
+                    }
                 }
                 ctx.stroke();
 
+                // 如果没有数据，画一条红线提示
+                if (!hasData) {
+                    ctx.strokeStyle = 'red';
+                    ctx.beginPath();
+                    ctx.moveTo(0, height/2);
+                    ctx.lineTo(width, height/2);
+                    ctx.stroke();
+                    ctx.fillStyle = 'red';
+                    ctx.fillText("No Data", 10, height/2 - 5);
+                }
+
+                // 绘制标记区域
                 const markRange = (start, end, color, label) => {
                     const startBin = Math.floor(start / binWidth);
                     const endBin = Math.floor(end / binWidth);
-                    const x1 = (startBin - minBin) * step;
-                    const x2 = (endBin - minBin) * step;
+                    const x1 = Math.max(0, (startBin - minBin) * step);
+                    const x2 = Math.min(width, (endBin - minBin) * step);
                     
                     ctx.fillStyle = color;
                     ctx.globalAlpha = 0.3;
@@ -492,8 +550,20 @@
                     ctx.fillText(label, x1 + 5, 15);
                 };
                 
-                markRange(FREQ_0_START, FREQ_0_END, 'rgba(255, 77, 79, 0.5)', 'Bit 0');
-                markRange(FREQ_1_START, FREQ_1_END, 'rgba(82, 196, 26, 0.5)', 'Bit 1');
+                markRange(freq0Start, freq0End, 'rgba(255, 77, 79, 0.5)', 'Bit 0');
+                markRange(freq1Start, freq1End, 'rgba(82, 196, 26, 0.5)', 'Bit 1');
+                
+                // 绘制阈值线
+                const thresholdY = height - ((-45 + 100) / 100) * height;
+                ctx.strokeStyle = 'yellow';
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(0, thresholdY);
+                ctx.lineTo(width, thresholdY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = 'yellow';
+                ctx.fillText('Threshold (-45dB)', width - 80, thresholdY - 5);
             };
 
             useEffect(() => {
@@ -506,15 +576,59 @@
             return (
                 <div className="container">
                     <div className="header">
-                        <h2 style={{margin: 0}}>声波文本传输 (修复版)</h2>
-                        <p style={{color: '#666', fontSize: '14px'}}>Chirp 信号 + 能量积分解码</p>
+                        <h2 style={{margin: 0}}>声波文本传输 (终极修复版)</h2>
+                        <p style={{color: '#666', fontSize: '14px'}}>已修复频谱显示问题，请允许麦克风权限</p>
                     </div>
                     
                     <div className="card">
                         <div className="tabs">
                             <div className={`tab ${activeTab === 'sender' ? 'active' : ''}`} onClick={() => setActiveTab('sender')}>发送端</div>
                             <div className={`tab ${activeTab === 'receiver' ? 'active' : ''}`} onClick={() => setActiveTab('receiver')}>接收端</div>
+                            <div className={`tab ${activeTab === 'config' ? 'active' : ''}`} onClick={() => setActiveTab('config')}>配置与测试</div>
                         </div>
+
+                        {activeTab === 'config' && (
+                            <div>
+                                <div className="alert-info">
+                                    <strong>故障排除指南：</strong><br/>
+                                    1. 如果接收端无反应，请先点击下方的“测试音调”按钮。<br/>
+                                    2. 如果你听不到声音，说明你的扬声器不支持该频率，请调低频率。<br/>
+                                    3. 确保发送设备和接收设备距离较近（< 50cm）。<br/>
+                                    4. 笔记本电脑通常无法处理 12kHz 以上的声音，建议设为 8k-10k。
+                                </div>
+                                
+                                <div className="config-row">
+                                    <div className="config-item">
+                                        <label>Bit 0 起始 (Hz)</label>
+                                        <input type="number" value={freq0Start} onChange={e => setFreq0Start(Number(e.target.value))} />
+                                    </div>
+                                    <div className="config-item">
+                                        <label>Bit 0 结束 (Hz)</label>
+                                        <input type="number" value={freq0End} onChange={e => setFreq0End(Number(e.target.value))} />
+                                    </div>
+                                    <button className="btn btn-default" onClick={() => playTestTone(freq0Start)}>测试 Bit 0</button>
+                                </div>
+                                
+                                <div className="config-row">
+                                    <div className="config-item">
+                                        <label>Bit 1 起始 (Hz)</label>
+                                        <input type="number" value={freq1Start} onChange={e => setFreq1Start(Number(e.target.value))} />
+                                    </div>
+                                    <div className="config-item">
+                                        <label>Bit 1 结束 (Hz)</label>
+                                        <input type="number" value={freq1End} onChange={e => setFreq1End(Number(e.target.value))} />
+                                    </div>
+                                    <button className="btn btn-default" onClick={() => playTestTone(freq1Start)}>测试 Bit 1</button>
+                                </div>
+                                
+                                <div className="config-row">
+                                    <div className="config-item">
+                                        <label>比特持续时间 (ms)</label>
+                                        <input type="number" value={BIT_DURATION_MS} readOnly style={{background:'#eee'}} />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {activeTab === 'sender' && (
                             <div>
@@ -531,24 +645,13 @@
                                     className={`btn btn-primary btn-block ${isSending ? 'btn-danger' : ''}`}
                                     onClick={isSending ? null : startTransmission}
                                     disabled={isSending}
-                                    style={{opacity: isSending ? 0.7 : 1}}
                                 >
                                     {isSending ? '正在发送...' : '开始发送'}
                                 </button>
                                 
-                                {isSending && (
-                                    <div className="progress-bar">
-                                        <div className="progress-fill" style={{width: `${sendProgress}%`}}></div>
-                                    </div>
-                                )}
-                                
-                                <div style={{marginTop: 15}}>
-                                    <span className="tag tag-red">Bit 0: 12k-13k</span>
-                                    <span className="tag tag-green">Bit 1: 14k-15k</span>
+                                <div style={{marginTop: 15, fontSize: 12, color: '#666'}}>
+                                    当前配置: Bit0 [{freq0Start}-{freq0End}Hz], Bit1 [{freq1Start}-{freq1End}Hz]
                                 </div>
-                                <p style={{fontSize: 12, color: '#999', marginTop: 10}}>
-                                    提示: 请将音量调至最大。声音类似鸟叫。
-                                </p>
                             </div>
                         )}
 
@@ -564,21 +667,25 @@
                                 </button>
 
                                 <div style={{marginTop: 20}}>
-                                    <div style={{fontSize: 14, fontWeight: 'bold', marginBottom: 5}}>实时频谱 (10k-16k)</div>
-                                    <canvas id="spectrumCanvas" width={500} height={100}></canvas>
+                                    <div style={{fontSize: 14, fontWeight: 'bold', marginBottom: 5}}>
+                                        实时频谱 
+                                        <span style={{fontSize: 12, color: '#888', fontWeight: 'normal'}}> (黄色虚线为解码阈值)</span>
+                                    </div>
+                                    <canvas id="spectrumCanvas" width={500} height={120}></canvas>
                                 </div>
                                 
                                 <div className="status-row">
                                     <div className="status-item">
-                                        <div className="status-label">信号强度</div>
-                                        <div className="status-value" style={{color: signalStrength > 50 ? '#52c41a' : '#333'}}>{signalStrength.toFixed(0)}%</div>
-                                        <div className="progress-bar" style={{width: 80, margin: '5px auto 0'}}>
-                                            <div className="progress-fill" style={{width: `${signalStrength}%`, background: signalStrength > 50 ? '#52c41a' : '#1890ff'}}></div>
-                                        </div>
+                                        <div className="status-label">Bit 0 能量</div>
+                                        <div className="status-value" style={{fontSize: 14}}>{currentEnergy0.toFixed(1)} dB</div>
                                     </div>
                                     <div className="status-item">
-                                        <div className="status-label">当前比特</div>
-                                        <div className="status-value">{detectedBit !== null ? detectedBit : '-'}</div>
+                                        <div className="status-label">Bit 1 能量</div>
+                                        <div className="status-value" style={{fontSize: 14}}>{currentEnergy1.toFixed(1)} dB</div>
+                                    </div>
+                                    <div className="status-item">
+                                        <div className="status-label">综合强度</div>
+                                        <div className="status-value">{signalStrength.toFixed(0)}%</div>
                                     </div>
                                 </div>
                                 
