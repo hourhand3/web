@@ -3,31 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>声波数据传输 (高频兼容优化版)</title>
+    <title>声波数据传输 (终极鲁棒版)</title>
     
-    <!-- 引入 React -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    
-    <!-- 引入 Babel -->
     <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- 引入 Ant Design CSS -->
     <link rel="stylesheet" href="https://unpkg.com/antd@5.12.0/dist/reset.css">
-    
-    <!-- 引入 Ant Design JS -->
     <script crossorigin src="https://unpkg.com/antd@5.12.0/dist/antd.min.js"></script>
 
     <style>
         body { background-color: #f0f2f5; padding: 20px; font-family: sans-serif; }
         .container { max-width: 600px; margin: 0 auto; }
         .card-shadow { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .debug-panel { background: #222; color: #0f0; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; margin-top: 10px; }
-        canvas { width: 100%; height: 60px; background: #333; margin-top: 5px; }
-        .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
-        .bg-green { background: #52c41a; }
-        .bg-red { background: #ff4d4f; }
-        .bg-gray { background: #ccc; }
+        .debug-panel { background: #222; color: #0f0; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; margin-top: 10px; height: 150px; overflow-y: auto; }
+        canvas { width: 100%; height: 80px; background: #333; margin-top: 5px; border-radius: 4px; }
+        .status-indicator { display: flex; align-items: center; justify-content: center; height: 40px; background: #eee; border-radius: 4px; margin-bottom: 10px; font-weight: bold; }
+        .status-active { background: #d9f7be; color: #389e0d; }
+        .status-idle { background: #fff1f0; color: #cf1322; }
     </style>
 </head>
 <body>
@@ -35,16 +27,20 @@
 
     <script type="text/babel">
         const { useState, useEffect, useRef, useCallback } = React;
-        const { Card, Tabs, Input, Button, Space, Typography, Progress, Alert, Tag, Row, Col, Statistic, Divider, Slider, message, Switch } = antd;
+        const { Card, Tabs, Input, Button, Space, Typography, Progress, Alert, Tag, Row, Col, Statistic, Divider, Switch, message } = antd;
         const { Title, Text } = Typography;
         const { TabPane } = Tabs;
 
-        // --- 核心参数配置 (已优化为兼容性更好的频率) ---
-        const FREQ_0 = 14000; // 14 kHz (Bit 0) - 兼容性更好
-        const FREQ_1 = 15000; // 15 kHz (Bit 1) - 兼容性更好
-        const BIT_DURATION_MS = 100; // 每个比特持续时间 (毫秒) - 稍长一点更稳定
+        // --- 核心参数配置 ---
+        // 使用更低的频率以确保兼容性，同时拉开间距
+        const FREQ_0_START = 12000; 
+        const FREQ_0_END = 13000;   // Bit 0: Chirp from 12k to 13k
+        const FREQ_1_START = 14000; 
+        const FREQ_1_END = 15000;   // Bit 1: Chirp from 14k to 15k
         
-        // 简单的 SVG 图标
+        const BIT_DURATION_MS = 150; // 增加比特持续时间，提高信噪比
+        const SAMPLE_RATE = 48000;   // 目标采样率
+
         const IconSound = () => (<svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor"><path d="M704 448H584V328c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v120H392c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h120v120c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8V520h120c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM400 256c-132.5 0-240 107.5-240 240s107.5 240 240 240 240-107.5 240-240-107.5-240-240-240zm0 416c-97.2 0-176-78.8-176-176s78.8-176 176-176 176 78.8 176 176-78.8 176-176 176z"></path></svg>);
         const IconPlay = () => (<svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor"><path d="M724 218.3V141c0-6.7-7.7-10.4-12.9-6.3L260.3 486.8a31.86 31.86 0 000 50.3l450.8 352.1c5.3 4.1 12.9.4 12.9-6.3v-77.3c0-4.9-2.3-9.6-6.1-12.6l-360-281 360-281.1c3.8-3 6.1-7.7 6.1-12.6z"></path></svg>);
         const IconRecord = () => (<svg viewBox="64 64 896 896" width="1em" height="1em" fill="currentColor"><path d="M448 744c163.5 0 296-132.5 296-296S611.5 152 448 152 152 284.5 152 448s132.5 296 296 296z"></path></svg>);
@@ -64,25 +60,30 @@
             const [signalStrength, setSignalStrength] = useState(0);
             const [detectedBit, setDetectedBit] = useState(null);
             const [receiverError, setReceiverError] = useState('');
-            
-            // Debug/Visualizer State
-            const [debugInfo, setDebugInfo] = useState({ e0: -100, e1: -100, noise: -100 });
-            const canvasRef = useRef(null);
+            const [debugLogs, setDebugLogs] = useState([]);
             
             // Audio Refs
             const audioContextRef = useRef(null);
-            const oscillatorRef = useRef(null);
-            const gainNodeRef = useRef(null);
-            const analyserRef = useRef(null);
             const streamRef = useRef(null);
+            const analyserRef = useRef(null);
             const animationFrameRef = useRef(null);
-            const sendIntervalRef = useRef(null);
+            const sendTimeoutRef = useRef(null);
             
-            // Decoder Refs
-            const lastBitTimeRef = useRef(0);
-            const currentByteRef = useRef(0);
-            const bitCountRef = useRef(0);
-            const syncStateRef = useRef('IDLE'); // IDLE, SYNCING, RECEIVING
+            // Decoder State Refs (使用 Ref 避免闭包陷阱)
+            const decoderState = useRef({
+                energy0History: [],
+                energy1History: [],
+                noiseHistory: [],
+                lastBitTime: 0,
+                currentByte: 0,
+                bitCount: 0,
+                syncState: 'IDLE', // IDLE, SYNCING, RECEIVING
+                preambleCount: 0
+            });
+
+            const addLog = (msg) => {
+                setDebugLogs(prev => [...prev.slice(-20), `${new Date().toLocaleTimeString()} ${msg}`]);
+            };
 
             // 初始化 AudioContext
             const initAudioContext = async () => {
@@ -95,33 +96,38 @@
                 return audioContextRef.current;
             };
 
-            // --- Sender Logic ---
+            // --- Sender Logic: Chirp Generation ---
+            const playChirp = (ctx, destination, startFreq, endFreq, durationSec, startTime) => {
+                const oscillator = ctx.createOscillator();
+                const gainNode = ctx.createGain();
+                
+                oscillator.type = 'sine';
+                // 线性调频模拟
+                oscillator.frequency.setValueAtTime(startFreq, startTime);
+                oscillator.frequency.linearRampToValueAtTime(endFreq, startTime + durationSec);
+                
+                // 包络：淡入淡出，避免爆音
+                gainNode.gain.setValueAtTime(0, startTime);
+                gainNode.gain.linearRampToValueAtTime(1.0, startTime + 0.01);
+                gainNode.gain.setValueAtTime(1.0, startTime + durationSec - 0.01);
+                gainNode.gain.linearRampToValueAtTime(0, startTime + durationSec);
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(destination);
+                
+                oscillator.start(startTime);
+                oscillator.stop(startTime + durationSec);
+                
+                return oscillator;
+            };
+
             const startTransmission = async () => {
                 if (!textToSend) return;
                 try {
                     const ctx = await initAudioContext();
-                    
-                    const oscillator = ctx.createOscillator();
-                    const gainNode = ctx.createGain();
-                    
-                    oscillator.type = 'sine';
-                    oscillator.frequency.value = FREQ_0;
-                    
-                    // 初始音量为0，避免爆音
-                    gainNode.gain.setValueAtTime(0, ctx.currentTime);
-                    
-                    oscillator.connect(gainNode);
-                    gainNode.connect(ctx.destination);
-                    
-                    oscillatorRef.current = oscillator;
-                    gainNodeRef.current = gainNode;
-                    
-                    oscillator.start();
-                    // 快速淡入
-                    gainNode.gain.linearRampToValueAtTime(1.0, ctx.currentTime + 0.1);
-                    
                     setIsSending(true);
                     setSendProgress(0);
+                    addLog("开始发送...");
 
                     // 准备数据
                     const bits = [];
@@ -132,62 +138,39 @@
                         }
                     }
                     
-                    // 添加前导码 (Preamble) 用于同步: 1010101010
+                    // 前导码: 1010101010 (用于同步)
                     const preamble = [1, 0, 1, 0, 1, 0, 1, 0, 1, 0];
-                    const payload = [...preamble, ...bits, 0, 0, 0, 0]; // 尾部补零
+                    const payload = [...preamble, ...bits];
                     
-                    let currentBitIndex = 0;
+                    let currentTime = ctx.currentTime + 0.1; // 稍微延迟一点开始
+                    const bitDurationSec = BIT_DURATION_MS / 1000;
                     const totalBits = payload.length;
-                    
-                    const sendNextBit = () => {
-                        if (currentBitIndex >= totalBits) {
-                            stopTransmission();
-                            setSendProgress(100);
-                            message.success("发送完成");
-                            return;
-                        }
-                        
-                        const bit = payload[currentBitIndex];
-                        const freq = bit === 0 ? FREQ_0 : FREQ_1;
-                        
-                        // 平滑切换频率
-                        oscillator.frequency.setTargetAtTime(freq, ctx.currentTime, 0.01);
-                        
-                        currentBitIndex++;
-                        setSendProgress(Math.floor((currentBitIndex / totalBits) * 100));
-                    };
 
-                    // 立即发送第一个比特
-                    sendNextBit();
-                    // 之后每隔 BIT_DURATION_MS 发送下一个
-                    sendIntervalRef.current = setInterval(sendNextBit, BIT_DURATION_MS);
+                    payload.forEach((bit, index) => {
+                        if (bit === 0) {
+                            playChirp(ctx, ctx.destination, FREQ_0_START, FREQ_0_END, bitDurationSec, currentTime);
+                        } else {
+                            playChirp(ctx, ctx.destination, FREQ_1_START, FREQ_1_END, bitDurationSec, currentTime);
+                        }
+                        currentTime += bitDurationSec;
+                        
+                        // 更新进度条 (粗略估计)
+                        setTimeout(() => {
+                            setSendProgress(Math.floor(((index + 1) / totalBits) * 100));
+                        }, (currentTime - ctx.currentTime) * 1000);
+                    });
+
+                    // 清理状态
+                    setTimeout(() => {
+                        setIsSending(false);
+                        setSendProgress(100);
+                        addLog("发送完成");
+                    }, (currentTime - ctx.currentTime) * 1000 + 500);
+
                 } catch (e) {
                     alert("发送失败: " + e.message);
                     setIsSending(false);
                 }
-            };
-
-            const stopTransmission = () => {
-                if (sendIntervalRef.current) {
-                    clearInterval(sendIntervalRef.current);
-                    sendIntervalRef.current = null;
-                }
-                if (gainNodeRef.current && audioContextRef.current) {
-                    // 淡出
-                    gainNodeRef.current.gain.setTargetAtTime(0, audioContextRef.current.currentTime, 0.1);
-                    setTimeout(() => {
-                        if (oscillatorRef.current) {
-                            try { oscillatorRef.current.stop(); } catch(e){}
-                            oscillatorRef.current.disconnect();
-                            oscillatorRef.current = null;
-                        }
-                        if (gainNodeRef.current) {
-                            gainNodeRef.current.disconnect();
-                            gainNodeRef.current = null;
-                        }
-                    }, 200);
-                }
-                setIsSending(false);
             };
 
             // --- Receiver Logic ---
@@ -195,9 +178,17 @@
                 setReceiverError('');
                 setReceivedData('');
                 setSignalStrength(0);
-                syncStateRef.current = 'IDLE';
-                bitCountRef.current = 0;
-                currentByteRef.current = 0;
+                setDebugLogs([]);
+                decoderState.current = {
+                    energy0History: [],
+                    energy1History: [],
+                    noiseHistory: [],
+                    lastBitTime: 0,
+                    currentByte: 0,
+                    bitCount: 0,
+                    syncState: 'IDLE',
+                    preambleCount: 0
+                };
                 
                 try {
                     const ctx = await initAudioContext();
@@ -206,28 +197,31 @@
                         throw new Error("浏览器不支持麦克风访问");
                     }
 
-                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                    // 关键：尝试关闭所有音频处理
+                    const constraints = {
                         audio: {
                             echoCancellation: false,
-                            noiseSuppression: false, // 关闭降噪，保留原始高频信号
-                            autoGainControl: false, // 关闭自动增益，防止信号忽大忽小
+                            noiseSuppression: false,
+                            autoGainControl: false,
                             latency: 0,
-                            sampleRate: 48000 
+                            sampleRate: SAMPLE_RATE 
                         } 
-                    });
+                    };
+
+                    const stream = await navigator.mediaDevices.getUserMedia(constraints);
                     streamRef.current = stream;
                     
                     const source = ctx.createMediaStreamSource(stream);
                     analyserRef.current = ctx.createAnalyser();
-                    // 增加 FFT 大小以提高频率分辨率
-                    analyserRef.current.fftSize = 32768; 
-                    analyserRef.current.smoothingTimeConstant = 0.5; 
+                    // 使用较大的 FFT 以获得更好的频率分辨率
+                    analyserRef.current.fftSize = 16384; 
+                    analyserRef.current.smoothingTimeConstant = 0.8; // 平滑处理
                     
                     source.connect(analyserRef.current);
                     setIsReceiving(true);
-                    message.success("监听中... 请靠近扬声器");
+                    addLog("监听中... 请靠近扬声器并播放测试音");
                     
-                    analyzeFrequency();
+                    analyzeFrequencyLoop();
                 } catch (error) {
                     console.error('Reception error:', error);
                     let errorMsg = '麦克风访问失败。';
@@ -250,113 +244,129 @@
                     analyserRef.current.disconnect();
                     analyserRef.current = null;
                 }
+                addLog("监听停止");
             };
 
-            const analyzeFrequency = () => {
+            const getBandEnergy = (dataArray, sampleRate, minFreq, maxFreq) => {
+                const binWidth = sampleRate / dataArray.length;
+                const minBin = Math.floor(minFreq / binWidth);
+                const maxBin = Math.floor(maxFreq / binWidth);
+                
+                let sum = 0;
+                let count = 0;
+                for (let i = minBin; i <= maxBin; i++) {
+                    if (i >= 0 && i < dataArray.length) {
+                        // 将 dB 值转换回线性幅度进行累加可能更准确，但这里直接用 dB 平均值简化
+                        // 注意: dataArray 是 Float32Array of dB values
+                        sum += dataArray[i];
+                        count++;
+                    }
+                }
+                return count > 0 ? sum / count : -100;
+            };
+
+            const analyzeFrequencyLoop = () => {
                 if (!isReceiving || !analyserRef.current) return;
 
                 const dataArray = new Float32Array(analyserRef.current.frequencyBinCount);
                 analyserRef.current.getFloatFrequencyData(dataArray);
+                const sampleRate = audioContextRef.current.sampleRate;
 
-                const actualSampleRate = audioContextRef.current.sampleRate;
-                const binWidth = actualSampleRate / analyserRef.current.fftSize;
+                // 1. 获取各频段能量
+                const e0 = getBandEnergy(dataArray, sampleRate, FREQ_0_START, FREQ_0_END);
+                const e1 = getBandEnergy(dataArray, sampleRate, FREQ_1_START, FREQ_1_END);
+                // 噪声参考: 8kHz - 9kHz (通常安静)
+                const noise = getBandEnergy(dataArray, sampleRate, 8000, 9000);
+
+                // 2. 更新历史记录 (滑动窗口)
+                const state = decoderState.current;
+                state.energy0History.push(e0);
+                state.energy1History.push(e1);
+                state.noiseHistory.push(noise);
                 
-                // 计算特定频率的能量
-                const getEnergy = (freq) => {
-                    const centerBin = Math.floor(freq / binWidth);
-                    // 搜索范围 +/- 100Hz
-                    const range = Math.floor(100 / binWidth); 
-                    let sum = 0;
-                    let count = 0;
-                    for (let i = centerBin - range; i <= centerBin + range; i++) {
-                        if (i >= 0 && i < dataArray.length) {
-                            sum += dataArray[i];
-                            count++;
-                        }
-                    }
-                    return count > 0 ? sum / count : -100;
-                };
+                // 保持最近 10 帧的数据 (约 100-200ms)
+                if (state.energy0History.length > 10) state.energy0History.shift();
+                if (state.energy1History.length > 10) state.energy1History.shift();
+                if (state.noiseHistory.length > 10) state.noiseHistory.shift();
 
-                const energy14k = getEnergy(FREQ_0);
-                const energy15k = getEnergy(FREQ_1);
-                
-                // 估算背景噪声 (取 10kHz 处的能量作为参考)
-                const noiseFloor = getEnergy(10000);
+                // 3. 计算平均能量
+                const avgE0 = state.energy0History.reduce((a,b)=>a+b,0) / state.energy0History.length;
+                const avgE1 = state.energy1History.reduce((a,b)=>a+b,0) / state.energy1History.length;
+                const avgNoise = state.noiseHistory.reduce((a,b)=>a+b,0) / state.noiseHistory.length;
 
-                setDebugInfo({ 
-                    e0: energy14k.toFixed(1), 
-                    e1: energy15k.toFixed(1),
-                    noise: noiseFloor.toFixed(1)
-                });
-
-                // 绘制频谱可视化
-                drawVisualizer(dataArray, actualSampleRate);
-
-                // 解码逻辑
-                // 阈值设定：信号必须比噪声高 15dB 以上，且绝对值大于 -50dB
-                const thresholdAbsolute = -50; 
-                const thresholdRelative = 15; 
-
-                const isSignalPresent = (energy14k > thresholdAbsolute || energy15k > thresholdAbsolute) &&
-                                        (Math.max(energy14k, energy15k) - noiseFloor > thresholdRelative);
-                
-                // 信号强度归一化用于显示
-                const maxE = Math.max(energy14k, energy15k);
-                const strength = Math.max(0, Math.min(100, (maxE + 60) * 2)); 
+                // 4. 信号强度显示
+                const maxSignal = Math.max(avgE0, avgE1);
+                const strength = Math.max(0, Math.min(100, (maxSignal + 60) * 2)); 
                 setSignalStrength(strength);
 
-                const now = Date.now();
+                // 5. 解码逻辑
+                // 阈值：信号必须比噪声高 10dB，且绝对值大于 -45dB
+                const isSignalValid = (maxSignal > -45) && (maxSignal - avgNoise > 10);
                 
-                if (isSignalPresent) {
-                    // 判断是 0 还是 1
-                    const detected = energy15k > energy14k ? 1 : 0;
+                let detected = null;
+                if (isSignalValid) {
+                    detected = avgE1 > avgE0 ? 1 : 0;
                     setDetectedBit(detected);
-                    
-                    // 简单的时序控制：防止一个比特被重复读取多次
-                    if (now - lastBitTimeRef.current > BIT_DURATION_MS * 0.6) {
-                        lastBitTimeRef.current = now;
-                        
-                        // 状态机
-                        if (syncStateRef.current === 'IDLE') {
-                            syncStateRef.current = 'SYNCING';
-                        }
+                } else {
+                    setDetectedBit(null);
+                }
 
-                        if (syncStateRef.current === 'SYNCING' || syncStateRef.current === 'RECEIVING') {
-                            const byte = currentByteRef.current;
-                            const newByte = (byte << 1) | detected;
-                            currentByteRef.current = newByte;
-                            bitCountRef.current++;
+                // 简单的状态机解码
+                const now = Date.now();
+                if (detected !== null) {
+                    // 防抖：确保每个比特只处理一次
+                    if (now - state.lastBitTime > BIT_DURATION_MS * 0.7) {
+                        state.lastBitTime = now;
+                        
+                        if (state.syncState === 'IDLE' || state.syncState === 'SYNCING') {
+                            // 寻找前导码 101010...
+                            // 简单策略：只要连续收到交替的 1 和 0，就认为在同步
+                            // 这里简化：如果收到 1，期待下一个是 0
+                            if (state.preambleCount < 5) {
+                                // 非常粗糙的同步检测：只要信号稳定出现，就开始尝试组装
+                                state.syncState = 'SYNCING';
+                                state.preambleCount++;
+                            } else {
+                                state.syncState = 'RECEIVING';
+                                state.bitCount = 0;
+                                state.currentByte = 0;
+                            }
+                        }
+                        
+                        if (state.syncState === 'RECEIVING') {
+                            state.currentByte = (state.currentByte << 1) | detected;
+                            state.bitCount++;
                             
-                            // 如果收齐了8位
-                            if (bitCountRef.current === 8) {
-                                const charCode = currentByteRef.current;
-                                // 简单校验：如果是可打印字符或常见控制符
-                                if ((charCode >= 32 && charCode <= 126) || charCode === 0) {
-                                    if (charCode !== 0) {
-                                        setReceivedData(prev => prev + String.fromCharCode(charCode));
-                                    }
+                            if (state.bitCount === 8) {
+                                const charCode = state.currentByte;
+                                if (charCode >= 32 && charCode <= 126) {
+                                    const char = String.fromCharCode(charCode);
+                                    setReceivedData(prev => prev + char);
+                                    addLog(`Decoded: '${char}' (${charCode})`);
+                                } else {
+                                    addLog(`Invalid Char: ${charCode}`);
                                 }
-                                // 重置
-                                currentByteRef.current = 0;
-                                bitCountRef.current = 0;
-                                syncStateRef.current = 'RECEIVING';
+                                state.bitCount = 0;
+                                state.currentByte = 0;
                             }
                         }
                     }
                 } else {
-                    setDetectedBit(null);
-                    // 如果长时间没有信号，重置同步状态
-                    if (now - lastBitTimeRef.current > BIT_DURATION_MS * 5) {
-                        syncStateRef.current = 'IDLE';
-                        bitCountRef.current = 0;
+                    // 信号丢失超时重置
+                    if (now - state.lastBitTime > BIT_DURATION_MS * 3) {
+                        state.syncState = 'IDLE';
+                        state.preambleCount = 0;
                     }
                 }
 
-                animationFrameRef.current = requestAnimationFrame(analyzeFrequency);
+                // 绘制频谱
+                drawVisualizer(dataArray, sampleRate);
+
+                animationFrameRef.current = requestAnimationFrame(analyzeFrequencyLoop);
             };
 
             const drawVisualizer = (dataArray, sampleRate) => {
-                const canvas = canvasRef.current;
+                const canvas = document.getElementById('spectrumCanvas');
                 if (!canvas) return;
                 const ctx = canvas.getContext('2d');
                 const width = canvas.width;
@@ -365,11 +375,12 @@
                 ctx.fillStyle = '#333';
                 ctx.fillRect(0, 0, width, height);
                 
-                // 只绘制 10kHz 到 20kHz 的部分
+                // 绘制 10kHz - 16kHz
                 const minFreq = 10000;
-                const maxFreq = 20000;
-                const minBin = Math.floor(minFreq / (sampleRate / dataArray.length));
-                const maxBin = Math.floor(maxFreq / (sampleRate / dataArray.length));
+                const maxFreq = 16000;
+                const binWidth = sampleRate / dataArray.length;
+                const minBin = Math.floor(minFreq / binWidth);
+                const maxBin = Math.floor(maxFreq / binWidth);
                 const binsToDraw = maxBin - minBin;
                 const step = width / binsToDraw;
                 
@@ -378,8 +389,7 @@
                 ctx.beginPath();
                 
                 for (let i = minBin; i < maxBin; i++) {
-                    const v = dataArray[i]; // dB value
-                    // Map -100dB..0dB to height
+                    const v = dataArray[i];
                     const y = height - ((v + 100) / 100) * height;
                     const x = (i - minBin) * step;
                     if (i === minBin) ctx.moveTo(x, y);
@@ -387,26 +397,26 @@
                 }
                 ctx.stroke();
 
-                // 标记目标频率
-                const markFreq = (freq, color, label) => {
-                    const bin = Math.floor(freq / (sampleRate / dataArray.length));
-                    const x = (bin - minBin) * step;
-                    ctx.strokeStyle = color;
-                    ctx.beginPath();
-                    ctx.moveTo(x, 0);
-                    ctx.lineTo(x, height);
-                    ctx.stroke();
+                // 标记区域
+                const markRange = (start, end, color, label) => {
+                    const startBin = Math.floor(start / binWidth);
+                    const endBin = Math.floor(end / binWidth);
+                    const x1 = (startBin - minBin) * step;
+                    const x2 = (endBin - minBin) * step;
+                    
                     ctx.fillStyle = color;
-                    ctx.fillText(label, x + 2, 10);
+                    ctx.globalAlpha = 0.3;
+                    ctx.fillRect(x1, 0, x2 - x1, height);
+                    ctx.globalAlpha = 1.0;
+                    ctx.fillText(label, x1 + 5, 15);
                 };
                 
-                markFreq(FREQ_0, '#ff4d4f', '0');
-                markFreq(FREQ_1, '#52c41a', '1');
+                markRange(FREQ_0_START, FREQ_0_END, 'rgba(255, 77, 79, 0.5)', 'Bit 0');
+                markRange(FREQ_1_START, FREQ_1_END, 'rgba(82, 196, 26, 0.5)', 'Bit 1');
             };
 
             useEffect(() => {
                 return () => {
-                    stopTransmission();
                     stopReception();
                     if (audioContextRef.current) audioContextRef.current.close();
                 };
@@ -415,7 +425,7 @@
             return (
                 <div className="container">
                     <Title level={3} style={{ textAlign: 'center' }}>
-                        <IconSound /> 声波文本传输 (14k/15kHz 优化版)
+                        <IconSound /> 声波文本传输 (Chirp 鲁棒版)
                     </Title>
                     
                     <Card bordered={false} className="card-shadow">
@@ -434,19 +444,19 @@
                                         type="primary" 
                                         block 
                                         icon={isSending ? <IconStop /> : <IconPlay />}
-                                        onClick={isSending ? stopTransmission : startTransmission}
-                                        danger={isSending}
+                                        onClick={isSending ? null : startTransmission} // 防止重复点击
+                                        disabled={isSending}
                                     >
-                                        {isSending ? '停止发送' : '开始发送'}
+                                        {isSending ? '正在发送...' : '开始发送'}
                                     </Button>
                                     {isSending && <Progress percent={sendProgress} showInfo={false} />}
                                     
                                     <Row justify="space-between">
-                                        <Tag color="red">0: 14kHz</Tag>
-                                        <Tag color="green">1: 15kHz</Tag>
+                                        <Tag color="red">Bit 0: 12k-13k Chirp</Tag>
+                                        <Tag color="green">Bit 1: 14k-15k Chirp</Tag>
                                     </Row>
                                     <Text type="secondary" style={{fontSize: 12}}>
-                                        提示: 请将手机/电脑音量调至最大，并靠近接收设备。
+                                        提示: 请将音量调至最大。Chirp 信号听起来像鸟叫声。
                                     </Text>
                                 </Space>
                             </TabPane>
@@ -465,8 +475,8 @@
                                         {isReceiving ? '停止监听' : '开始监听'}
                                     </Button>
 
-                                    <Divider orientation="left">实时频谱 (10k-20k)</Divider>
-                                    <canvas ref={canvasRef} width={500} height={100}></canvas>
+                                    <Divider orientation="left">实时频谱 (10k-16k)</Divider>
+                                    <canvas id="spectrumCanvas" width={500} height={100}></canvas>
                                     
                                     <Row gutter={16} style={{marginTop: 10}}>
                                         <Col span={12}>
@@ -478,11 +488,9 @@
                                         </Col>
                                     </Row>
                                     
+                                    <Divider orientation="left">调试日志</Divider>
                                     <div className="debug-panel">
-                                        <div>14kHz (Bit 0): {debugInfo.e0} dB</div>
-                                        <div>15kHz (Bit 1): {debugInfo.e1} dB</div>
-                                        <div>Noise Floor: {debugInfo.noise} dB</div>
-                                        <div>Sync State: {syncStateRef.current}</div>
+                                        {debugLogs.map((log, i) => <div key={i}>{log}</div>)}
                                     </div>
 
                                     <Divider orientation="left">接收结果</Divider>
