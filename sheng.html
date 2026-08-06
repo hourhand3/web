@@ -3,9 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 防止浏览器缓存，确保每次刷新都是最新代码 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Acoustic Transfer - Wideband Capture Demo</title>
     <style>
         body { font-family: sans-serif; padding: 20px; background: #111; color: #eee; max-width: 800px; margin: 0 auto; }
+        .version-tag { display: inline-block; background: #f44336; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; margin-bottom: 15px; }
         .card { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #333; }
         button { padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; font-weight: bold; }
         .btn-send { background: #4caf50; color: #fff; }
@@ -19,7 +24,10 @@
 </head>
 <body>
 
+    <!-- 🌟 核心改动：增加醒目的版本号标识 🌟 -->
     <h2>🎙️ 接收端 (Receiver)</h2>
+    <div class="version-tag">DEBUG VERSION: v1.0</div>
+
     <div class="card">
         <button class="btn-recv" id="btnStartListen">开始监听</button>
         <button class="btn-stop" id="btnStopListen">停止监听</button>
@@ -43,10 +51,10 @@
     const FREQ_0 = 14000; 
     const FREQ_1 = 15000; 
     const BIT_DURATION_MS = 60; 
-    const GUARD_INTERVAL_MS = 10; // 比特间的静音保护间隔
+    const GUARD_INTERVAL_MS = 10; 
     const PREAMBLE = '10101010'; 
     const TERMINATOR = '10101011'; 
-    const SIGNAL_MARGIN_DB = 15; // 信号必须比底噪高出 15dB 才视为有效
+    const SIGNAL_MARGIN_DB = 15; 
 
     // ================= 调试日志工具 =================
     const recvLogEl = document.getElementById('recvLog');
@@ -106,7 +114,7 @@
         return dataBytes.map(b => String.fromCharCode(b)).join('');
     }
 
-    // ================= 发送端逻辑 (带保护间隔) =================
+    // ================= 发送端逻辑 =================
     document.getElementById('btnSend').onclick = async () => {
         const text = document.getElementById('sendText').value;
         if (!text) return;
@@ -135,7 +143,6 @@
             await new Promise(resolve => setTimeout(resolve, BIT_DURATION_MS));
             osc.stop();
             
-            // 核心：每个比特之间插入静音保护间隔
             if (i < fullStream.length - 1) {
                 await new Promise(resolve => setTimeout(resolve, GUARD_INTERVAL_MS));
             }
@@ -147,10 +154,10 @@
         log('send', "✅ 文本发送完毕");
     };
 
-    // ================= 接收端逻辑 (宽频带捕获 + 动态底噪) =================
+    // ================= 接收端逻辑 =================
     let recvAudioCtx = null, recvAnalyser = null, isListening = false;
     let isSignalActive = false, currentBitBuffer = '', preambleBuffer = '', isSynced = false, activeStartTime = 0;
-    let noiseFloor = -100; // 动态底噪
+    let noiseFloor = -100; 
 
     document.getElementById('btnStartListen').onclick = async () => {
         if (isListening) return;
@@ -162,7 +169,7 @@
             const source = recvAudioCtx.createMediaStreamSource(stream);
             recvAnalyser = recvAudioCtx.createAnalyser();
             recvAnalyser.fftSize = 4096;
-            recvAnalyser.smoothingTimeConstant = 0.8; // 提高平滑度，减少毛刺
+            recvAnalyser.smoothingTimeConstant = 0.8; 
             source.connect(recvAnalyser);
             
             isListening = true;
@@ -189,7 +196,6 @@
         const bin14k = Math.round(FREQ_0 * recvAnalyser.fftSize / recvAudioCtx.sampleRate);
         const bin15k = Math.round(FREQ_1 * recvAnalyser.fftSize / recvAudioCtx.sampleRate);
         
-        // 核心修复：扩大捕获带宽，取前后 15 个 bin 的总和
         const getBandEnergy = (centerBin) => {
             let sum = 0;
             for(let i = -15; i <= 15; i++) sum += dataArray[centerBin + i];
@@ -200,7 +206,6 @@
         const energy15k = getBandEnergy(bin15k);
         const maxEnergy = Math.max(energy14k, energy15k);
         
-        // 动态更新底噪（使用滑动平均）
         if (maxEnergy < noiseFloor + 5) {
             noiseFloor = noiseFloor * 0.95 + maxEnergy * 0.05;
         }
@@ -208,11 +213,9 @@
         document.getElementById('energyVal').innerText = maxEnergy.toFixed(2) + ' dB';
         document.getElementById('noiseVal').innerText = noiseFloor.toFixed(2) + ' dB';
         
-        // 动态阈值判定
         const now = Date.now();
         const isAboveThreshold = maxEnergy > (noiseFloor + SIGNAL_MARGIN_DB);
         
-        // 状态机：上升沿触发
         if (isAboveThreshold && !isSignalActive) {
             isSignalActive = true;
             activeStartTime = now;
