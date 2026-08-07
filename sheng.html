@@ -1,246 +1,965 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <title>Acoustic Transfer - v1.2</title>
-    <style>
-        body { font-family: sans-serif; padding: 20px; background: #111; color: #eee; max-width: 800px; margin: 0 auto; }
-        .version-tag { display: inline-block; background: #f44336; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; margin-bottom: 15px; }
-        .card { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #333; }
-        button { padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; font-weight: bold; }
-        .btn-send { background: #4caf50; color: #fff; }
-        .btn-recv { background: #2196f3; color: #fff; }
-        .btn-stop { background: #f44336; color: #fff; }
-        input { padding: 8px; width: 200px; border-radius: 4px; border: 1px solid #555; background: #333; color: #fff; }
-        .status { font-size: 14px; margin-top: 10px; color: #aaa; }
-        .result-box { background: #000; padding: 15px; border-radius: 5px; font-family: monospace; font-size: 18px; min-height: 40px; margin-top: 10px; border: 1px solid #4caf50; color: #4caf50; word-break: break-all;}
-        .log-box { background: #000; padding: 10px; border-radius: 5px; font-family: monospace; font-size: 12px; height: 120px; overflow-y: auto; margin-top: 10px; border: 1px solid #333; color: #888; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#070d18">
+<title>声波传文 · 声音传输文本（高频兼容优化版）</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5/400.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5/500.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5/700.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5/400.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5/700.css">
+<style>
+:root{
+  --bg:#070d18; --panel:#0d1626; --panel2:#0a1220; --line:#1c3050; --line2:#25406b;
+  --tx:#d9e8ff; --dim:#8aa3c7; --dim2:#5c7396;
+  --cy:#38e1ff; --cy2:#18b6dd; --gr:#3df0a6; --am:#ffc857; --rd:#ff5d73; --vi:#9d8cff;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--bg); color:var(--tx);
+  font-family:'Noto Sans SC',system-ui,-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;
+  min-height:100vh; overflow-x:hidden;
+}
+.bgfx{position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(900px 500px at 85% -10%, rgba(56,225,255,.09), transparent 60%),
+    radial-gradient(700px 420px at 8% 108%, rgba(61,240,166,.06), transparent 60%),
+    repeating-linear-gradient(0deg, rgba(120,170,255,.030) 0 1px, transparent 1px 44px),
+    repeating-linear-gradient(90deg, rgba(120,170,255,.024) 0 1px, transparent 1px 44px);
+}
+.wrap{max-width:900px;margin:0 auto;padding:22px 16px 60px}
+
+/* ===== header ===== */
+header{display:flex;flex-direction:column;gap:10px;padding:8px 2px 18px}
+.brandRow{display:flex;align-items:center;gap:14px}
+.logo{width:52px;height:52px;border-radius:14px;flex:none;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,#0f2d46,#0a1a2e);border:1px solid var(--line2);
+  box-shadow:0 0 24px rgba(56,225,255,.18), inset 0 0 18px rgba(56,225,255,.08);
+  font-size:26px;color:var(--cy)}
+h1{font-size:24px;font-weight:700;letter-spacing:1px}
+h1 .ver{font-size:12px;font-weight:500;color:var(--am);border:1px solid rgba(255,200,87,.4);
+  padding:2px 8px;border-radius:99px;margin-left:8px;vertical-align:3px;letter-spacing:.5px}
+.sub{color:var(--dim);font-size:13px;line-height:1.7}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+.chip{font-size:11.5px;color:var(--dim);border:1px solid var(--line);background:rgba(13,22,38,.7);
+  padding:4px 10px;border-radius:99px;display:flex;align-items:center;gap:6px}
+.chip i{width:6px;height:6px;border-radius:50%;background:var(--cy);box-shadow:0 0 8px var(--cy);flex:none}
+.chip.g i{background:var(--gr);box-shadow:0 0 8px var(--gr)}
+.chip.a i{background:var(--am);box-shadow:0 0 8px var(--am)}
+.chip.v i{background:var(--vi);box-shadow:0 0 8px var(--vi)}
+
+/* ===== tabs ===== */
+.tabs{display:flex;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:6px;position:sticky;top:10px;z-index:20;backdrop-filter:blur(8px)}
+.tab{flex:1;padding:12px 8px;border:none;border-radius:10px;background:transparent;color:var(--dim);
+  font-size:15px;font-weight:500;font-family:inherit;cursor:pointer;transition:all .22s;letter-spacing:1px}
+.tab:hover{color:var(--tx)}
+.tab.on{background:linear-gradient(135deg,rgba(56,225,255,.16),rgba(56,225,255,.05));
+  color:var(--cy);box-shadow:inset 0 0 0 1px rgba(56,225,255,.35), 0 0 18px rgba(56,225,255,.10)}
+.tab.on.g{color:var(--gr);background:linear-gradient(135deg,rgba(61,240,166,.14),rgba(61,240,166,.04));
+  box-shadow:inset 0 0 0 1px rgba(61,240,166,.35), 0 0 18px rgba(61,240,166,.08)}
+
+/* ===== panels / cards ===== */
+main{margin-top:16px}
+.panel{display:flex;flex-direction:column;gap:14px;animation:fadeUp .35s ease}
+.panel[hidden]{display:none}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);
+  border-radius:16px;padding:18px;box-shadow:0 8px 28px rgba(0,0,0,.28)}
+.card h2{font-size:14px;font-weight:700;color:var(--tx);margin-bottom:12px;display:flex;align-items:center;gap:8px;letter-spacing:.5px}
+.card h2::before{content:'';width:4px;height:15px;border-radius:2px;background:linear-gradient(180deg,var(--cy),var(--cy2));box-shadow:0 0 8px rgba(56,225,255,.6)}
+.card h2.g::before{background:linear-gradient(180deg,var(--gr),#14b87e);box-shadow:0 0 8px rgba(61,240,166,.6)}
+.card h2 .r{margin-left:auto;font-weight:400;font-size:12px;color:var(--dim2)}
+
+textarea{width:100%;min-height:130px;resize:vertical;background:#0a1424;border:1px solid var(--line);
+  border-radius:12px;color:var(--tx);font-family:inherit;font-size:15px;line-height:1.7;padding:12px 14px;outline:none;transition:border .2s, box-shadow .2s}
+textarea:focus{border-color:var(--cy2);box-shadow:0 0 0 3px rgba(56,225,255,.12)}
+textarea::placeholder{color:var(--dim2)}
+.tFoot{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px;font-size:12px;color:var(--dim)}
+.tFoot b{color:var(--cy);font-family:var(--mono);font-weight:700}
+.linkBtn{margin-left:auto;background:none;border:none;color:var(--cy2);font-size:12px;cursor:pointer;font-family:inherit;padding:2px 4px}
+.linkBtn:hover{color:var(--cy);text-decoration:underline}
+
+/* segmented */
+.segRow{display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.segRow label{font-size:13px;color:var(--dim);min-width:64px}
+.seg{display:inline-flex;background:#0a1424;border:1px solid var(--line);border-radius:11px;padding:4px;gap:4px}
+.seg button{border:none;background:transparent;color:var(--dim);font-family:inherit;font-size:13px;
+  padding:7px 14px;border-radius:8px;cursor:pointer;transition:all .18s;white-space:nowrap}
+.seg button:hover{color:var(--tx)}
+.seg button.on{background:linear-gradient(135deg,rgba(56,225,255,.22),rgba(56,225,255,.08));color:var(--cy);box-shadow:inset 0 0 0 1px rgba(56,225,255,.4)}
+.seg button small{display:block;font-size:10px;color:var(--dim2);font-family:var(--mono);margin-top:1px}
+.seg button.on small{color:rgba(56,225,255,.75)}
+.chk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--dim);cursor:pointer;user-select:none}
+.chk input{accent-color:#38e1ff;width:16px;height:16px}
+
+/* buttons */
+.btnRow{display:flex;gap:10px;flex-wrap:wrap}
+.btn{border:none;font-family:inherit;font-size:15px;font-weight:700;letter-spacing:2px;cursor:pointer;
+  padding:14px 26px;border-radius:13px;transition:all .18s;display:inline-flex;align-items:center;gap:8px;justify-content:center}
+.btn:active{transform:scale(.97)}
+.btn.primary{flex:1;color:#04222e;background:linear-gradient(135deg,#4de9ff,#18b6dd);
+  box-shadow:0 6px 22px rgba(56,225,255,.30)}
+.btn.primary:hover{box-shadow:0 8px 28px rgba(56,225,255,.45);filter:brightness(1.06)}
+.btn.primary:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+.btn.green{flex:1;color:#03271a;background:linear-gradient(135deg,#4df3b0,#12c583);box-shadow:0 6px 22px rgba(61,240,166,.28)}
+.btn.green:hover{box-shadow:0 8px 28px rgba(61,240,166,.42);filter:brightness(1.05)}
+.btn.ghost{background:transparent;border:1px solid var(--line2);color:var(--dim)}
+.btn.ghost:hover{color:var(--tx);border-color:var(--cy2)}
+.btn.danger{background:transparent;border:1px solid rgba(255,93,115,.5);color:var(--rd)}
+.btn.danger:hover{background:rgba(255,93,115,.08)}
+.btn.mini{padding:8px 16px;font-size:13px;letter-spacing:1px;border-radius:10px}
+.btn.pulsing{animation:pulse 1.6s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(61,240,166,.45)}50%{box-shadow:0 0 0 12px rgba(61,240,166,0)}}
+
+/* status / progress */
+.statusLine{margin-top:12px;font-size:13px;color:var(--dim);display:flex;align-items:center;gap:8px;min-height:20px}
+.statusLine .dot{width:8px;height:8px;border-radius:50%;background:var(--dim2);flex:none}
+.statusLine.live .dot{background:var(--gr);box-shadow:0 0 10px var(--gr);animation:blink 1.1s infinite}
+.statusLine.err{color:var(--rd)} .statusLine.err .dot{background:var(--rd)}
+.statusLine.ok{color:var(--gr)} .statusLine.ok .dot{background:var(--gr);box-shadow:0 0 8px var(--gr)}
+@keyframes blink{50%{opacity:.35}}
+.pbar{height:10px;background:#0a1424;border:1px solid var(--line);border-radius:99px;overflow:hidden;margin-top:10px}
+.pbar .fill{height:100%;width:0%;border-radius:99px;background:linear-gradient(90deg,var(--cy2),var(--cy));
+  box-shadow:0 0 12px rgba(56,225,255,.5);transition:width .18s linear}
+.pbar .fill.g{background:linear-gradient(90deg,#12c583,var(--gr));box-shadow:0 0 12px rgba(61,240,166,.5)}
+.pMeta{display:flex;justify-content:space-between;font-size:11.5px;color:var(--dim2);margin-top:6px;font-family:var(--mono)}
+
+canvas.viz{width:100%;height:170px;display:block;border-radius:12px;background:#081120;border:1px solid var(--line)}
+canvas.viz.tall{height:190px}
+
+/* pill */
+.pill{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;padding:5px 12px;border-radius:99px;
+  border:1px solid var(--line2);color:var(--dim);background:#0a1424;transition:all .25s}
+.pill i{width:8px;height:8px;border-radius:50%;background:var(--dim2);flex:none}
+.pill.hunt{color:var(--am);border-color:rgba(255,200,87,.4)} .pill.hunt i{background:var(--am);animation:blink 1s infinite}
+.pill.lock{color:var(--cy);border-color:rgba(56,225,255,.45)} .pill.lock i{background:var(--cy);box-shadow:0 0 8px var(--cy)}
+.pill.data{color:var(--gr);border-color:rgba(61,240,166,.45)} .pill.data i{background:var(--gr);box-shadow:0 0 8px var(--gr);animation:blink .8s infinite}
+.pill.ok{color:var(--gr);border-color:rgba(61,240,166,.5)} .pill.ok i{background:var(--gr)}
+.pill.err{color:var(--rd);border-color:rgba(255,93,115,.5)} .pill.err i{background:var(--rd)}
+
+.rxHead{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.rxMeta{margin-left:auto;font-size:11.5px;color:var(--dim2);font-family:var(--mono);text-align:right;line-height:1.7}
+.lvl{margin-top:14px}
+.lvl .lab{display:flex;justify-content:space-between;font-size:11.5px;color:var(--dim2);margin-bottom:5px}
+.lvl .bar{height:7px;background:#0a1424;border:1px solid var(--line);border-radius:99px;overflow:hidden}
+.lvl .bar i{display:block;height:100%;width:0%;background:linear-gradient(90deg,#12c583,var(--gr),var(--am));transition:width .08s}
+
+.chipsBox{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;min-height:30px}
+.cchip{font-size:12px;font-family:var(--mono);padding:5px 11px;border-radius:9px;border:1px solid var(--line);color:var(--dim);background:#0a1424;display:flex;gap:6px;align-items:center}
+.cchip.ok{color:var(--gr);border-color:rgba(61,240,166,.4);background:rgba(61,240,166,.06)}
+.cchip.bad{color:var(--rd);border-color:rgba(255,93,115,.4);background:rgba(255,93,115,.06)}
+.cchip.rxing{color:var(--cy);border-color:rgba(56,225,255,.35)}
+
+.resultBox{width:100%;min-height:110px;background:#0a1424;border:1px solid var(--line);border-radius:12px;
+  color:var(--gr);font-family:var(--mono);font-size:14px;line-height:1.7;padding:12px 14px;resize:vertical;outline:none}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 11px;border-radius:99px;margin-top:10px}
+.badge.ok{color:#052b1d;background:var(--gr);font-weight:700}
+.badge.warn{color:#3a2a05;background:var(--am);font-weight:700}
+.badge.err{color:#fff;background:var(--rd);font-weight:700}
+.badge[hidden]{display:none}
+
+.logBox{margin-top:12px;background:#060c16;border:1px solid var(--line);border-radius:10px;padding:10px 12px;
+  font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--dim2);max-height:150px;overflow-y:auto}
+.logBox .t{color:#37538000}
+.logBox .l-ok{color:var(--gr)} .logBox .l-warn{color:var(--am)} .logBox .l-err{color:var(--rd)} .logBox .l-info{color:#7ea6d8}
+
+/* tips */
+.tips{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:9px}
+.tip{display:flex;gap:9px;font-size:12.5px;color:var(--dim);line-height:1.65;background:#0a1424;
+  border:1px solid var(--line);border-radius:11px;padding:10px 12px}
+.tip b{color:var(--cy);font-weight:700;flex:none}
+
+footer{margin-top:26px;padding:18px;border-top:1px solid var(--line);color:var(--dim2);font-size:12px;line-height:2}
+footer b{color:var(--dim)}
+footer .ft{color:var(--dim);font-size:12.5px;font-weight:700;margin-bottom:6px}
+
+@media (max-width:560px){
+  h1{font-size:20px}
+  .rxMeta{margin-left:0;text-align:left;width:100%}
+  .btn{padding:13px 18px}
+}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:#1d3355;border-radius:4px}
+::-webkit-scrollbar-track{background:transparent}
+</style>
 </head>
 <body>
-    <h2>🎙️ 接收端 (Receiver)</h2>
-    <div class="version-tag">DEBUG VERSION: v1.2</div>
-    <div class="card">
-        <button class="btn-recv" id="btnStartListen">开始监听</button>
-        <button class="btn-stop" id="btnStopListen">停止监听</button>
-        <div class="status">状态: <span id="recvStatus">等待操作</span></div>
-        <div class="status">实时能量: <span id="energyVal">-100 dB</span> | 底噪: <span id="noiseVal">-</span></div>
-        <div style="margin-top:10px; color:#aaa; font-size:12px;">👇 接收到的明文消息</div>
-        <div class="result-box" id="receivedText">等待接收...</div>
-        <div class="log-box" id="recvLog">等待初始化...</div>
+<div class="bgfx"></div>
+<div class="wrap">
+
+<header>
+  <div class="brandRow">
+    <div class="logo">∿</div>
+    <div>
+      <h1>声波传文<span class="ver">高频兼容优化版</span></h1>
+      <div class="sub" style="margin-top:4px">通过「扬声器 → 空气 → 麦克风」在两台设备间无线传输文本，无需网络与配对</div>
     </div>
-    <h2>📡 发送端 (Sender)</h2>
-    <div class="card">
-        <input type="text" id="sendText" value="hello" />
-        <button class="btn-send" id="btnSend">发送文本</button>
-        <div class="status">状态: <span id="sendStatus">等待操作</span></div>
-        <div class="log-box" id="sendLog">等待初始化...</div>
+  </div>
+  <div class="chips">
+    <span class="chip"><i></i>16 频 MFSK 调制（每符号 4 bit）</span>
+    <span class="chip a"><i></i>兼容频段 2.5 – 7.9 kHz</span>
+    <span class="chip v"><i></i>整包冗余重传 + 符号级多数表决</span>
+    <span class="chip g"><i></i>CRC-16 校验 · 中途同步字抗漂移</span>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="tab on" id="tabSend">📤 发送端</button>
+  <button class="tab g" id="tabRecv">📥 接收端</button>
+</nav>
+
+<main>
+<!-- ============ 发送端 ============ -->
+<section class="panel" id="panelSend">
+  <div class="card">
+    <h2>要发送的文本 <span class="r" id="cntLimit"></span></h2>
+    <textarea id="txtInput" placeholder="在此输入要传输的文本（支持中文、英文、数字、标点符号）…"></textarea>
+    <div class="tFoot">
+      <span>字符 <b id="cntChars">0</b></span>
+      <span>UTF-8 <b id="cntBytes">0</b> 字节</span>
+      <span>预计耗时 <b id="cntTime">0 秒</b></span>
+      <button class="linkBtn" id="btnSample">填入示例文本</button>
+      <button class="linkBtn" id="btnClearTxt">清空</button>
     </div>
-    <script>
-    // ================= 核心配置 =================
-    const FREQ_0 = 14000; 
-    const FREQ_1 = 15000; 
-    const BIT_DURATION_MS = 60; 
-    const GUARD_INTERVAL_MS = 10; 
-    const PREAMBLE = '10101010'; 
-    const TERMINATOR = '10101011'; 
-    const SIGNAL_MARGIN_DB = 15; 
-    const CALIBRATION_DURATION_MS = 1000; 
+  </div>
 
-    const recvLogEl = document.getElementById('recvLog');
-    const sendLogEl = document.getElementById('sendLog');
-    const log = (type, msg) => {
-        const time = new Date().toLocaleTimeString();
-        const line = `[${time}] ${msg}\n`;
-        if (type === 'recv') { recvLogEl.innerText += line; recvLogEl.scrollTop = recvLogEl.scrollHeight; }
-        else { sendLogEl.innerText += line; sendLogEl.scrollTop = sendLogEl.scrollHeight; }
-        console.log(`[${type}] ${msg}`);
-    };
+  <div class="card">
+    <h2>传输参数</h2>
+    <div class="segRow">
+      <label>传输速度</label>
+      <div class="seg" id="segMode">
+        <button data-v="fast">快速<small>167 sym/s</small></button>
+        <button data-v="std" class="on">标准<small>125 sym/s</small></button>
+        <button data-v="rob">稳健<small>83 sym/s</small></button>
+      </div>
+    </div>
+    <div class="segRow">
+      <label>冗余份数</label>
+      <div class="seg" id="segCopies">
+        <button data-v="1">1 份<small>最快</small></button>
+        <button data-v="2" class="on">2 份<small>推荐</small></button>
+        <button data-v="3">3 份<small>嘈杂环境</small></button>
+      </div>
+    </div>
+    <label class="chk"><input type="checkbox" id="chkLoop"> 循环发送（直到手动停止，便于接收端随时开始）</label>
+  </div>
 
-    function crc8(data) {
-        let crc = 0x00;
-        for (let b of data) {
-            crc ^= b;
-            for (let i = 0; i < 8; i++) crc = (crc & 0x80) ? ((crc << 1) ^ 0x07) : (crc << 1);
-        }
-        return crc & 0xFF;
+  <div class="card">
+    <h2>发送控制</h2>
+    <div class="btnRow">
+      <button class="btn primary" id="btnSend">▶ 开始发送</button>
+      <button class="btn danger" id="btnStop" hidden>■ 停止</button>
+    </div>
+    <div class="statusLine" id="txStatus"><span class="dot"></span><span id="txStatusTxt">待命 · 输入文本后点击开始发送</span></div>
+    <div class="pbar"><div class="fill" id="txBar"></div></div>
+    <div class="pMeta"><span id="txPct">0%</span><span id="txClock">00:00 / 00:00</span></div>
+    <canvas class="viz" id="sonoCanvas" style="margin-top:14px"></canvas>
+    <div style="font-size:11px;color:var(--dim2);margin-top:6px">▲ 发射声谱图（横轴时间，纵轴频率；橙色 = 前导码，青色 = 数据符号，白色竖线 = 播放进度）</div>
+  </div>
+
+  <div class="card">
+    <h2>提高成功率的建议</h2>
+    <div class="tips">
+      <div class="tip"><b>音量</b>发送设备音量调至 80% 以上，声音越清晰越好</div>
+      <div class="tip"><b>距离</b>两台设备相距 10 ~ 40 厘米，接收端麦克风正对扬声器</div>
+      <div class="tip"><b>环境</b>保持安静，远离风扇、音响、键盘敲击等噪声源</div>
+      <div class="tip"><b>稳定</b>传输过程中不要移动设备或遮挡扬声器 / 麦克风</div>
+      <div class="tip"><b>分批</b>超长文本耗时较久，建议分多次发送</div>
+      <div class="tip"><b>手机</b>若手机麦克风降噪过强，可尝试切换「稳健」模式</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 接收端 ============ -->
+<section class="panel" id="panelRecv" hidden>
+  <div class="card">
+    <h2 class="g">接收控制 <span class="r">符号速率自动识别</span></h2>
+    <div class="rxHead">
+      <button class="btn green" id="btnMic">🎙 开始接收</button>
+      <span class="pill" id="rxPill"><i></i><span id="rxPillTxt">待命</span></span>
+      <div class="rxMeta" id="rxMeta">采样率 -- kHz · 速率自动<br>已接收 0 份</div>
+    </div>
+    <div class="statusLine" id="rxStatus"><span class="dot"></span><span id="rxStatusTxt">点击「开始接收」并允许麦克风权限，然后将本机麦克风靠近发送设备的扬声器</span></div>
+    <div class="lvl">
+      <div class="lab"><span>麦克风电平</span><span id="lvlPct">-∞ dB</span></div>
+      <div class="bar"><i id="lvlFill"></i></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 class="g">实时频谱监视</h2>
+    <canvas class="viz tall" id="specCanvas"></canvas>
+    <div style="font-size:11px;color:var(--dim2);margin-top:6px">▲ 18 个解调频点能量（橙 = 前导码频点，青 = 16 个数据频点；出现高亮尖峰即表示收到信号）</div>
+  </div>
+
+  <div class="card">
+    <h2 class="g">接收进度</h2>
+    <div class="pbar"><div class="fill g" id="symBar"></div></div>
+    <div class="pMeta"><span id="symTxt">尚未锁定信号</span><span id="symCount"></span></div>
+    <div class="chipsBox" id="chipsBox"><span style="font-size:12px;color:var(--dim2)">等待数据包…</span></div>
+  </div>
+
+  <div class="card">
+    <h2 class="g">解码结果</h2>
+    <textarea class="resultBox" id="resultBox" readonly placeholder="解码成功后，原文将显示在这里…"></textarea>
+    <span class="badge" id="resBadge" hidden></span>
+    <div class="btnRow" style="margin-top:12px">
+      <button class="btn ghost mini" id="btnCopy">📋 复制文本</button>
+      <button class="btn ghost mini" id="btnRxClear">🗑 清空重来</button>
+    </div>
+    <div class="logBox" id="logBox">[日志] 等待启动…</div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="ft">工作原理</div>
+  文本经 <b>UTF-8</b> 编码后附加帧头与 <b>CRC-16</b> 校验位，使用 <b>16 频 MFSK</b>（2.5–7.9 kHz 兼容频段，每符号携带 4 bit）调制为声波。
+  帧前的<b>交替前导码</b>用于信号捕获并自动测定符号速率；<b>同步字</b>与每 64 个符号插入的<b>中途同步字</b>持续校正采样时钟漂移。
+  默认整包<b>重复发送 2 份</b>，接收端对各副本逐符号做<b>多数表决</b>，再由 CRC-16 验证——少量误码可自动修复，无法修复时会明确提示重传。
+</footer>
+</div>
+
+<script>
+/* ================= 协议常量 ================= */
+const DATA_N   = 16;          // 数据频点数（MFSK-16）
+const DATA_F0  = 3700;        // 数据基频 Hz
+const DATA_DF  = 280;         // 频点间隔 Hz（3700 ~ 7900）
+const PRE_L    = 2500;        // 前导码低频
+const PRE_H    = 3100;        // 前导码高频
+const SYNC_NIB = [0,15,5,10]; // 同步字（4 个符号）
+const PRE_SYMS = 8;           // 前导码符号数
+const MID_EVERY= 64;          // 每 64 个数据符号插入中途同步字
+const MODES    = { fast:{S:0.024,label:'快速'}, std:{S:0.032,label:'标准'}, rob:{S:0.048,label:'稳健'} };
+const GAP_SEC  = 0.40, TAIL_SEC = 0.12;
+const MAX_PAYLOAD = 2048;
+const MAGIC1=0x9A, MAGIC2=0x57;
+/* 接收分析参数 */
+const HOP=256, WIN=1024;
+const FREQS=[PRE_L,PRE_H]; for(let i=0;i<DATA_N;i++) FREQS.push(DATA_F0+i*DATA_DF);
+const NTOT=FREQS.length;
+const dataFreq=n=>DATA_F0+n*DATA_DF;
+
+/* ================= 工具 ================= */
+function crc16(bytes){let crc=0xFFFF;for(let i=0;i<bytes.length;i++){crc^=bytes[i]<<8;for(let k=0;k<8;k++){crc=(crc&0x8000)?((crc<<1)^0x1021):(crc<<1);crc&=0xFFFF;}}return crc;}
+function fmtTime(s){s=Math.max(0,Math.round(s));const m=Math.floor(s/60),ss=s%60;return String(m).padStart(2,'0')+':'+String(ss).padStart(2,'0');}
+const $=id=>document.getElementById(id);
+
+/* ================= 页签 ================= */
+$('tabSend').onclick=()=>{ $('tabSend').classList.add('on');$('tabRecv').classList.remove('on');$('panelSend').hidden=false;$('panelRecv').hidden=true; };
+$('tabRecv').onclick=()=>{ $('tabRecv').classList.add('on');$('tabSend').classList.remove('on');$('panelRecv').hidden=false;$('panelSend').hidden=true; };
+
+/* ================= 分段控件 ================= */
+let selMode='std', selCopies=2;
+function bindSeg(id,fn){const box=$(id);box.querySelectorAll('button').forEach(b=>{b.onclick=()=>{box.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');fn(+b.dataset.v||b.dataset.v);};});}
+bindSeg('segMode',v=>{selMode=v;updateCounts();});
+bindSeg('segCopies',v=>{selCopies=+v;updateCounts();});
+
+/* ================= 帧结构 ================= */
+function buildFrame(payload,copies){
+  const len=payload.length;
+  const f=new Uint8Array(6+len+2);
+  f[0]=MAGIC1;f[1]=MAGIC2;f[2]=copies;f[3]=0;f[4]=len>>8;f[5]=len&255;
+  f.set(payload,6);
+  const c=crc16(f.subarray(0,6+len));
+  f[6+len]=c>>8;f[7+len]=c&255;
+  return f;
+}
+function estDuration(payloadLen,Ssec,copies){
+  const dataSyms=2*(payloadLen+8);
+  const mid=Math.floor((dataSyms-1)/MID_EVERY);
+  const syms=PRE_SYMS+4+dataSyms+mid*4+1;
+  return copies*(syms*Ssec+TAIL_SEC)+(copies-1)*GAP_SEC;
+}
+
+/* ================= 发送端 ================= */
+const SND={ctx:null,src:null,playing:false,dur:0,t0:0,raf:0,wake:null,sched:null,baseCv:null};
+const SAMPLE_TXT='【声波传文测试】Hello World! 你好，世界。1234567890，标点符号：，。！？、；：""（）——这段文字正通过空气振动传给你～';
+
+$('btnSample').onclick=()=>{$('txtInput').value=SAMPLE_TXT;updateCounts();};
+$('btnClearTxt').onclick=()=>{$('txtInput').value='';updateCounts();};
+$('txtInput').addEventListener('input',updateCounts);
+$('cntLimit').textContent='上限 '+MAX_PAYLOAD+' 字节';
+
+function updateCounts(){
+  const v=$('txtInput').value;
+  const bytes=new TextEncoder().encode(v).length;
+  $('cntChars').textContent=v.length;
+  $('cntBytes').textContent=bytes;
+  if(bytes===0){$('cntTime').textContent='0 秒';return;}
+  const d=estDuration(bytes,MODES[selMode].S,selCopies);
+  $('cntTime').textContent=(d<90? d.toFixed(1)+' 秒':fmtTime(d));
+  if(bytes>MAX_PAYLOAD)$('cntTime').style.color='var(--rd)';else $('cntTime').style.color='';
+}
+function txStatus(txt,cls){const el=$('txStatus');el.className='statusLine'+(cls?' '+cls:'');$('txStatusTxt').textContent=txt;}
+
+function buildSchedule(frame,Ssec,sr,copies){
+  const S=Math.max(1,Math.round(Ssec*sr));
+  const seg=[];
+  const pushSym=f=>seg.push({f,n:S});
+  const nib=[];frame.forEach(b=>{nib.push(b>>4,b&15);});
+  for(let c=0;c<copies;c++){
+    if(c>0)seg.push({f:0,n:Math.round(GAP_SEC*sr)});
+    for(let i=0;i<PRE_SYMS;i++)pushSym(i%2?PRE_H:PRE_L);
+    SYNC_NIB.forEach(x=>pushSym(dataFreq(x)));
+    let rem=nib.length;
+    for(let i=0;i<nib.length;i++){
+      pushSym(dataFreq(nib[i]));rem--;
+      if((i+1)%MID_EVERY===0&&rem>0)SYNC_NIB.forEach(x=>pushSym(dataFreq(x)));
     }
+    pushSym(PRE_L);
+    seg.push({f:0,n:Math.round(TAIL_SEC*sr)});
+  }
+  return seg;
+}
+function synthesize(seg,sr){
+  let total=0;seg.forEach(s=>total+=s.n);
+  const out=new Float32Array(total);
+  let ph=0,idx=0;
+  for(const s of seg){
+    if(s.f>0){
+      const w=2*Math.PI*s.f/sr;
+      const amp=Math.min(0.92,0.60+0.32*(s.f-2500)/5400); // 高频略增强，抵消扬声器衰减
+      for(let k=0;k<s.n;k++){out[idx++]=amp*Math.sin(ph);ph+=w;if(ph>6.28e5)ph%=2*Math.PI;}
+    }else idx+=s.n;
+  }
+  const r=Math.min(Math.round(0.01*sr),total>>1);
+  for(let k=0;k<r;k++){out[k]*=k/r;out[total-1-k]*=k/r;}
+  return out;
+}
+async function ensureSendCtx(){
+  if(!SND.ctx){const AC=window.AudioContext||window.webkitAudioContext;SND.ctx=new AC();}
+  if(SND.ctx.state==='suspended')await SND.ctx.resume();
+}
+$('btnSend').onclick=async()=>{
+  const text=$('txtInput').value;
+  const payload=new TextEncoder().encode(text);
+  if(payload.length===0){txStatus('请先输入要发送的文本','err');return;}
+  if(payload.length>MAX_PAYLOAD){txStatus('文本过长（超过 '+MAX_PAYLOAD+' 字节），请精简后重试','err');return;}
+  try{
+    await ensureSendCtx();
+    const sr=SND.ctx.sampleRate;
+    const frame=buildFrame(payload,selCopies);
+    SND.sched=buildSchedule(frame,MODES[selMode].S,sr,selCopies);
+    const data=synthesize(SND.sched,sr);
+    const buf=SND.ctx.createBuffer(1,data.length,sr);
+    buf.copyToChannel(data,0);
+    SND.buf=buf;SND.dur=buf.duration;
+    drawSonoBase();
+    SND.playing=true;
+    $('btnSend').hidden=true;$('btnStop').hidden=false;
+    try{SND.wake=await navigator.wakeLock?.request('screen');}catch(e){}
+    playOnce();
+    txStatus('正在发射声波…（会听到清脆的“嘀嘀”变频音，属正常现象）','live');
+  }catch(err){txStatus('音频初始化失败：'+err.message,'err');}
+};
+function playOnce(){
+  const src=SND.ctx.createBufferSource();
+  src.buffer=SND.buf;
+  const g=SND.ctx.createGain();g.gain.value=1;
+  src.connect(g);g.connect(SND.ctx.destination);
+  src.onended=()=>{ if(SND.playing&&$('chkLoop').checked){playOnce();txStatus('循环发送中…（第 '+(++loopN)+' 轮）','live');} else finishSend(true); };
+  src.start();
+  SND.t0=SND.ctx.currentTime;
+  tickTx();
+}
+let loopN=1;
+function tickTx(){
+  if(!SND.playing)return;
+  const t=Math.min(SND.ctx.currentTime-SND.t0,SND.dur);
+  const p=t/SND.dur*100;
+  $('txBar').style.width=p+'%';
+  $('txPct').textContent=p.toFixed(0)+'%';
+  $('txClock').textContent=fmtTime(t)+' / '+fmtTime(SND.dur);
+  drawSonoPlayhead(t);
+  SND.raf=requestAnimationFrame(tickTx);
+}
+function finishSend(natural){
+  SND.playing=false;cancelAnimationFrame(SND.raf);
+  $('btnSend').hidden=false;$('btnStop').hidden=true;
+  try{SND.wake?.release();}catch(e){}
+  if(natural){$('txBar').style.width='100%';$('txPct').textContent='100%';
+    txStatus($('chkLoop').checked?'循环发送中…':'✓ 发送完毕，可切到接收端查看结果','ok');}
+}
+$('btnStop').onclick=()=>{try{SND.playing=false;SND.ctx.suspend();}catch(e){}
+  setTimeout(()=>{try{SND.ctx.resume();}catch(e){}},60);
+  finishSend(false);txStatus('已手动停止发送');$('txBar').style.width='0%';$('txPct').textContent='0%';};
 
-    function buildFrame(text) {
-        let bytes = Array.from(text).map(c => c.charCodeAt(0));
-        let crc = crc8(bytes);
-        bytes.push(crc);
-        let frameBytes = [bytes.length - 1, ...bytes]; 
-        let bits = frameBytes.map(b => b.toString(2).padStart(8, '0')).join('');
-        let interleaved = '';
-        for (let i = 0; i < 8; i++) {
-            for (let j = i; j < bits.length; j += 8) interleaved += bits[j];
-        }
-        return interleaved + TERMINATOR;
+/* --- 声谱图 --- */
+function fitCanvas(cv){const dpr=Math.min(2,window.devicePixelRatio||1);const w=cv.clientWidth,h=cv.clientHeight;
+  if(cv.width!==w*dpr||cv.height!==h*dpr){cv.width=w*dpr;cv.height=h*dpr;}return cv.getContext('2d');}
+function drawSonoBase(){
+  const cv=$('sonoCanvas'),ctx=fitCanvas(cv),W=cv.width,H=cv.height;
+  ctx.fillStyle='#081120';ctx.fillRect(0,0,W,H);
+  if(!SND.sched)return;
+  let total=0;SND.sched.forEach(s=>total+=s.n);
+  const sr=SND.ctx.sampleRate;
+  const fLo=2200,fHi=8300;
+  ctx.strokeStyle='rgba(120,170,255,.08)';ctx.lineWidth=1;
+  for(let f=3000;f<=8000;f+=1000){const y=H-(f-fLo)/(fHi-fLo)*H;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  let acc=0;
+  for(const s of SND.sched){
+    if(s.f>0){
+      const x0=acc/total*W,x1=(acc+s.n)/total*W;
+      const y=H-(s.f-fLo)/(fHi-fLo)*H;
+      let col;
+      if(s.f===PRE_L||s.f===PRE_H)col='#ffc857';
+      else{const nb=Math.round((s.f-DATA_F0)/DATA_DF);col='hsl('+(186+nb*6)+',95%,62%)';}
+      ctx.fillStyle=col;ctx.shadowColor=col;ctx.shadowBlur=6;
+      ctx.fillRect(x0,Math.max(1,y-3),Math.max(1.2,x1-x0),6);ctx.shadowBlur=0;
     }
+    acc+=s.n;
+  }
+  SND.baseCv=document.createElement('canvas');SND.baseCv.width=W;SND.baseCv.height=H;
+  SND.baseCv.getContext('2d').drawImage(cv,0,0);
+}
+function drawSonoPlayhead(t){
+  const cv=$('sonoCanvas'),ctx=cv.getContext('2d');
+  if(!SND.baseCv)return;
+  ctx.drawImage(SND.baseCv,0,0);
+  const x=t/SND.dur*cv.width;
+  ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,cv.height);ctx.stroke();
+}
+window.addEventListener('resize',()=>{if(SND.sched&&!SND.playing)drawSonoBase();});
 
-    function parseFrame(bits) {
-        if (bits.length % 8 !== 0) return null;
-        let deinterleaved = '';
-        let rows = bits.length / 8;
-        for (let i = 0; i < rows; i++) {
-            for (let j = 0; j < 8; j++) deinterleaved += bits[i + j * rows];
+/* ================= 接收端 ================= */
+const RX={
+  running:false,sr:0,state:'idle',
+  Ssec:0,Sps:0,
+  buf:new Float32Array(1<<20),slen:0,absStart:0,absTotal:0,
+  hopNext:0,hopBase:0,hopMags:[],hopCls:[],
+  noiseFloor:1e-7,level:0,rms:0,
+  cArr:null,hann:null,
+  anchor0:0,anchor:0,dataRun:0,firstDataHop:-1,lostHop:0,
+  nextSymAbs:0,expect:'data',chunk:0,dataSymIdx:0,midStartAbs:0,
+  totalDataSyms:0,copiesHint:0,headerParsed:false,
+  nibbles:[],
+  copies:[],lastPacketAt:0,finalized:false
+};
+let rxStream=null,rxProc=null,rxSrcNode=null;
+let HANN=null,specSmooth=new Float64Array(NTOT);
+
+function rxLog(msg,cls){
+  const box=$('logBox');
+  const t=new Date();const ts=String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0')+':'+String(t.getSeconds()).padStart(2,'0');
+  const div=document.createElement('div');
+  div.innerHTML='<span style="color:#375380">['+ts+']</span> <span class="l-'+(cls||'info')+'">'+msg+'</span>';
+  box.appendChild(div);box.scrollTop=box.scrollHeight;
+  while(box.children.length>120)box.removeChild(box.firstChild);
+}
+function rxPill(txt,cls){$('rxPillTxt').textContent=txt;const p=$('rxPill');p.className='pill'+(cls?' '+cls:'');}
+function rxStatus(txt,cls){const el=$('rxStatus');el.className='statusLine'+(cls?' '+cls:'');$('rxStatusTxt').textContent=txt;}
+
+$('btnMic').onclick=async()=>{
+  if(RX.running){stopRx('已手动停止接收');return;}
+  try{
+    let st=null;
+    try{st=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});}
+    catch(e1){st=await navigator.mediaDevices.getUserMedia({audio:true});}
+    rxStream=st;
+    const AC=window.AudioContext||window.webkitAudioContext;
+    const ctx=new AC();RX.ctx=ctx;await ctx.resume();
+    RX.sr=ctx.sampleRate;
+    if(RX.sr<20000)rxLog('警告：采样率仅 '+Math.round(RX.sr/1000)+' kHz，高频解析可能受限','warn');
+    /* Goertzel 系数 + Hann 窗 */
+    RX.cArr=FREQS.map(f=>2*Math.cos(2*Math.PI*f/RX.sr));
+    HANN=new Float32Array(WIN);
+    for(let n=0;n<WIN;n++)HANN[n]=0.5*(1-Math.cos(2*Math.PI*n/(WIN-1)));
+    /* 重置状态 */
+    Object.assign(RX,{running:true,state:'idle',slen:0,absStart:0,absTotal:0,hopNext:0,hopBase:0,
+      hopMags:[],hopCls:[],noiseFloor:1e-7,level:0,dataRun:0,firstDataHop:-1,
+      copies:[],finalized:false,headerParsed:false,nibbles:[],dataSymIdx:0});
+    specSmooth.fill(0);
+    $('chipsBox').innerHTML='';$('resultBox').value='';$('resBadge').hidden=true;
+    $('symBar').style.width='0%';$('symTxt').textContent='正在搜索前导码…';$('symCount').textContent='';
+    $('logBox').innerHTML='';
+    rxSrcNode=ctx.createMediaStreamSource(st);
+    rxProc=ctx.createScriptProcessor(2048,1,1);
+    const sil=ctx.createGain();sil.gain.value=0;
+    rxSrcNode.connect(rxProc);rxProc.connect(sil);sil.connect(ctx.destination);
+    rxProc.onaudioprocess=e=>pushSamples(e.inputBuffer.getChannelData(0));
+    $('btnMic').textContent='■ 停止接收';$('btnMic').classList.add('pulsing');
+    rxPill('监听中','hunt');rxStatus('正在监听麦克风，等待发送端播放…','live');
+    rxLog('接收已启动 · 采样率 '+Math.round(RX.sr/1000)+' kHz','ok');
+    requestAnimationFrame(rxUiLoop);
+  }catch(err){
+    rxPill('失败','err');rxStatus('麦克风启动失败：'+err.name+' '+err.message+'（请检查浏览器权限）','err');
+  }
+};
+function stopRx(msg){
+  RX.running=false;
+  try{rxProc.disconnect();rxSrcNode.disconnect();}catch(e){}
+  try{rxProc.onaudioprocess=null;}catch(e){}
+  try{rxStream.getTracks().forEach(t=>t.stop());}catch(e){}
+  try{RX.ctx.close();}catch(e){}
+  $('btnMic').textContent='🎙 开始接收';$('btnMic').classList.remove('pulsing');
+  if(msg){rxStatus(msg);rxLog(msg,'warn');}
+  updateRxMeta();
+}
+
+/* --- 样本缓冲与逐跳处理 --- */
+function pushSamples(ch){
+  if(RX.slen+ch.length>RX.buf.length){
+    const nb=new Float32Array(Math.max(RX.buf.length*2,RX.slen+ch.length+65536));
+    nb.set(RX.buf.subarray(0,RX.slen));RX.buf=nb;
+  }
+  RX.buf.set(ch,RX.slen);RX.slen+=ch.length;RX.absTotal+=ch.length;
+  let sum=0;for(let i=0;i<ch.length;i++)sum+=ch[i]*ch[i];
+  RX.rms=Math.sqrt(sum/ch.length);
+  while(RX.hopNext*HOP+WIN<=RX.absTotal){processHop(RX.hopNext);RX.hopNext++;}
+  const cut=RX.hopNext*HOP-RX.absStart-8192;
+  if(cut>65536){RX.buf.copyWithin(0,cut);RX.slen-=cut;RX.absStart+=cut;}
+}
+function goertzel(off,c){
+  let s1=0,s2=0;const b=RX.buf;
+  for(let n=0;n<WIN;n++){const s=b[off+n]*HANN[n]+c*s1-s2;s2=s1;s1=s;}
+  return s1*s1+s2*s2-c*s1*s2;
+}
+const hcls=h=>{const i=h-RX.hopBase;return(i>=0&&i<RX.hopCls.length)?RX.hopCls[i]:-1;};
+const hmag=h=>{const i=h-RX.hopBase;return(i>=0&&i<RX.hopMags.length)?RX.hopMags[i]:null;};
+
+function processHop(j){
+  const off=j*HOP-RX.absStart;
+  if(off<0||off+WIN>RX.slen)return;
+  const mags=new Float32Array(NTOT);
+  let sum=0,best=0;
+  for(let t=0;t<NTOT;t++){const m=goertzel(off,RX.cArr[t]);mags[t]=m;sum+=m;if(m>mags[best])best=t;}
+  RX.hopMags.push(mags);
+  const mean=sum/NTOT;
+  const th=Math.max(RX.noiseFloor*10,mean*2.2,1e-12);
+  let cls=-1;
+  if(mags[best]>th&&mags[best]>mean*2.6)cls=best;
+  RX.hopCls.push(cls);
+  if(cls===-1)RX.noiseFloor=RX.noiseFloor*0.93+mean*0.07;
+  RX.level=Math.max(RX.level*0.88,mags[best]);
+  if(RX.state==='idle'&&RX.hopCls.length>4200){
+    const c=RX.hopCls.length-1600;RX.hopCls.splice(0,c);RX.hopMags.splice(0,c);RX.hopBase+=c;
+  }
+  stateMachine(j);
+}
+
+/* --- 状态机 --- */
+function stateMachine(j){
+  switch(RX.state){
+    case 'idle':{
+      if((j&1)===0){
+        const r=scanPreamble();
+        if(r){RX.Ssec=r.S;RX.Sps=r.S*RX.sr;RX.state='preamble';RX.dataRun=0;RX.firstDataHop=-1;RX.lostHop=0;
+          rxPill('前导码锁定','lock');
+          rxStatus('已锁定前导码 · 自动识别符号速率 '+(1000/RX.Ssec).toFixed(0)+' sym/s（'+(4/RX.Ssec).toFixed(0)+' bit/s）','live');
+          rxLog('前导码锁定，符号时长 '+(RX.Ssec*1000).toFixed(1)+' ms','ok');updateRxMeta();}
+      }
+      break;}
+    case 'preamble':{
+      const c=hcls(j);
+      if(c>=2){RX.dataRun++;if(RX.firstDataHop<0)RX.firstDataHop=j;RX.lostHop=0;
+        if(RX.dataRun===2){RX.anchor0=RX.firstDataHop*HOP;RX.state='syncWait';}
+      }else if(c===0||c===1){RX.dataRun=0;RX.firstDataHop=-1;RX.lostHop=0;}
+      else{RX.lostHop++;if(RX.lostHop>Math.ceil(RX.Sps/HOP)*6){RX.state='idle';rxPill('监听中','hunt');}}
+      break;}
+    case 'syncWait':{
+      if(RX.absTotal>=RX.anchor0+4*RX.Sps+2*HOP+WIN){
+        let bestD=0,bestS=-1;
+        for(let d=-RX.Sps;d<=2*HOP+1;d+=HOP/2){
+          const sc=syncScore(RX.anchor0+d);
+          if(sc>bestS){bestS=sc;bestD=d;}
         }
-        let bytes = [];
-        for (let i = 0; i < deinterleaved.length; i += 8) bytes.push(parseInt(deinterleaved.substr(i, 8), 2));
-        let len = bytes[0];
-        let dataBytes = bytes.slice(1, 1 + len);
-        let receivedCrc = bytes[1 + len];
-        let calcCrc = crc8(dataBytes);
-        if (receivedCrc !== calcCrc) {
-            log('recv', `⚠️ CRC 校验失败! 收到: ${receivedCrc}, 计算: ${calcCrc}`);
-            return null;
+        if(bestS>=0.5){
+          RX.anchor=RX.anchor0+bestD;
+          RX.state='data';RX.expect='data';
+          RX.nextSymAbs=RX.anchor+4*RX.Sps;
+          RX.chunk=0;RX.dataSymIdx=0;RX.nibbles=[];RX.headerParsed=false;RX.totalDataSyms=0;RX.copiesHint=0;
+          rxPill('接收数据','data');rxStatus('同步字匹配成功（置信度 '+(bestS*100).toFixed(0)+'%），正在解调数据符号…','live');
+          rxLog('同步字锁定，开始解调','ok');
+          addChip();
+        }else{
+          RX.state='idle';rxPill('监听中','hunt');rxLog('同步字校验失败（'+(bestS*100).toFixed(0)+'%），回到搜索','warn');
         }
-        return dataBytes.map(b => String.fromCharCode(b)).join('');
+      }
+      break;}
+    case 'data':
+    case 'mid':{
+      let guard=0;
+      while(guard++<200){
+        if(RX.state!=='data'&&RX.state!=='mid')break;
+        const needEnd=RX.expect==='data'?RX.nextSymAbs+RX.Sps+WIN/2:RX.midStartAbs+4*RX.Sps+WIN/2;
+        if(RX.absTotal<needEnd)break;
+        if(RX.expect==='data')finalizeDataSymbol();
+        else finalizeMidamble();
+      }
+      break;}
+  }
+}
+
+function scanPreamble(){
+  let i=RX.hopCls.length-1,sk=0;
+  while(i>=0&&hcls(RX.hopBase+i)===-1&&sk<4){i--;sk++;}
+  if(i<0)return null;
+  let cur=hcls(RX.hopBase+i);
+  if(cur!==0&&cur!==1)return null;
+  const segs=[];let len=1;i--;
+  while(i>=0&&segs.length<12){
+    const c=hcls(RX.hopBase+i);
+    if(c===cur)len++;
+    else if(c===0||c===1){segs.push({t:cur,l:len});cur=c;len=1;}
+    else break;
+    i--;
+  }
+  segs.push({t:cur,l:len});
+  if(segs.length<5)return null;
+  const mid=segs.length>=6?segs.slice(1,-1):segs.slice(1);
+  if(mid.length<3)return null;
+  const ls=mid.map(s=>s.l).sort((a,b)=>a-b);
+  const med=ls[ls.length>>1];
+  if(med<3||med>40)return null;
+  for(const s of mid)if(s.l<med*0.5||s.l>med*2.0)return null;
+  let Ssec=med*HOP/RX.sr;
+  const cand=[0.024,0.032,0.048];let best=cand[0];
+  for(const c of cand)if(Math.abs(c-Ssec)<Math.abs(best-Ssec))best=c;
+  if(Math.abs(best-Ssec)>best*0.32)best=Math.min(0.06,Math.max(0.018,Ssec));
+  return {S:best};
+}
+
+function symbolEnergies(a,b){
+  const e=new Float64Array(DATA_N);
+  const lo=a+0.25*(b-a),hi=b-0.25*(b-a);
+  const h0=Math.ceil((lo-WIN/2)/HOP),h1=Math.floor((hi-WIN/2)/HOP);
+  for(let h=h0;h<=h1;h++){
+    const m=hmag(h);if(!m)continue;
+    for(let t=0;t<DATA_N;t++)e[t]+=m[2+t];
+  }
+  return e;
+}
+function syncScore(anchor){
+  let tot=0;
+  for(let k=0;k<4;k++){
+    const a=anchor+k*RX.Sps;
+    const e=symbolEnergies(a,a+RX.Sps);
+    let sum=1e-12;for(let m=0;m<DATA_N;m++)sum+=e[m];
+    tot+=e[SYNC_NIB[k]]/sum;
+  }
+  return tot/4;
+}
+
+function finalizeDataSymbol(){
+  const a=RX.nextSymAbs,S=RX.Sps;
+  const e=symbolEnergies(a,a+S);
+  let best=0,sum=0;
+  for(let t=0;t<DATA_N;t++){sum+=e[t];if(e[t]>e[best])best=t;}
+  const share=sum>0?e[best]/sum:0;
+  RX.nibbles.push((share>=0.42&&e[best]>RX.noiseFloor*6)?best:-1);
+  RX.dataSymIdx++;RX.chunk++;RX.nextSymAbs+=S;
+  if(!RX.headerParsed&&RX.dataSymIdx>=12)parseHeader();
+  updateProgress();
+  if(RX.headerParsed&&RX.dataSymIdx>=RX.totalDataSyms){packetComplete();return;}
+  if(RX.chunk>=MID_EVERY){
+    const remaining=RX.headerParsed?RX.totalDataSyms-RX.dataSymIdx:1;
+    if(remaining>0){RX.expect='mid';RX.midStartAbs=RX.nextSymAbs;}
+    else RX.chunk=0;
+  }
+}
+function finalizeMidamble(){
+  let bestD=0,bestS=syncScore(RX.midStartAbs);
+  for(let d=-3*HOP;d<=3*HOP;d+=HOP/2){
+    const sc=syncScore(RX.midStartAbs+d);
+    if(sc>bestS){bestS=sc;bestD=d;}
+  }
+  if(bestS>=0.45&&bestD!==0){
+    RX.nextSymAbs=RX.midStartAbs+4*RX.Sps+bestD;
+    rxLog('中途同步字校正时钟偏移 '+bestD.toFixed(0)+' 采样','info');
+  }else RX.nextSymAbs=RX.midStartAbs+4*RX.Sps;
+  RX.chunk=0;RX.expect='data';
+}
+function parseHeader(){
+  const nb=RX.nibbles.slice(0,12).map(x=>x<0?0:x);
+  const b=[];for(let i=0;i<6;i++)b.push((nb[2*i]<<4)|nb[2*i+1]);
+  const len=(b[4]<<8)|b[5],copies=b[2];
+  if(b[0]===MAGIC1&&b[1]===MAGIC2&&len<=MAX_PAYLOAD&&copies>=1&&copies<=4){
+    RX.headerParsed=true;RX.totalDataSyms=2*(len+8);RX.copiesHint=copies;
+    rxLog('帧头有效：载荷 '+len+' 字节 · 发送端共发 '+copies+' 份','ok');
+    updateRxMeta();
+  }else{
+    RX.state='idle';RX.dataRun=0;RX.firstDataHop=-1;
+    rxPill('监听中','hunt');
+    rxLog('帧头校验失败，丢弃本份，等待下一份冗余包','warn');
+  }
+}
+function nibsToBytes(nibs){
+  const out=new Uint8Array(nibs.length>>1);
+  for(let i=0;i<out.length;i++){
+    const hi=nibs[2*i],lo=nibs[2*i+1];
+    out[i]=((hi<0?0:hi)<<4)|(lo<0?0:lo);
+  }
+  return out;
+}
+function packetComplete(){
+  const bytes=nibsToBytes(RX.nibbles);
+  const len=(bytes[4]<<8)|bytes[5];
+  let ok=false,text='',plen=0,erased=RX.nibbles.filter(x=>x<0).length;
+  if(len<=MAX_PAYLOAD&&6+len+2<=bytes.length){
+    const crcR=(bytes[6+len]<<8)|bytes[7+len];
+    const crcC=crc16(bytes.subarray(0,6+len));
+    ok=crcR===crcC;plen=len;
+    if(ok){try{text=new TextDecoder('utf-8',{fatal:false}).decode(bytes.subarray(6,6+len));}catch(e){text='';}}
+  }
+  RX.copies.push({ok,text,len:plen,nibs:RX.nibbles.slice(),bytes,erased});
+  RX.lastPacketAt=performance.now();
+  finishChip(RX.copies.length-1,ok,plen,erased);
+  rxLog('第 '+RX.copies.length+' 份接收完成 · '+plen+' 字节 · CRC '+(ok?'✓ 通过':'✗ 失败')+(erased?' · 弱符号 '+erased+' 个':''),ok?'ok':'warn');
+  if(ok){
+    $('resultBox').value=text;
+    showBadge('ok','✓ CRC-16 校验通过 · 第 '+RX.copies.length+' 份完整无误');
+  }
+  updateRxMeta();
+  /* 复位，准备接收下一份 */
+  RX.state='idle';RX.dataRun=0;RX.firstDataHop=-1;RX.nibbles=[];RX.dataSymIdx=0;
+  rxPill('监听中','hunt');
+  const hint=RX.copiesHint;
+  if(hint&&RX.copies.length>=hint){finalize();}
+  else rxStatus('已收到 '+RX.copies.length+' 份，等待后续冗余份…（约 6 秒无新数据将自动结算）','live');
+}
+
+/* --- 结算与纠错合并 --- */
+function voteBytes(list){
+  let L=0;list.forEach(b=>{if(b.length>L)L=b.length;});
+  const out=new Uint8Array(L);
+  for(let i=0;i<L;i++){
+    const cnt=new Map();
+    for(const b of list)if(i<b.length){const v=b[i];cnt.set(v,(cnt.get(v)||0)+1);}
+    let bv=0,bn=-1;cnt.forEach((n,v)=>{if(n>bn){bn=n;bv=v;}});
+    out[i]=bv;
+  }
+  return out;
+}
+function finalize(){
+  if(RX.finalized||!RX.running)return;
+  RX.finalized=true;
+  const okc=RX.copies.filter(c=>c.ok);
+  if(okc.length){
+    const vb=voteBytes(okc.map(c=>c.bytes.subarray(0,6+c.len+2)));
+    const len=(vb[4]<<8)|vb[5];
+    let text='';try{text=new TextDecoder('utf-8',{fatal:false}).decode(vb.subarray(6,6+len));}catch(e){}
+    $('resultBox').value=text;
+    showBadge('ok','✓ 解码成功 · '+okc.length+' 份通过校验'+(okc.length>1?'（已交叉核对）':'')+' · '+len+' 字节');
+    rxLog('结算：'+okc.length+'/'+RX.copies.length+' 份校验通过，输出最终文本','ok');
+    rxStatus('✓ 接收完成，文本已成功还原','ok');rxPill('完成','ok');
+  }else{
+    const cnt={};RX.copies.forEach(c=>{const k=c.nibs.length;cnt[k]=(cnt[k]||0)+1;});
+    let L=0,Ln=0;for(const k in cnt)if(cnt[k]>Ln){Ln=cnt[k];L=+k;}
+    const cs=RX.copies.filter(c=>c.nibs.length===L);
+    const nb=new Array(L).fill(0);
+    for(let i=0;i<L;i++){
+      const tall=new Array(DATA_N).fill(0);let has=false;
+      for(const c of cs){const v=c.nibs[i];if(v>=0){tall[v]++;has=true;}}
+      if(has){let b=0;for(let t=1;t<DATA_N;t++)if(tall[t]>tall[b])b=t;nb[i]=b;}
     }
-
-    document.getElementById('btnSend').onclick = async () => {
-        const text = document.getElementById('sendText').value;
-        if (!text) return;
-        const sendStatus = document.getElementById('sendStatus');
-        sendStatus.innerText = "正在编码并发送...";
-        log('send', `开始发送文本: "${text}"`);
-        const payloadBits = buildFrame(text);
-        const fullStream = PREAMBLE + payloadBits;
-        log('send', `完整二进制流 (${fullStream.length} bits)`);
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        if (ctx.state === 'suspended') await ctx.resume();
-        for (let i = 0; i < fullStream.length; i++) {
-            const bit = fullStream[i];
-            const freq = bit === '0' ? FREQ_0 : FREQ_1;
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.frequency.value = freq;
-            gain.gain.value = 1.0; 
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start();
-            await new Promise(resolve => setTimeout(resolve, BIT_DURATION_MS));
-            osc.stop();
-            if (i < fullStream.length - 1) {
-                await new Promise(resolve => setTimeout(resolve, GUARD_INTERVAL_MS));
-            }
-        }
-        await new Promise(resolve => setTimeout(resolve, 200));
-        ctx.close();
-        sendStatus.innerText = "发送完成";
-        log('send', "✅ 文本发送完毕");
-    };
-            <script>
-    let recvAudioCtx = null, recvAnalyser = null, isListening = false;
-    let isSignalActive = false, currentBitBuffer = '', preambleBuffer = '', isSynced = false, activeStartTime = 0;
-    let noiseFloor = -70; 
-    let isCalibrating = false; 
-
-    document.getElementById('btnStartListen').onclick = async () => {
-        if (isListening) return;
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
-            recvAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            if (recvAudioCtx.state === 'suspended') await recvAudioCtx.resume();
-            const source = recvAudioCtx.createMediaStreamSource(stream);
-            recvAnalyser = recvAudioCtx.createAnalyser();
-            recvAnalyser.fftSize = 4096;
-            recvAnalyser.smoothingTimeConstant = 0.8; 
-            source.connect(recvAnalyser);
-            isListening = true;
-            isSignalActive = false; currentBitBuffer = ''; preambleBuffer = ''; isSynced = false;
-            document.getElementById('receivedText').innerText = '';
-            document.getElementById('recvStatus').innerText = "正在校准环境底噪 (1秒)...";
-            log('recv', "✅ 开始监听，请保持安静，正在校准底噪...");
-            isCalibrating = true;
-            analyzeLoop();
-            setTimeout(() => {
-                isCalibrating = false;
-                log('recv', `🎯 底噪校准完成！当前环境底噪: ${noiseFloor.toFixed(2)} dB`);
-                document.getElementById('recvStatus').innerText = "监听中...";
-            }, CALIBRATION_DURATION_MS);
-        } catch (e) { log('recv', `❌ 麦克风初始化失败: ${e.message}`); }
-    };
-
-    document.getElementById('btnStopListen').onclick = () => {
-        isListening = false;
-        if (recvAudioCtx) recvAudioCtx.close();
-        document.getElementById('recvStatus').innerText = "已停止";
-        log('recv', "监听已停止");
-    };
-
-    function analyzeLoop() {
-        if (!isListening || !recvAnalyser) return;
-        const dataArray = new Float32Array(recvAnalyser.frequencyBinCount);
-        recvAnalyser.getFloatFrequencyData(dataArray);
-        const bin14k = Math.round(FREQ_0 * recvAnalyser.fftSize / recvAudioCtx.sampleRate);
-        const bin15k = Math.round(FREQ_1 * recvAnalyser.fftSize / recvAudioCtx.sampleRate);
-        const getBandEnergy = (centerBin) => {
-            let sum = 0;
-            for(let i = -15; i <= 15; i++) sum += dataArray[centerBin + i];
-            return sum / 31;
-        };
-        const energy14k = getBandEnergy(bin14k);
-        const energy15k = getBandEnergy(bin15k);
-        const maxEnergy = Math.max(energy14k, energy15k);
-        if (maxEnergy < noiseFloor + 5) {
-            noiseFloor = noiseFloor * 0.95 + maxEnergy * 0.05;
-        }
-        document.getElementById('energyVal').innerText = maxEnergy.toFixed(2) + ' dB';
-        document.getElementById('noiseVal').innerText = noiseFloor.toFixed(2) + ' dB';
-        if (isCalibrating) {
-            requestAnimationFrame(analyzeLoop);
-            return;
-        }
-        const now = Date.now();
-        const isAboveThreshold = maxEnergy > (noiseFloor + SIGNAL_MARGIN_DB);
-        if (isAboveThreshold && !isSignalActive) {
-            isSignalActive = true;
-            activeStartTime = now;
-            let detectedBit = energy14k > energy15k ? '0' : '1';
-            processBit(detectedBit);
-        } else if (!isAboveThreshold && isSignalActive) {
-            isSignalActive = false;
-        } else if (isSignalActive && (now - activeStartTime > 150)) {
-            isSignalActive = false;
-            log('recv', "⚠️ 信号超时，强制复位状态机");
-            isSynced = false; currentBitBuffer = ''; preambleBuffer = '';
-        }
-        requestAnimationFrame(analyzeLoop);
+    const bytes=nibsToBytes(nb);
+    const len=(bytes[4]<<8)|bytes[5];
+    let valid=false,text='';
+    if(len<=MAX_PAYLOAD&&6+len+2<=bytes.length){
+      valid=((bytes[6+len]<<8)|bytes[7+len])===crc16(bytes.subarray(0,6+len));
+      if(valid)try{text=new TextDecoder('utf-8',{fatal:false}).decode(bytes.subarray(6,6+len));}catch(e){}
     }
-
-    function processBit(bit) {
-        if (!isSynced) {
-            preambleBuffer += bit;
-            if (preambleBuffer.length > 8) preambleBuffer = preambleBuffer.slice(-8);
-            let diff = 0;
-            for(let i=0; i<8; i++) if(preambleBuffer[i] !== PREAMBLE[i]) diff++;
-            if (diff <= 2) {
-                isSynced = true; currentBitBuffer = '';
-                log('recv', `🎯 成功匹配前导码！开始接收数据帧...`);
-                document.getElementById('recvStatus').innerText = "接收数据帧中...";
-            }
-        } else {
-            currentBitBuffer += bit;
-            const MIN_FRAME_BITS = 24; 
-            if (currentBitBuffer.length >= MIN_FRAME_BITS && currentBitBuffer.slice(-8) === TERMINATOR) {
-                let frameBits = currentBitBuffer.slice(0, -8); 
-                log('recv', `📦 收到完整数据帧 (${frameBits.length} bits)，正在解析...`);
-                let decoded = parseFrame(frameBits);
-                if (decoded) {
-                    document.getElementById('receivedText').innerText = decoded;
-                    log('recv', `🎉 成功解析明文: "${decoded}"`);
-                }
-                isSynced = false; currentBitBuffer = '';
-                document.getElementById('recvStatus').innerText = "监听中...";
-            }
-        }
+    if(valid){
+      $('resultBox').value=text;
+      showBadge('warn','⚡ 无完整副本，已通过多数表决修复成功 · '+len+' 字节');
+      rxLog('结算：无完整副本，多数表决修复成功','warn');
+      rxStatus('✓ 接收完成（经表决修复）','ok');rxPill('完成','ok');
+    }else{
+      showBadge('err','✗ 校验失败：干扰过强，请点击发送端重新发送（建议改用「稳健」模式或增加冗余份数）');
+      rxLog('结算：全部 '+RX.copies.length+' 份均无法通过校验','err');
+      rxStatus('✗ 解码失败，建议重发','err');rxPill('失败','err');
     }
+  }
+  stopRx('接收会话已结束');
+}
+
+/* --- 接收 UI --- */
+function addChip(){
+  const box=$('chipsBox');
+  if(box.querySelector('span:only-child'))box.innerHTML='';
+  const d=document.createElement('span');d.className='cchip rxing';d.id='chip'+RX.copies.length;
+  d.textContent='第 '+(RX.copies.length+1)+' 份 · 解调中…';box.appendChild(d);
+}
+function finishChip(idx,ok,len,erased){
+  const d=$('chip'+idx);if(!d)return;
+  d.className='cchip '+(ok?'ok':'bad');
+  d.textContent='第 '+(idx+1)+' 份 · '+(ok?'CRC✓ ':'CRC✗ ')+len+'B'+(erased?' · 弱'+erased:'');
+}
+function updateProgress(){
+  if(RX.headerParsed&&RX.totalDataSyms>0){
+    const p=Math.min(100,RX.dataSymIdx/RX.totalDataSyms*100);
+    $('symBar').style.width=p+'%';
+    $('symTxt').textContent='正在解调第 '+RX.copies.length+ (RX.expect==='mid'?1:0) +' 份数据';
+    $('symCount').textContent=RX.dataSymIdx+' / '+RX.totalDataSyms+' 符号';
+  }else{
+    $('symTxt').textContent='正在解析帧头…';
+    $('symBar').style.width=Math.min(8,RX.dataSymIdx/12*8)+'%';
+  }
+}
+function updateRxMeta(){
+  const rate=RX.Ssec>0?(1000/RX.Ssec).toFixed(0)+' sym/s':'自动';
+  $('rxMeta').innerHTML='采样率 '+Math.round(RX.sr/1000)+' kHz · '+rate+'<br>已接收 '+RX.copies.length+' 份'+(RX.copiesHint?' / 共 '+RX.copiesHint+' 份':'');
+}
+function showBadge(cls,txt){const b=$('resBadge');b.hidden=false;b.className='badge '+cls;b.textContent=txt;}
+
+function rxUiLoop(){
+  if(!RX.running)return;
+  /* 电平表 */
+  const db=RX.rms>1e-6?20*Math.log10(RX.rms):-60;
+  $('lvlFill').style.width=Math.max(0,Math.min(100,(db+60)/54*100))+'%';
+  $('lvlPct').textContent=db<-58?'静音':db.toFixed(1)+' dB';
+  /* 频谱条 */
+  const last=RX.hopMags.length?RX.hopMags[RX.hopMags.length-1]:null;
+  const cv=$('specCanvas'),ctx=fitCanvas(cv),W=cv.width,H=cv.height;
+  ctx.fillStyle='#081120';ctx.fillRect(0,0,W,H);
+  const n=NTOT,pad=W*0.03,bw=(W-pad*2)/n;
+  for(let t=0;t<n;t++){
+    const v=last?last[t]:0;
+    specSmooth[t]=Math.max(v,specSmooth[t]*0.82);
+    const ref=RX.noiseFloor*10+1e-12;
+    let d=10*Math.log10((specSmooth[t]+1e-15)/ref);
+    d=Math.max(0,Math.min(42,d));
+    const h=d/42*(H-30);
+    const x=pad+t*bw+bw*0.16,w=bw*0.68;
+    const isPre=t<2;
+    const grad=ctx.createLinearGradient(0,H-22-h,0,H-22);
+    grad.addColorStop(0,isPre?'#ffc857':'hsl('+(186+(t-2)*6)+',95%,62%)');
+    grad.addColorStop(1,isPre?'rgba(255,200,87,.15)':'rgba(56,225,255,.12)');
+    ctx.fillStyle=grad;
+    ctx.fillRect(x,H-22-h,w,h);
+    ctx.fillStyle='rgba(138,163,199,.55)';
+    ctx.font=(bw>44?'11px':'9px')+' JetBrains Mono, monospace';
+    ctx.textAlign='center';
+    ctx.fillText((FREQS[t]/1000).toFixed(1),x+w/2,H-7);
+  }
+  /* 自动结算超时 */
+  if(!RX.finalized&&RX.copies.length>0&&performance.now()-RX.lastPacketAt>6000)finalize();
+  requestAnimationFrame(rxUiLoop);
+}
+
+$('btnCopy').onclick=async()=>{
+  const t=$('resultBox').value;
+  if(!t){rxLog('暂无可复制的文本','warn');return;}
+  try{await navigator.clipboard.writeText(t);rxLog('已复制到剪贴板','ok');}
+  catch(e){$('resultBox').select();document.execCommand('copy');rxLog('已复制到剪贴板','ok');}
+};
+$('btnRxClear').onclick=()=>{
+  RX.copies=[];RX.copiesHint=0;RX.finalized=false;RX.lastPacketAt=0;
+  $('chipsBox').innerHTML='<span style="font-size:12px;color:var(--dim2)">等待数据包…</span>';
+  $('resultBox').value='';$('resBadge').hidden=true;
+  $('symBar').style.width='0%';$('symTxt').textContent=RX.running?'正在搜索前导码…':'尚未锁定信号';$('symCount').textContent='';
+  rxLog('已清空接收缓存','info');updateRxMeta();
+};
+
+/* 初始化 */
+updateCounts();
+window.addEventListener('resize',()=>{ if(!$('panelRecv').hidden){fitCanvas($('specCanvas'));} });
 </script>
 </body>
 </html>
