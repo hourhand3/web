@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#070d18">
-<title>声波传文 · 声音传输文本（高频兼容优化版）</title>
+<title>声波传文 · 声音传输文本（高频兼容优化版 v3）</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5/400.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5/500.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5/700.css">
@@ -77,9 +77,9 @@ textarea::placeholder{color:var(--dim2)}
 .linkBtn:hover{color:var(--cy);text-decoration:underline}
 .segRow{display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}
 .segRow label{font-size:13px;color:var(--dim);min-width:64px}
-.seg{display:inline-flex;background:#0a1424;border:1px solid var(--line);border-radius:11px;padding:4px;gap:4px}
+.seg{display:inline-flex;background:#0a1424;border:1px solid var(--line);border-radius:11px;padding:4px;gap:4px;flex-wrap:wrap}
 .seg button{border:none;background:transparent;color:var(--dim);font-family:inherit;font-size:13px;
-  padding:7px 14px;border-radius:8px;cursor:pointer;transition:all .18s;white-space:nowrap}
+  padding:7px 13px;border-radius:8px;cursor:pointer;transition:all .18s;white-space:nowrap}
 .seg button:hover{color:var(--tx)}
 .seg button.on{background:linear-gradient(135deg,rgba(56,225,255,.22),rgba(56,225,255,.08));color:var(--cy);box-shadow:inset 0 0 0 1px rgba(56,225,255,.4)}
 .seg button small{display:block;font-size:10px;color:var(--dim2);font-family:var(--mono);margin-top:1px}
@@ -170,15 +170,15 @@ footer .ft{color:var(--dim);font-size:12.5px;font-weight:700;margin-bottom:6px}
   <div class="brandRow">
     <div class="logo">∿</div>
     <div>
-      <h1>声波传文<span class="ver">高频兼容优化版 v2</span></h1>
+      <h1>声波传文<span class="ver">高频兼容优化版 v3</span></h1>
       <div class="sub" style="margin-top:4px">通过「扬声器 → 空气 → 麦克风」在两台设备间无线传输文本，无需网络与配对</div>
     </div>
   </div>
   <div class="chips">
-    <span class="chip"><i></i>16 频 MFSK 调制（每符号 4 bit）</span>
-    <span class="chip a"><i></i>兼容频段 2.5 – 7.9 kHz</span>
+    <span class="chip"><i></i>16 频 MFSK（每符号 4 bit · 3.6–7.65 kHz）</span>
+    <span class="chip a"><i></i>8 符号长同步字 · 三窗择优抗混响判决</span>
     <span class="chip v"><i></i>帧头双冗余 · 整包重传 · 置信度加权表决</span>
-    <span class="chip g"><i></i>符号整窗 Goertzel · CRC-16 · 中途同步字</span>
+    <span class="chip g"><i></i>活动驱动结算 · CRC-16 · 中途同步字</span>
   </div>
 </header>
 
@@ -209,6 +209,7 @@ footer .ft{color:var(--dim);font-size:12.5px;font-weight:700;margin-bottom:6px}
         <button data-v="fast">快速<small>167 sym/s</small></button>
         <button data-v="std" class="on">标准<small>125 sym/s</small></button>
         <button data-v="rob">稳健<small>83 sym/s</small></button>
+        <button data-v="ult">超强<small>42 sym/s</small></button>
       </div>
     </div>
     <div class="segRow">
@@ -220,7 +221,7 @@ footer .ft{color:var(--dim);font-size:12.5px;font-weight:700;margin-bottom:6px}
       </div>
     </div>
     <label class="chk"><input type="checkbox" id="chkLoop"> 循环发送（直到手动停止，便于接收端随时开始）</label>
-    <div style="margin-top:10px;font-size:12px;color:var(--am)">💡 为获得高容错率，建议至少选择「2 份」，环境嘈杂时用「稳健 + 3 份」。</div>
+    <div style="margin-top:10px;font-size:12px;color:var(--am)">💡 高容错建议：至少「2 份」；仍失败请改「稳健/超强 + 3 份」并拉近两机距离。</div>
   </div>
 
   <div class="card">
@@ -242,9 +243,9 @@ footer .ft{color:var(--dim);font-size:12.5px;font-weight:700;margin-bottom:6px}
       <div class="tip"><b>音量</b>发送设备音量调至 80% 以上，声音越清晰越好</div>
       <div class="tip"><b>距离</b>两台设备相距 10 ~ 40 厘米，接收端麦克风正对扬声器</div>
       <div class="tip"><b>环境</b>保持安静，远离风扇、音响、键盘敲击等噪声源</div>
-      <div class="tip"><b>稳定</b>传输过程中不要移动设备或遮挡扬声器 / 麦克风</div>
-      <div class="tip"><b>冗余</b>务必发送 ≥2 份，接收端靠多份表决纠错</div>
-      <div class="tip"><b>手机</b>若手机麦克风降噪过强，可尝试切换「稳健」模式</div>
+      <div class="tip"><b>混响</b>混响强的房间（空旷/瓷砖）请用更慢的模式</div>
+      <div class="tip"><b>冗余</b>务必发送 ≥2 份，接收端靠多份加权表决纠错</div>
+      <div class="tip"><b>手机</b>手机麦克风降噪过强时，试试「稳健」或「超强」模式</div>
     </div>
   </div>
 </section>
@@ -291,28 +292,31 @@ footer .ft{color:var(--dim);font-size:12.5px;font-weight:700;margin-bottom:6px}
 </main>
 
 <footer>
-  <div class="ft">工作原理</div>
-  文本经 <b>UTF-8</b> 编码后附加<b>双重帧头</b>与 <b>CRC-16</b> 校验位，使用 <b>16 频 MFSK</b>（2.5–7.9 kHz 兼容频段，每符号携带 4 bit）调制为声波。
-  帧前的<b>加长交替前导码</b>用于信号捕获、AGC 稳定并自动测定符号速率；<b>同步字</b>与每 64 个符号插入的<b>中途同步字</b>以 64 采样精度持续校正采样时钟漂移。
-  接收端对每个符号做<b>整窗 Goertzel</b> 判决并记录置信度；默认整包<b>重复发送 2 份</b>，逐符号做<b>置信度加权表决</b>，再由 CRC-16 验证——少量误码可自动修复，无法修复时会明确提示重传。
+  <div class="ft">工作原理（v3）</div>
+  文本经 <b>UTF-8</b> 编码后附加<b>双重帧头</b>与 <b>CRC-16</b> 校验位，使用 <b>16 频 MFSK</b>（3.6–7.65 kHz 兼容频段，每符号 4 bit）调制为声波。
+  <b>加长前导码</b>用于捕获与自动测速；<b>8 符号长同步字</b>与每 64 符号插入的中途同步字以 64 采样精度校正时钟。
+  每个符号在三个候选时间窗内做 <b>Goertzel 择优判决</b>以抵抗房间混响；整包默认<b>重传 2 份</b>，逐符号<b>置信度加权表决</b>后经 CRC-16 验证。
+  结算采用<b>活动驱动</b>策略，确保每一份冗余包都完整接收后才合并输出。
 </footer>
 </div>
 
 <script>
-/* ================= 协议常量 ================= */
+/* ================= 协议常量（v3） ================= */
 const DATA_N   = 16;
-const DATA_F0  = 3700;
-const DATA_DF  = 280;
+const DATA_F0  = 3600;         // 数据频段下移，兼容更多扬声器
+const DATA_DF  = 270;          // 3600 ~ 7650 Hz
 const PRE_L    = 2500;
 const PRE_H    = 3100;
-const SYNC_NIB = [0,15,5,10];
-const PRE_SYMS = 12;           // 加长前导码：利于 AGC 稳定与测速
+const SYNC_NIB = [3,11,6,9];   // 中频频点，避免高低两端衰减
+const SYNC8    = SYNC_NIB.concat(SYNC_NIB); // 8 符号长同步字
+const PRE_SYMS = 12;
 const MID_EVERY= 64;
-const HDR_BYTES= 6;            // 帧头字节数
-const HDR_DUP  = 2;            // 帧头重复次数（双冗余）
-const FRAME_PRE= HDR_BYTES*HDR_DUP; // 帧前缀 12 字节
+const HDR_BYTES= 6;
+const HDR_DUP  = 2;
+const FRAME_PRE= HDR_BYTES*HDR_DUP;
 const CRC_BYTES= 2;
-const MODES    = { fast:{S:0.024,label:'快速'}, std:{S:0.032,label:'标准'}, rob:{S:0.048,label:'稳健'} };
+const MODES    = { fast:{S:0.024,label:'快速'}, std:{S:0.032,label:'标准'}, rob:{S:0.048,label:'稳健'}, ult:{S:0.096,label:'超强'} };
+const SNAP_CAND= [0.024,0.032,0.048,0.096];
 const GAP_SEC  = 0.40, TAIL_SEC = 0.12;
 const MAX_PAYLOAD = 2048;
 const MAGIC1=0x9A, MAGIC2=0x57;
@@ -349,7 +353,7 @@ function buildFrame(payload,copies){
 function estDuration(payloadLen,Ssec,copies){
   const dataSyms=2*(payloadLen+FRAME_PRE+CRC_BYTES);
   const mid=Math.floor((dataSyms-1)/MID_EVERY);
-  const syms=PRE_SYMS+4+dataSyms+mid*4+1;
+  const syms=PRE_SYMS+8+dataSyms+mid*8+1;
   return copies*(syms*Ssec+TAIL_SEC)+(copies-1)*GAP_SEC;
 }
 
@@ -374,6 +378,9 @@ function updateCounts(){
 }
 function txStatus(txt,cls){const el=$('txStatus');el.className='statusLine'+(cls?' '+cls:'');$('txStatusTxt').textContent=txt;}
 
+function toneAmp(f){ /* 高频预加重，抵消小型扬声器高频衰减 */
+  return Math.min(0.95, 0.55 + 0.40*(f-2500)/5400);
+}
 function buildSchedule(frame,Ssec,sr,copies){
   const S=Math.max(1,Math.round(Ssec*sr));
   const seg=[];
@@ -382,11 +389,11 @@ function buildSchedule(frame,Ssec,sr,copies){
   for(let c=0;c<copies;c++){
     if(c>0)seg.push({f:0,n:Math.round(GAP_SEC*sr)});
     for(let i=0;i<PRE_SYMS;i++)pushSym(i%2?PRE_H:PRE_L);
-    SYNC_NIB.forEach(x=>pushSym(dataFreq(x)));
+    SYNC8.forEach(x=>pushSym(dataFreq(x)));
     let rem=nib.length;
     for(let i=0;i<nib.length;i++){
       pushSym(dataFreq(nib[i]));rem--;
-      if((i+1)%MID_EVERY===0&&rem>0)SYNC_NIB.forEach(x=>pushSym(dataFreq(x)));
+      if((i+1)%MID_EVERY===0&&rem>0)SYNC8.forEach(x=>pushSym(dataFreq(x)));
     }
     pushSym(PRE_L);
     seg.push({f:0,n:Math.round(TAIL_SEC*sr)});
@@ -400,7 +407,7 @@ function synthesize(seg,sr){
   for(const s of seg){
     if(s.f>0){
       const w=2*Math.PI*s.f/sr;
-      const amp=Math.min(0.92,0.60+0.32*(s.f-2500)/5400);
+      const amp=toneAmp(s.f);
       for(let k=0;k<s.n;k++){out[idx++]=amp*Math.sin(ph);ph+=w;if(ph>6.28e5)ph%=2*Math.PI;}
     }else idx+=s.n;
   }
@@ -462,7 +469,7 @@ function finishSend(natural){
   if(natural){$('txBar').style.width='100%';$('txPct').textContent='100%';
     txStatus($('chkLoop').checked?'循环发送中…':'✓ 发送完毕，可切到接收端查看结果','ok');}
 }
-$('btnStop').onclick=()=>{try{SND.playing=false;}catch(e){};finishSend(false);txStatus('已手动停止发送');$('txBar').style.width='0%';$('txPct').textContent='0%';};
+$('btnStop').onclick=()=>{SND.playing=false;finishSend(false);txStatus('已手动停止发送');$('txBar').style.width='0%';$('txPct').textContent='0%';};
 
 function fitCanvas(cv){const dpr=Math.min(2,window.devicePixelRatio||1);const w=cv.clientWidth,h=cv.clientHeight;
   if(cv.width!==w*dpr||cv.height!==h*dpr){cv.width=w*dpr;cv.height=h*dpr;}return cv.getContext('2d');}
@@ -471,7 +478,7 @@ function drawSonoBase(){
   ctx.fillStyle='#081120';ctx.fillRect(0,0,W,H);
   if(!SND.sched)return;
   let total=0;SND.sched.forEach(s=>total+=s.n);
-  const fLo=2200,fHi=8300;
+  const fLo=2200,fHi=8100;
   ctx.strokeStyle='rgba(120,170,255,.08)';ctx.lineWidth=1;
   for(let f=3000;f<=8000;f+=1000){const y=H-(f-fLo)/(fHi-fLo)*H;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
   let acc=0;
@@ -508,11 +515,11 @@ const RX={
   hopNext:0,hopBase:0,hopMags:[],hopCls:[],
   noiseFloor:1e-7,level:0,rms:0,
   cArr:null,ctx:null,
-  anchor0:0,anchor:0,dataRun:0,firstDataHop:-1,lostHop:0,
-  nextSymAbs:0,expect:'data',chunk:0,dataSymIdx:0,midStartAbs:0,
+  anchor0:0,anchor:0,dataRun:0,firstDataHop:-1,lastPreHop:-99,lostHop:0,
+  nextSymAbs:0,expect:'data',chunk:0,dataSymIdx:0,midStartAbs:0,badRun:0,
   totalDataSyms:0,copiesHint:0,headerParsed:false,
   nibbles:[],nibQ:[],
-  copies:[],lastPacketAt:0,finalized:false
+  copies:[],lastPacketAt:0,lastActivity:0,finalized:false
 };
 let rxStream=null,rxProc=null,rxSrcNode=null;
 let HANN=null,specSmooth=new Float64Array(NTOT);
@@ -544,8 +551,9 @@ $('btnMic').onclick=async()=>{
     HANN=new Float32Array(WIN);
     for(let n=0;n<WIN;n++)HANN[n]=0.5*(1-Math.cos(2*Math.PI*n/(WIN-1)));
     Object.assign(RX,{running:true,state:'idle',slen:0,absStart:0,absTotal:0,hopNext:0,hopBase:0,
-      hopMags:[],hopCls:[],noiseFloor:1e-7,level:0,dataRun:0,firstDataHop:-1,
+      hopMags:[],hopCls:[],noiseFloor:1e-7,level:0,dataRun:0,firstDataHop:-1,lastPreHop:-99,badRun:0,
       copies:[],finalized:false,headerParsed:false,nibbles:[],nibQ:[],dataSymIdx:0});
+    RX.lastActivity=performance.now();
     specSmooth.fill(0);symWin=null;symWinN=0;
     $('chipsBox').innerHTML='';$('resultBox').value='';$('resBadge').hidden=true;
     $('symBar').style.width='0%';$('symTxt').textContent='正在搜索前导码…';$('symCount').textContent='';
@@ -592,7 +600,6 @@ function goertzel(off,c){
   return s1*s1+s2*s2-c*s1*s2;
 }
 const hcls=h=>{const i=h-RX.hopBase;return(i>=0&&i<RX.hopCls.length)?RX.hopCls[i]:-1;};
-const hmag=h=>{const i=h-RX.hopBase;return(i>=0&&i<RX.hopMags.length)?RX.hopMags[i]:null;};
 
 function processHop(j){
   const off=j*HOP-RX.absStart;
@@ -614,28 +621,37 @@ function processHop(j){
   stateMachine(j);
 }
 
-/* --- 符号整窗 Goertzel：对符号中段 60% 原始采样做一次性分析 --- */
+/* --- 符号三窗择优 Goertzel 判决（抗混响拖尾） --- */
 function getSymWin(N){ if(symWinN===N&&symWin)return symWin; const w=new Float32Array(N); for(let n=0;n<N;n++)w[n]=0.5*(1-Math.cos(2*Math.PI*n/(N-1))); symWin=w; symWinN=N; return w;}
 function goertzelWin(off,N,c,w){let s1=0,s2=0;const b=RX.buf;for(let n=0;n<N;n++){const s=b[off+n]*w[n]+c*s1-s2;s2=s1;s1=s;}return s1*s1+s2*s2-c*s1*s2;}
+const SUB_WINS=[[0.20,0.60],[0.30,0.70],[0.40,0.80]];
 function symbolEnergies(a,b){
-  const S=b-a,g=S*0.2;
-  const start=Math.round(a+g),end=Math.round(b-g);
-  const N=end-start,off=start-RX.absStart;
-  const e=new Float64Array(DATA_N);
-  if(N<32||off<0||off+N>RX.slen)return e;
-  const w=getSymWin(N);
-  for(let t=0;t<DATA_N;t++)e[t]=goertzelWin(off,N,RX.cArr[2+t],w);
-  return e;
+  const S=b-a;
+  let bestE=null,bestC=-1;
+  for(let wi=0;wi<3;wi++){
+    const w0=SUB_WINS[wi][0],w1=SUB_WINS[wi][1];
+    const start=Math.round(a+w0*S),end=Math.round(a+w1*S);
+    const N=end-start,off=start-RX.absStart;
+    if(N<32||off<0||off+N>RX.slen)continue;
+    const w=getSymWin(N);
+    const e=new Float64Array(DATA_N);
+    for(let t=0;t<DATA_N;t++)e[t]=goertzelWin(off,N,RX.cArr[2+t],w);
+    let sum=0,mx=0;
+    for(let t=0;t<DATA_N;t++){sum+=e[t];if(e[t]>mx)mx=e[t];}
+    const c=sum>0?mx/sum:0;
+    if(c>bestC){bestC=c;bestE=e;}
+  }
+  return bestE||new Float64Array(DATA_N);
 }
 function syncScore(anchor){
   let tot=0;
-  for(let k=0;k<4;k++){
+  for(let k=0;k<8;k++){
     const a=anchor+k*RX.Sps;
     const e=symbolEnergies(a,a+RX.Sps);
     let sum=1e-12;for(let m=0;m<DATA_N;m++)sum+=e[m];
-    tot+=e[SYNC_NIB[k]]/sum;
+    tot+=e[SYNC8[k]]/sum;
   }
-  return tot/4;
+  return tot/8;
 }
 
 /* --- 状态机 --- */
@@ -645,6 +661,7 @@ function stateMachine(j){
       if((j&1)===0){
         const r=scanPreamble();
         if(r){RX.Ssec=r.S;RX.Sps=r.S*RX.sr;RX.state='preamble';RX.dataRun=0;RX.firstDataHop=-1;RX.lostHop=0;
+          RX.lastActivity=performance.now();
           rxPill('前导码锁定','lock');
           rxStatus('已锁定前导码 · 自动识别符号速率 '+(1000/RX.Ssec).toFixed(0)+' sym/s（'+(4/RX.Ssec).toFixed(0)+' bit/s）','live');
           rxLog('前导码锁定，符号时长 '+(RX.Ssec*1000).toFixed(1)+' ms','ok');updateRxMeta();}
@@ -652,23 +669,29 @@ function stateMachine(j){
       break;}
     case 'preamble':{
       const c=hcls(j);
-      if(c>=2){RX.dataRun++;if(RX.firstDataHop<0)RX.firstDataHop=j;RX.lostHop=0;
-        if(RX.dataRun===2){RX.anchor0=RX.firstDataHop*HOP;RX.state='syncWait';}
-      }else if(c===0||c===1){RX.dataRun=0;RX.firstDataHop=-1;RX.lostHop=0;}
+      if(c>=2){
+        RX.dataRun++;if(RX.firstDataHop<0)RX.firstDataHop=j;RX.lostHop=0;
+        if(RX.dataRun===2){
+          if(j-RX.lastPreHop<=6){ // 跳变前必须确实存在前导码，防噪声假触发
+            RX.anchor0=RX.firstDataHop*HOP;RX.state='syncWait';
+          }else{RX.dataRun=0;RX.firstDataHop=-1;}
+        }
+      }else if(c===0||c===1){RX.dataRun=0;RX.firstDataHop=-1;RX.lastPreHop=j;RX.lostHop=0;}
       else{RX.lostHop++;if(RX.lostHop>Math.ceil(RX.Sps/HOP)*6){RX.state='idle';rxPill('监听中','hunt');}}
       break;}
     case 'syncWait':{
-      if(RX.absTotal>=RX.anchor0+5*RX.Sps+WIN){
+      if(RX.absTotal>=RX.anchor0+9.5*RX.Sps+WIN){
         let bestD=0,bestS=-1;
-        for(let d=-RX.Sps;d<=RX.Sps;d+=HOP/4){
+        for(let d=-0.75*RX.Sps;d<=RX.Sps;d+=HOP/4){
           const sc=syncScore(RX.anchor0+d);
           if(sc>bestS){bestS=sc;bestD=d;}
         }
-        if(bestS>=0.5){
+        if(bestS>=0.55){
           RX.anchor=RX.anchor0+bestD;
           RX.state='data';RX.expect='data';
-          RX.nextSymAbs=RX.anchor+4*RX.Sps;
-          RX.chunk=0;RX.dataSymIdx=0;RX.nibbles=[];RX.nibQ=[];RX.headerParsed=false;RX.totalDataSyms=0;RX.copiesHint=0;
+          RX.nextSymAbs=RX.anchor+8*RX.Sps;
+          RX.chunk=0;RX.dataSymIdx=0;RX.nibbles=[];RX.nibQ=[];RX.headerParsed=false;RX.totalDataSyms=0;RX.copiesHint=0;RX.badRun=0;
+          RX.lastActivity=performance.now();
           rxPill('接收数据','data');rxStatus('同步字匹配成功（置信度 '+(bestS*100).toFixed(0)+'%），正在解调数据符号…','live');
           rxLog('同步字锁定（定时偏移 '+bestD.toFixed(0)+' 采样），开始解调','ok');
           addChip();
@@ -682,7 +705,7 @@ function stateMachine(j){
       let guard=0;
       while(guard++<200){
         if(RX.state!=='data'&&RX.state!=='mid')break;
-        const needEnd=RX.expect==='data'?RX.nextSymAbs+RX.Sps+WIN/2:RX.midStartAbs+4*RX.Sps+WIN/2;
+        const needEnd=RX.expect==='data'?RX.nextSymAbs+RX.Sps+WIN/2:RX.midStartAbs+8*RX.Sps+WIN/2;
         if(RX.absTotal<needEnd)break;
         if(RX.expect==='data')finalizeDataSymbol();
         else finalizeMidamble();
@@ -698,7 +721,7 @@ function scanPreamble(){
   let cur=hcls(RX.hopBase+i);
   if(cur!==0&&cur!==1)return null;
   const segs=[];let len=1;i--;
-  while(i>=0&&segs.length<12){
+  while(i>=0&&segs.length<14){
     const c=hcls(RX.hopBase+i);
     if(c===cur)len++;
     else if(c===0||c===1){segs.push({t:cur,l:len});cur=c;len=1;}
@@ -711,12 +734,12 @@ function scanPreamble(){
   if(mid.length<3)return null;
   const ls=mid.map(s=>s.l).sort((a,b)=>a-b);
   const med=ls[ls.length>>1];
-  if(med<3||med>40)return null;
+  if(med<3||med>80)return null;
   for(const s of mid)if(s.l<med*0.5||s.l>med*2.0)return null;
   let Ssec=med*HOP/RX.sr;
-  const cand=[0.024,0.032,0.048];let best=cand[0];
-  for(const c of cand)if(Math.abs(c-Ssec)<Math.abs(best-Ssec))best=c;
-  if(Math.abs(best-Ssec)>best*0.32)best=Math.min(0.06,Math.max(0.018,Ssec));
+  let best=SNAP_CAND[0];
+  for(const c of SNAP_CAND)if(Math.abs(c-Ssec)<Math.abs(best-Ssec))best=c;
+  if(Math.abs(best-Ssec)>best*0.32)best=Math.min(0.12,Math.max(0.018,Ssec));
   return {S:best};
 }
 
@@ -726,9 +749,19 @@ function finalizeDataSymbol(){
   let best=0,sum=0;
   for(let t=0;t<DATA_N;t++){sum+=e[t];if(e[t]>e[best])best=t;}
   const share=sum>0?e[best]/sum:0;
-  RX.nibbles.push(best);      // 硬判决：始终取最强频点
-  RX.nibQ.push(share);        // 置信度，供多份加权表决
+  RX.nibbles.push(best);
+  RX.nibQ.push(share);
   RX.dataSymIdx++;RX.chunk++;RX.nextSymAbs+=S;
+  RX.lastActivity=performance.now();
+  /* 信号中断检测：连续 12 个低质量符号 → 放弃本份 */
+  if(share<0.25)RX.badRun++;else RX.badRun=0;
+  if(RX.badRun>=12&&(!RX.headerParsed||RX.dataSymIdx<RX.totalDataSyms)){
+    rxLog('连续弱符号：判定信号丢失，放弃本份','warn');
+    RX.state='idle';RX.dataRun=0;RX.firstDataHop=-1;RX.nibbles=[];RX.nibQ=[];RX.dataSymIdx=0;
+    rxPill('监听中','hunt');
+    const d=$('chip'+RX.copies.length);if(d){d.className='cchip bad';d.textContent='第 '+(RX.copies.length+1)+' 份 · 信号丢失';}
+    return;
+  }
   if(!RX.headerParsed&&RX.dataSymIdx>=FRAME_PRE*2)parseHeader();
   updateProgress();
   if(RX.headerParsed&&RX.dataSymIdx>=RX.totalDataSyms){packetComplete();return;}
@@ -740,14 +773,15 @@ function finalizeDataSymbol(){
 }
 function finalizeMidamble(){
   let bestD=0,bestS=syncScore(RX.midStartAbs);
-  for(let d=-3*HOP;d<=3*HOP;d+=HOP/4){
+  for(let d=-4*HOP;d<=4*HOP;d+=HOP/4){
     const sc=syncScore(RX.midStartAbs+d);
     if(sc>bestS){bestS=sc;bestD=d;}
   }
-  if(bestS>=0.45&&bestD!==0){
-    RX.nextSymAbs=RX.midStartAbs+4*RX.Sps+bestD;
+  if(bestS>=0.5&&bestD!==0){
+    RX.nextSymAbs=RX.midStartAbs+8*RX.Sps+bestD;
     rxLog('中途同步字校正时钟偏移 '+bestD.toFixed(0)+' 采样','info');
-  }else RX.nextSymAbs=RX.midStartAbs+4*RX.Sps;
+  }else RX.nextSymAbs=RX.midStartAbs+8*RX.Sps;
+  RX.lastActivity=performance.now();
   RX.chunk=0;RX.expect='data';
 }
 function parseHeader(){
@@ -794,7 +828,7 @@ function packetComplete(){
     if(ok){try{text=new TextDecoder('utf-8',{fatal:false}).decode(bytes.subarray(FRAME_PRE,FRAME_PRE+len));}catch(e){text='';}}
   }
   RX.copies.push({ok,text,len:plen,nibs:RX.nibbles.slice(),qs:RX.nibQ.slice(),bytes});
-  RX.lastPacketAt=performance.now();
+  RX.lastPacketAt=performance.now();RX.lastActivity=RX.lastPacketAt;
   finishChip(RX.copies.length-1,ok,plen);
   rxLog('第 '+RX.copies.length+' 份接收完成 · '+plen+' 字节 · CRC '+(ok?'✓ 通过':'✗ 失败'),ok?'ok':'warn');
   if(ok){
@@ -802,11 +836,11 @@ function packetComplete(){
     showBadge('ok','✓ CRC-16 校验通过 · 第 '+RX.copies.length+' 份完整无误');
   }
   updateRxMeta();
-  RX.state='idle';RX.dataRun=0;RX.firstDataHop=-1;RX.nibbles=[];RX.nibQ=[];RX.dataSymIdx=0;
+  RX.state='idle';RX.dataRun=0;RX.firstDataHop=-1;RX.nibbles=[];RX.nibQ=[];RX.dataSymIdx=0;RX.badRun=0;
   rxPill('监听中','hunt');
   const hint=RX.copiesHint;
   if(hint&&RX.copies.length>=hint){finalize();}
-  else rxStatus('已收到 '+RX.copies.length+' 份，等待后续冗余份…（约 6 秒无新数据将自动结算）','live');
+  else rxStatus('已收到 '+RX.copies.length+' 份，等待后续冗余份…','live');
 }
 
 /* --- 结算与置信度加权表决 --- */
@@ -857,7 +891,7 @@ function finalize(){
       rxLog('结算：无完整副本，加权表决修复成功','warn');
       rxStatus('✓ 接收完成（经表决修复）','ok');rxPill('完成','ok');
     }else{
-      showBadge('err','✗ 校验失败：误码过多。请改用「稳健 + 2~3 份」重新发送，并让两机更近、环境更安静');
+      showBadge('err','✗ 校验失败：误码过多。请改用「稳健/超强 + 2~3 份」重新发送，并让两机更近、环境更安静');
       rxLog('结算：全部 '+RX.copies.length+' 份均无法通过校验','err');
       rxStatus('✗ 解码失败，建议按提示重发','err');rxPill('失败','err');
     }
@@ -881,7 +915,7 @@ function updateProgress(){
   if(RX.headerParsed&&RX.totalDataSyms>0){
     const p=Math.min(100,RX.dataSymIdx/RX.totalDataSyms*100);
     $('symBar').style.width=p+'%';
-    $('symTxt').textContent='正在解调第 '+Math.min(RX.copies.length+1,Math.max(1,RX.copies.length))+' 份数据';
+    $('symTxt').textContent='正在解调第 '+(RX.copies.length+1)+' 份数据';
     $('symCount').textContent=RX.dataSymIdx+' / '+RX.totalDataSyms+' 符号';
   }else{
     $('symTxt').textContent='正在解析帧头…';
@@ -922,7 +956,12 @@ function rxUiLoop(){
     ctx.textAlign='center';
     ctx.fillText((FREQS[t]/1000).toFixed(1),x+w/2,H-7);
   }
-  if(!RX.finalized&&RX.copies.length>0&&performance.now()-RX.lastPacketAt>6000)finalize();
+  /* 活动驱动结算：仍在等后续份 → 10 秒静默结算；已收齐 → 3 秒 */
+  if(!RX.finalized&&RX.copies.length>0){
+    const expecting=(RX.copiesHint===0||RX.copies.length<RX.copiesHint);
+    const to=expecting?10000:3000;
+    if(performance.now()-RX.lastActivity>to)finalize();
+  }
   requestAnimationFrame(rxUiLoop);
 }
 
