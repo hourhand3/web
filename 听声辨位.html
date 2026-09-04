@@ -458,68 +458,108 @@
 <script>
 // ============ 全局状态 ============
 const S = {
-  // 传感器
-  compass: 0,           // 罗盘朝向（0=北，顺时针，度）
+  compass: 0,
   compassReady: false,
-  pitch: 0,             // 俯仰角（度）
+  pitch: 0,
   hasSensor: false,
   
-  // 摄像头坐标系（世界坐标：X=东, Y=北, Z=天）
-  camF: { x: 0, y: 1, z: 0 },   // forward
-  camU: { x: 0, y: 0, z: 1 },   // up
-  camR: { x: 1, y: 0, z: 0 },   // right
+  camF: { x: 0, y: 1, z: 0 },
+  camU: { x: 0, y: 0, z: 1 },
+  camR: { x: 1, y: 0, z: 0 },
   
-  // 音频
   audioCtx: null,
   analyser: null,
   micStream: null,
   smoothLevel: 0,
   
-  // 声源（世界坐标方向向量，固定不变）
-  soundDir: null,        // 声源世界方向（单位向量）
-  soundConfidence: 0,    // 0-1
+  soundDir: null,
+  soundConfidence: 0,
   soundLocked: false,
   
-  // 扫描数据（关键改进：存储世界坐标中的摄像头朝向）
-  samples: [],           // {camF, camU, camR, level, heading, time}
+  samples: [],
   scanning: false,
   totalRotation: 0,
   lastHeading: null,
   
-  // 运行状态
   running: false,
   cameraFOV: 70,
 };
 
-// ============ 启动 ============
+// ============ 启动（改进错误处理）============
 async function boot() {
   const btn = document.getElementById('btnStart');
   btn.disabled = true;
   btn.textContent = '初始化中...';
   
+  console.log('开始初始化...');
+  
   try {
+    // 1. 初始化摄像头
+    console.log('正在请求摄像头权限...');
+    toast('📷 正在请求摄像头权限...');
     await initCamera();
     setDot('dotCam', true);
+    console.log('✅ 摄像头初始化成功');
+    toast('✅ 摄像头就绪');
     
+    // 等待一下再请求下一个权限
+    await sleep(500);
+    
+    // 2. 初始化麦克风
+    console.log('正在请求麦克风权限...');
+    toast('🎤 正在请求麦克风权限...');
     await initMic();
     setDot('dotMic', true);
+    console.log('✅ 麦克风初始化成功');
+    toast('✅ 麦克风就绪');
     
+    await sleep(500);
+    
+    // 3. 初始化传感器
+    console.log('正在请求传感器权限...');
+    toast('🧭 正在请求传感器权限...');
     await initSensors();
     setDot('dotSen', true);
+    console.log('✅ 传感器初始化成功');
+    toast('✅ 传感器就绪');
     
+    // 4. 调整画布
     resizeCanvas();
     
+    // 5. 隐藏启动画面
     setTimeout(() => {
       document.getElementById('startup').classList.add('hidden');
-      toast('✅ 系统就绪');
-    }, 400);
+      toast('✅ 系统就绪，点击启动抓拍');
+    }, 800);
     
   } catch (err) {
-    console.error(err);
-    toast('❌ ' + err.message);
+    console.error('❌ 初始化失败:', err);
+    console.error('错误堆栈:', err.stack);
+    
+    let errorMsg = '初始化失败';
+    if (err.name === 'NotAllowedError') {
+      errorMsg = '权限被拒绝，请在浏览器设置中允许访问';
+    } else if (err.name === 'NotFoundError') {
+      errorMsg = '未找到设备，请检查摄像头/麦克风';
+    } else if (err.name === 'NotReadableError') {
+      errorMsg = '设备被占用，请关闭其他应用';
+    } else if (err.message) {
+      errorMsg = err.message;
+    }
+    
+    toast('❌ ' + errorMsg);
     btn.disabled = false;
     btn.textContent = '重 试';
+    
+    // 显示详细错误（调试用）
+    setTimeout(() => {
+      alert('初始化失败详情:\n\n' + errorMsg + '\n\n请查看浏览器控制台获取更多信息');
+    }, 1000);
   }
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function setDot(id, on) {
@@ -530,16 +570,44 @@ function setDot(id, on) {
 
 // ============ 摄像头 ============
 async function initCamera() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    throw new Error('浏览器不支持摄像头访问');
+  }
+  
   const stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+    video: { 
+      facingMode: 'environment', 
+      width: { ideal: 1920 }, 
+      height: { ideal: 1080 } 
+    },
     audio: false
   });
-  document.getElementById('cameraVideo').srcObject = stream;
+  
+  const video = document.getElementById('cameraVideo');
+  video.srcObject = stream;
+  
+  // 等待视频加载
+  await new Promise((resolve, reject) => {
+    video.onloadedmetadata = () => {
+      video.play().then(resolve).catch(reject);
+    };
+    setTimeout(() => reject(new Error('视频加载超时')), 5000);
+  });
 }
 
 // ============ 麦克风 ============
 async function initMic() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    throw new Error('浏览器不支持麦克风访问');
+  }
+  
   S.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  
+  // 恢复音频上下文（某些浏览器需要用户交互后才能使用）
+  if (S.audioCtx.state === 'suspended') {
+    await S.audioCtx.resume();
+  }
+  
   S.micStream = await navigator.mediaDevices.getUserMedia({
     audio: {
       echoCancellation: false,
@@ -547,6 +615,7 @@ async function initMic() {
       autoGainControl: false
     }
   });
+  
   const src = S.audioCtx.createMediaStreamSource(S.micStream);
   S.analyser = S.audioCtx.createAnalyser();
   S.analyser.fftSize = 2048;
@@ -556,21 +625,31 @@ async function initMic() {
 
 // ============ 传感器 ============
 async function initSensors() {
+  // iOS 权限请求
   if (typeof DeviceOrientationEvent !== 'undefined' && 
       typeof DeviceOrientationEvent.requestPermission === 'function') {
+    console.log('请求 iOS 方向传感器权限...');
     const p1 = await DeviceOrientationEvent.requestPermission();
-    if (p1 !== 'granted') throw new Error('方向传感器权限被拒绝');
-  }
-  if (typeof DeviceMotionEvent !== 'undefined' && 
-      typeof DeviceMotionEvent.requestPermission === 'function') {
-    const p2 = await DeviceMotionEvent.requestPermission();
-    if (p2 !== 'granted') throw new Error('运动传感器权限被拒绝');
+    if (p1 !== 'granted') {
+      throw new Error('方向传感器权限被拒绝');
+    }
   }
   
+  if (typeof DeviceMotionEvent !== 'undefined' && 
+      typeof DeviceMotionEvent.requestPermission === 'function') {
+    console.log('请求 iOS 运动传感器权限...');
+    const p2 = await DeviceMotionEvent.requestPermission();
+    if (p2 !== 'granted') {
+      throw new Error('运动传感器权限被拒绝');
+    }
+  }
+  
+  // 监听方向事件
   window.addEventListener('deviceorientationabsolute', handleOrientation, true);
   window.addEventListener('deviceorientation', handleOrientation, true);
   
   S.hasSensor = true;
+  console.log('传感器监听器已添加');
 }
 
 function handleOrientation(e) {
@@ -591,12 +670,10 @@ function handleOrientation(e) {
     S._lastAlpha = e.alpha;
   }
   
-  // 俯仰角（简化：使用 beta）
   if (e.beta !== null) {
     S.pitch = e.beta;
   }
   
-  // 计算摄像头坐标系
   computeCameraVectors();
 }
 
@@ -608,24 +685,16 @@ function computeCameraVectors() {
   const ch = Math.cos(h), sh = Math.sin(h);
   const cb = Math.cos(b), sb = Math.sin(b);
   
-  // 摄像头朝向（简化模型：假设手机竖屏）
-  // 实际应该考虑屏幕旋转，但这里简化处理
   const camF = {
     x: sh * cb,
     y: ch * cb,
     z: -sb
   };
   
-  // 手机顶部方向
-  const camU = {
-    x: 0,
-    y: 0,
-    z: 1
-  };
+  const camU = { x: 0, y: 0, z: 1 };
   
   normalize(camF);
   
-  // 右侧 = forward × up
   const camR = {
     x: camF.y * camU.z - camF.z * camU.y,
     y: camF.z * camU.x - camF.x * camU.z,
@@ -633,7 +702,6 @@ function computeCameraVectors() {
   };
   normalize(camR);
   
-  // 重新计算 up = right × forward
   camU.x = camR.y * camF.z - camR.z * camF.y;
   camU.y = camR.z * camF.x - camR.x * camF.z;
   camU.z = camR.x * camF.y - camR.y * camF.x;
@@ -721,7 +789,6 @@ function resetScan() {
 function loop() {
   if (!S.running) return;
   
-  // 1. 读取音频
   const levelData = new Uint8Array(S.analyser.frequencyBinCount);
   S.analyser.getByteFrequencyData(levelData);
   
@@ -736,7 +803,6 @@ function loop() {
   const rawIntensity = Math.min(1, hornLevel / 130);
   S.smoothLevel = S.smoothLevel * 0.6 + rawIntensity * 0.4;
   
-  // 2. 跟踪旋转量
   if (S.lastHeading !== null) {
     let delta = S.compass - S.lastHeading;
     if (delta > 180) delta -= 360;
@@ -745,7 +811,6 @@ function loop() {
   }
   S.lastHeading = S.compass;
   
-  // 3. 采样（关键：存储世界坐标中的摄像头朝向）
   if (S.scanning && S.smoothLevel > 0.12) {
     S.samples.push({
       camF: { ...S.camF },
@@ -757,41 +822,34 @@ function loop() {
     });
     
     const now = Date.now();
-    S.samples = S.samples.filter(s => now - s.time < 10000); // 保留10秒
+    S.samples = S.samples.filter(s => now - s.time < 10000);
     if (S.samples.length > 300) {
       S.samples = S.samples.slice(-300);
     }
   }
   
-  // 4. 计算声源（关键改进：高斯峰值检测）
   if (S.samples.length >= 8) {
     computeSoundSource();
   }
   
-  // 5. 更新UI
   updateScanHint();
   updateHUD();
-  
-  // 6. 渲染
   render();
   renderRadar();
   
   requestAnimationFrame(loop);
 }
 
-// ============ 声源定位算法（核心改进）============
+// ============ 声源定位算法 ============
 function computeSoundSource() {
-  // 找最大强度
   let maxLevel = 0;
   S.samples.forEach(s => { if (s.level > maxLevel) maxLevel = s.level; });
   if (maxLevel < 0.05) return;
   
-  // 高斯加权：以最大强度为中心
-  const sigma = maxLevel * 0.35; // 高斯宽度
+  const sigma = maxLevel * 0.35;
   let wx = 0, wy = 0, wz = 0, ww = 0;
   
   S.samples.forEach(s => {
-    // 高斯权重
     const diff = maxLevel - s.level;
     const w = Math.exp(-(diff * diff) / (2 * sigma * sigma));
     
@@ -803,15 +861,11 @@ function computeSoundSource() {
   
   if (ww < 0.001) return;
   
-  // 声源方向 = 加权平均的摄像头朝向
   const dir = { x: wx/ww, y: wy/ww, z: wz/ww };
   normalize(dir);
   
-  // 关键：声源方向是世界坐标中的固定向量，不使用平滑插值
-  // 每次都用所有样本重新计算，避免坐标系突变时的错误
   S.soundDir = dir;
   
-  // 计算置信度
   const countScore = Math.min(1, S.samples.length / 60);
   const vecLen = Math.sqrt(wx*wx + wy*wy + wz*wz) / ww;
   const consistencyScore = vecLen;
@@ -822,7 +876,6 @@ function computeSoundSource() {
   const rawConf = countScore * 0.2 + consistencyScore * 0.4 + coverageScore * 0.2 + peakScore * 0.2;
   S.soundConfidence = S.soundConfidence * 0.85 + rawConf * 0.15;
   
-  // 锁定判断
   if (S.soundConfidence > 0.5 && S.totalRotation > 240 && !S.soundLocked) {
     S.soundLocked = true;
     S.scanning = false;
@@ -832,7 +885,6 @@ function computeSoundSource() {
   }
 }
 
-// ============ 扫描提示 ============
 function updateScanHint() {
   if (!S.scanning) return;
   
@@ -864,7 +916,6 @@ function vectorToHeading(v) {
   return angle;
 }
 
-// ============ HUD ============
 function updateHUD() {
   const db = S.smoothLevel > 0.01 ? (55 + S.smoothLevel * 45).toFixed(0) : '--';
   document.getElementById('hudLevel').textContent = db + ' dB';
@@ -880,7 +931,6 @@ function updateHUD() {
   }
 }
 
-// ============ 渲染主画布 ============
 function render() {
   const W = window.innerWidth;
   const H = window.innerHeight;
@@ -895,7 +945,6 @@ function render() {
     return;
   }
   
-  // 投影声源到屏幕
   const proj = projectToScreen(S.soundDir);
   
   if (proj && proj.inView) {
@@ -907,18 +956,15 @@ function render() {
   }
 }
 
-// ============ 投影到屏幕 ============
 function projectToScreen(soundDir) {
   const F = S.camF;
   const U = S.camU;
   const R = S.camR;
   
-  // 声源在摄像头坐标系中的坐标
   const fwd = dot(soundDir, F);
   const up = dot(soundDir, U);
   const right = dot(soundDir, R);
   
-  // 在背后
   if (fwd < 0.1) {
     return null;
   }
@@ -956,7 +1002,6 @@ function projectToScreen(soundDir) {
   return { inView: true, x: px, y: py };
 }
 
-// ============ 声源标记 ============
 function drawSoundMarker(x, y, intensity, confidence) {
   const now = Date.now();
   
@@ -969,7 +1014,6 @@ function drawSoundMarker(x, y, intensity, confidence) {
     color = '#22c55e'; rgb = [34, 197, 94];
   }
   
-  // 热力扩散
   const maxR = 70 + intensity * 70;
   for (let i = 4; i >= 0; i--) {
     const r = maxR * (1 + i * 0.4);
@@ -984,7 +1028,6 @@ function drawSoundMarker(x, y, intensity, confidence) {
     ctx.fill();
   }
   
-  // 脉冲波纹
   for (let p = 0; p < 2; p++) {
     const phase = ((now / 1600 + p * 0.5) % 1);
     const pr = 35 + phase * maxR * 1.3;
@@ -996,7 +1039,6 @@ function drawSoundMarker(x, y, intensity, confidence) {
     ctx.stroke();
   }
   
-  // 定位方框
   const boxSize = 55 + intensity * 25;
   const cornerLen = 16;
   ctx.strokeStyle = color;
@@ -1019,7 +1061,6 @@ function drawSoundMarker(x, y, intensity, confidence) {
   });
   ctx.shadowBlur = 0;
   
-  // 中心十字
   ctx.strokeStyle = `rgba(${rgb.join(',')},0.95)`;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
@@ -1029,7 +1070,6 @@ function drawSoundMarker(x, y, intensity, confidence) {
   ctx.moveTo(x, y + 4); ctx.lineTo(x, y + 12);
   ctx.stroke();
   
-  // 中心点
   ctx.fillStyle = color;
   ctx.beginPath();
   ctx.arc(x, y, 3.5, 0, Math.PI * 2);
@@ -1038,7 +1078,6 @@ function drawSoundMarker(x, y, intensity, confidence) {
   ctx.lineWidth = 1;
   ctx.stroke();
   
-  // 标签
   const db = (55 + intensity * 45).toFixed(0);
   const label = `声源 ${db}dB`;
   ctx.font = 'bold 12px -apple-system, sans-serif';
@@ -1056,7 +1095,6 @@ function drawSoundMarker(x, y, intensity, confidence) {
   ctx.textBaseline = 'middle';
   ctx.fillText(label, lx + 9, ly + 11);
   
-  // 置信度标签
   if (confidence > 0.2) {
     const confLabel = `${(confidence * 100).toFixed(0)}%`;
     ctx.font = 'bold 10px -apple-system, sans-serif';
@@ -1076,7 +1114,6 @@ function drawSoundMarker(x, y, intensity, confidence) {
     ctx.fillText(confLabel, cx2 + (cw + 12) / 2, cy2 + 9);
   }
   
-  // 方位角标签
   const angle = vectorToHeading(S.soundDir);
   const dirs = ['N','NE','E','SE','S','SW','W','NW'];
   const idx = Math.round(angle / 45) % 8;
@@ -1108,7 +1145,6 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-// ============ 画面外指示 ============
 function drawOffscreenIndicator(x, y, angle) {
   const intensity = S.smoothLevel;
   const color = intensity > 0.6 ? '#ef4444' : intensity > 0.3 ? '#f59e0b' : '#22c55e';
@@ -1160,7 +1196,6 @@ function drawBehindIndicator(W, H) {
   ctx.fillText('声源在背后 · 请转身', W / 2, H / 2 + 80);
 }
 
-// ============ 中心脉冲 ============
 function drawCenterPulse(W, H) {
   const cx = W / 2, cy = H / 2;
   const now = Date.now();
@@ -1183,7 +1218,6 @@ function drawCenterPulse(W, H) {
   ctx.fillText('检测到声音 · 请水平旋转手机', cx, cy + 70);
 }
 
-// ============ 画面边角 ============
 function drawFrameCorners(W, H) {
   const len = 28;
   const m = 14;
@@ -1193,4 +1227,148 @@ function drawFrameCorners(W, H) {
   ctx.beginPath();
   ctx.moveTo(m, m + len); ctx.lineTo(m, m); ctx.lineTo(m + len, m);
   ctx.moveTo(W - m - len, m); ctx.lineTo(W - m, m); ctx.lineTo(W - m, m + len);
-  ctx.moveTo(m, H - m - len);
+  ctx.moveTo(m, H - m - len); ctx.lineTo(m, H - m); ctx.lineTo(m + len, H - m);
+  ctx.moveTo(W - m - len, H - m); ctx.lineTo(W - m, H - m); ctx.lineTo(W - m, H - m - len);
+  ctx.stroke();
+}
+
+function renderRadar() {
+  const W = 220, H = 220;
+  const cx = W / 2, cy = H / 2;
+  const R = 90;
+  
+  rctx.clearRect(0, 0, W, H);
+  
+  rctx.fillStyle = 'rgba(0,0,0,0.3)';
+  rctx.beginPath();
+  rctx.arc(cx, cy, R, 0, Math.PI * 2);
+  rctx.fill();
+  
+  rctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  rctx.lineWidth = 1;
+  for (let i = 1; i <= 3; i++) {
+    rctx.beginPath();
+    rctx.arc(cx, cy, R * i / 3, 0, Math.PI * 2);
+    rctx.stroke();
+  }
+  
+  rctx.beginPath();
+  rctx.moveTo(cx - R, cy); rctx.lineTo(cx + R, cy);
+  rctx.moveTo(cx, cy - R); rctx.lineTo(cx, cy + R);
+  rctx.stroke();
+  
+  rctx.font = 'bold 10px -apple-system, sans-serif';
+  rctx.textAlign = 'center';
+  rctx.textBaseline = 'middle';
+  rctx.fillStyle = '#ef4444';
+  rctx.fillText('N', cx, cy - R + 8);
+  rctx.fillStyle = 'rgba(255,255,255,0.6)';
+  rctx.fillText('E', cx + R - 8, cy);
+  rctx.fillText('S', cx, cy + R - 8);
+  rctx.fillText('W', cx - R + 8, cy);
+  
+  if (S.samples.length > 0) {
+    rctx.strokeStyle = 'rgba(251, 191, 36, 0.4)';
+    rctx.lineWidth = 1.5;
+    rctx.beginPath();
+    let first = true;
+    S.samples.forEach(s => {
+      const h = s.heading * Math.PI / 180;
+      const rx = cx + Math.sin(h) * R * 0.85;
+      const ry = cy - Math.cos(h) * R * 0.85;
+      if (first) { rctx.moveTo(rx, ry); first = false; }
+      else rctx.lineTo(rx, ry);
+    });
+    rctx.stroke();
+    
+    S.samples.forEach(s => {
+      const h = s.heading * Math.PI / 180;
+      const rx = cx + Math.sin(h) * R * 0.85;
+      const ry = cy - Math.cos(h) * R * 0.85;
+      const alpha = 0.3 + s.level * 0.7;
+      const color = s.level > 0.5 ? `rgba(239,68,68,${alpha})` : 
+                    s.level > 0.25 ? `rgba(245,158,11,${alpha})` : 
+                    `rgba(34,197,94,${alpha})`;
+      rctx.fillStyle = color;
+      rctx.beginPath();
+      rctx.arc(rx, ry, 2 + s.level * 2, 0, Math.PI * 2);
+      rctx.fill();
+    });
+  }
+  
+  if (S.soundDir) {
+    const angle = vectorToHeading(S.soundDir);
+    const h = angle * Math.PI / 180;
+    const sx = cx + Math.sin(h) * R * 0.85;
+    const sy = cy - Math.cos(h) * R * 0.85;
+    
+    const intensity = S.smoothLevel;
+    const color = intensity > 0.6 ? '#ef4444' : intensity > 0.3 ? '#f59e0b' : '#22c55e';
+    
+    rctx.strokeStyle = color;
+    rctx.lineWidth = 1.5;
+    rctx.setLineDash([3, 3]);
+    rctx.beginPath();
+    rctx.moveTo(cx, cy);
+    rctx.lineTo(sx, sy);
+    rctx.stroke();
+    rctx.setLineDash([]);
+    
+    rctx.fillStyle = color;
+    rctx.shadowColor = color;
+    rctx.shadowBlur = 8;
+    rctx.beginPath();
+    rctx.arc(sx, sy, 5, 0, Math.PI * 2);
+    rctx.fill();
+    rctx.shadowBlur = 0;
+    rctx.strokeStyle = '#fff';
+    rctx.lineWidth = 1.5;
+    rctx.stroke();
+  }
+  
+  const ch = S.compass * Math.PI / 180;
+  const tx = cx + Math.sin(ch) * (R - 4);
+  const ty = cy - Math.cos(ch) * (R - 4);
+  
+  rctx.save();
+  rctx.translate(tx, ty);
+  rctx.rotate(ch);
+  rctx.fillStyle = '#60a5fa';
+  rctx.beginPath();
+  rctx.moveTo(0, -6);
+  rctx.lineTo(-4, 4);
+  rctx.lineTo(4, 4);
+  rctx.closePath();
+  rctx.fill();
+  rctx.restore();
+  
+  rctx.fillStyle = '#fff';
+  rctx.beginPath();
+  rctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
+  rctx.fill();
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+resizeCanvas();
+
+// 全局错误处理
+window.addEventListener('error', (e) => {
+  console.error('全局错误:', e.error);
+  toast('❌ 发生错误: ' + e.message);
+});
+
+window.addEventListener('unhandledrejection', (e) => {
+  console.error('未处理的 Promise 拒绝:', e.reason);
+  toast('❌ 异步错误: ' + (e.reason?.message || '未知错误'));
+});
+</script>
+</body>
+</html>
