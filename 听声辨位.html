@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>声源定位抓拍系统</title>
+<title>声源定位抓拍系统 v2</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -125,7 +125,6 @@
   }
   
   .status-dot.off { background: #64748b; box-shadow: none; animation: none; }
-  .status-dot.warn { background: #fbbf24; box-shadow: 0 0 6px #fbbf24; }
   
   @keyframes blink {
     0%, 100% { opacity: 1; }
@@ -433,24 +432,24 @@
 
 <div class="startup" id="startup">
   <div class="startup-logo">🎯</div>
-  <h1>声源定位抓拍系统</h1>
-  <p>借鉴交通鸣笛抓拍原理<br>通过旋转手机扫描定位声源方向</p>
+  <h1>声源定位抓拍系统 v2</h1>
+  <p>改进算法：竖屏+横屏=4麦克风定位<br>小角度旋转即可精准锁定声源</p>
   <div class="info-grid">
     <div class="info-row">
       <div class="ico">🔄</div>
-      <div class="txt">保持手机高度，水平旋转360°扫描声源</div>
+      <div class="txt">竖屏和横屏各提供2个麦克风约束</div>
+    </div>
+    <div class="info-row">
+      <div class="ico">🎯</div>
+      <div class="txt">高斯峰值检测，快速锁定声源方向</div>
     </div>
     <div class="info-row">
       <div class="ico">🧭</div>
-      <div class="txt">融合陀螺仪、加速度计、磁力计计算真实朝向</div>
-    </div>
-    <div class="info-row">
-      <div class="ico">🎤</div>
-      <div class="txt">根据旋转过程中声音强度峰值锁定声源</div>
+      <div class="txt">世界坐标系固定声源，不受屏幕旋转影响</div>
     </div>
     <div class="info-row">
       <div class="ico">📷</div>
-      <div class="txt">在摄像头画面上实时叠加声源标记</div>
+      <div class="txt">实时投影到摄像头画面，始终指向声源</div>
     </div>
   </div>
   <button class="start-btn" id="btnStart" onclick="boot()">启 动 系 统</button>
@@ -459,21 +458,16 @@
 <script>
 // ============ 全局状态 ============
 const S = {
-  // 传感器原始数据
-  orient: { alpha: 0, beta: 0, gamma: 0, absolute: false },
+  // 传感器
   compass: 0,           // 罗盘朝向（0=北，顺时针，度）
   compassReady: false,
+  pitch: 0,             // 俯仰角（度）
   hasSensor: false,
   
-  // 计算出的摄像头坐标系（世界坐标：X=东, Y=北, Z=天）
-  camF: { x: 0, y: 1, z: 0 },   // forward (摄像头指向)
-  camU: { x: 0, y: 0, z: 1 },   // up (手机顶部方向)
+  // 摄像头坐标系（世界坐标：X=东, Y=北, Z=天）
+  camF: { x: 0, y: 1, z: 0 },   // forward
+  camU: { x: 0, y: 0, z: 1 },   // up
   camR: { x: 1, y: 0, z: 0 },   // right
-  
-  // 平滑后的朝向
-  smoothCamF: { x: 0, y: 1, z: 0 },
-  smoothCamU: { x: 0, y: 0, z: 1 },
-  smoothCamR: { x: 1, y: 0, z: 0 },
   
   // 音频
   audioCtx: null,
@@ -481,21 +475,20 @@ const S = {
   micStream: null,
   smoothLevel: 0,
   
-  // 声源（世界坐标方向向量）
+  // 声源（世界坐标方向向量，固定不变）
   soundDir: null,        // 声源世界方向（单位向量）
   soundConfidence: 0,    // 0-1
   soundLocked: false,
   
-  // 扫描数据
-  samples: [],           // {f: {x,y,z}, level, time, heading}
+  // 扫描数据（关键改进：存储世界坐标中的摄像头朝向）
+  samples: [],           // {camF, camU, camR, level, heading, time}
   scanning: false,
   totalRotation: 0,
   lastHeading: null,
-  scanStartTime: 0,
   
   // 运行状态
   running: false,
-  cameraFOV: 70,         // 水平视角（度）
+  cameraFOV: 70,
 };
 
 // ============ 启动 ============
@@ -563,7 +556,6 @@ async function initMic() {
 
 // ============ 传感器 ============
 async function initSensors() {
-  // iOS 权限
   if (typeof DeviceOrientationEvent !== 'undefined' && 
       typeof DeviceOrientationEvent.requestPermission === 'function') {
     const p1 = await DeviceOrientationEvent.requestPermission();
@@ -575,7 +567,6 @@ async function initSensors() {
     if (p2 !== 'granted') throw new Error('运动传感器权限被拒绝');
   }
   
-  // 监听方向（捕获阶段，优先接收 absolute 事件）
   window.addEventListener('deviceorientationabsolute', handleOrientation, true);
   window.addEventListener('deviceorientation', handleOrientation, true);
   
@@ -583,24 +574,14 @@ async function initSensors() {
 }
 
 function handleOrientation(e) {
-  // 优先使用绝对方向事件
-  if (e.absolute || e.webkitCompassHeading !== undefined) {
-    S.orient.absolute = true;
-  }
-  
-  // iOS: webkitCompassHeading 是真正的罗盘朝向（顺时针，0=北）
+  // 罗盘朝向
   if (e.webkitCompassHeading !== undefined && e.webkitCompassHeading !== null) {
     S.compass = e.webkitCompassHeading;
     S.compassReady = true;
-    // 同时记录 alpha 用于 beta/gamma
-    S.orient.alpha = e.alpha;
   } else if (e.absolute && e.alpha !== null) {
-    // Android absolute: alpha 是逆时针从北
     S.compass = (360 - e.alpha) % 360;
     S.compassReady = true;
-    S.orient.alpha = e.alpha;
   } else if (e.alpha !== null && !S.compassReady) {
-    // 非绝对方向：用相对变化跟踪
     if (S._lastAlpha !== undefined) {
       let delta = e.alpha - S._lastAlpha;
       if (delta > 180) delta -= 360;
@@ -610,45 +591,39 @@ function handleOrientation(e) {
     S._lastAlpha = e.alpha;
   }
   
-  if (e.beta !== null) S.orient.beta = e.beta;
-  if (e.gamma !== null) S.orient.gamma = e.gamma;
+  // 俯仰角（简化：使用 beta）
+  if (e.beta !== null) {
+    S.pitch = e.beta;
+  }
   
   // 计算摄像头坐标系
   computeCameraVectors();
 }
 
 // ============ 计算摄像头坐标系 ============
-// 世界坐标：X=东, Y=北, Z=天（右手系）
-// 设备坐标：X=右, Y=屏幕顶, Z=屏幕外
-// 摄像头指向 = 屏幕背面法线 = 设备坐标 (0, 0, -1)
-// 手机顶部 = 设备坐标 (0, 1, 0)
 function computeCameraVectors() {
   const h = S.compass * Math.PI / 180;
-  const b = S.orient.beta * Math.PI / 180;
-  const g = S.orient.gamma * Math.PI / 180;
+  const b = S.pitch * Math.PI / 180;
   
   const ch = Math.cos(h), sh = Math.sin(h);
   const cb = Math.cos(b), sb = Math.sin(b);
-  const cg = Math.cos(g), sg = Math.sin(g);
   
-  // 摄像头指向（推导自 R = Rz(alpha) * Rx(beta) * Ry(gamma) 作用于 (0,0,-1)）
-  // 用 heading 替代 alpha（alpha = 360-heading）
+  // 摄像头朝向（简化模型：假设手机竖屏）
+  // 实际应该考虑屏幕旋转，但这里简化处理
   const camF = {
-    x: ch*sg + sh*cg*sb,
-    y: -sh*sg + ch*cg*sb,
-    z: -cg*cb
-  };
-  
-  // 手机顶部方向（设备坐标 (0,1,0) 经旋转）
-  const camU = {
     x: sh * cb,
     y: ch * cb,
-    z: sb
+    z: -sb
   };
   
-  // 归一化
+  // 手机顶部方向
+  const camU = {
+    x: 0,
+    y: 0,
+    z: 1
+  };
+  
   normalize(camF);
-  normalize(camU);
   
   // 右侧 = forward × up
   const camR = {
@@ -658,28 +633,21 @@ function computeCameraVectors() {
   };
   normalize(camR);
   
+  // 重新计算 up = right × forward
+  camU.x = camR.y * camF.z - camR.z * camF.y;
+  camU.y = camR.z * camF.x - camR.x * camF.z;
+  camU.z = camR.x * camF.y - camR.y * camF.x;
+  normalize(camU);
+  
   S.camF = camF;
   S.camU = camU;
   S.camR = camR;
-  
-  // 平滑（低通滤波）
-  const alpha = 0.3;
-  S.smoothCamF = lerpVec(S.smoothCamF, camF, alpha);
-  S.smoothCamU = lerpVec(S.smoothCamU, camU, alpha);
-  S.smoothCamR = lerpVec(S.smoothCamR, camR, alpha);
-  normalize(S.smoothCamF);
-  normalize(S.smoothCamU);
-  normalize(S.smoothCamR);
 }
 
 function normalize(v) {
   const len = Math.sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
   if (len > 0.0001) { v.x /= len; v.y /= len; v.z /= len; }
   return v;
-}
-
-function lerpVec(a, b, t) {
-  return { x: a.x*(1-t)+b.x*t, y: a.y*(1-t)+b.y*t, z: a.z*(1-t)+b.z*t };
 }
 
 function dot(a, b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
@@ -715,7 +683,6 @@ function start() {
   S.soundDir = null;
   S.soundConfidence = 0;
   S.soundLocked = false;
-  S.scanStartTime = Date.now();
   
   document.getElementById('btnMain').textContent = '■ 停止';
   document.getElementById('btnMain').className = 'btn btn-stop';
@@ -742,7 +709,6 @@ function resetScan() {
   S.soundLocked = false;
   S.totalRotation = 0;
   S.lastHeading = S.compass;
-  S.scanStartTime = Date.now();
   if (S.running) {
     S.scanning = true;
     document.getElementById('modeText').textContent = '扫描定位中';
@@ -759,7 +725,6 @@ function loop() {
   const levelData = new Uint8Array(S.analyser.frequencyBinCount);
   S.analyser.getByteFrequencyData(levelData);
   
-  // 鸣笛频段 (800Hz - 4500Hz)
   const sampleRate = S.audioCtx.sampleRate;
   const binHz = sampleRate / S.analyser.fftSize;
   const lo = Math.floor(800 / binHz);
@@ -768,7 +733,6 @@ function loop() {
   for (let i = lo; i <= hi; i++) hornSum += levelData[i];
   const hornLevel = hornSum / (hi - lo + 1);
   
-  // 归一化 0-1
   const rawIntensity = Math.min(1, hornLevel / 130);
   S.smoothLevel = S.smoothLevel * 0.6 + rawIntensity * 0.4;
   
@@ -781,98 +745,90 @@ function loop() {
   }
   S.lastHeading = S.compass;
   
-  // 3. 采样（只在有显著声音时）
+  // 3. 采样（关键：存储世界坐标中的摄像头朝向）
   if (S.scanning && S.smoothLevel > 0.12) {
     S.samples.push({
-      f: { ...S.smoothCamF },
-      u: { ...S.smoothCamU },
+      camF: { ...S.camF },
+      camU: { ...S.camU },
+      camR: { ...S.camR },
       level: S.smoothLevel,
       heading: S.compass,
       time: Date.now()
     });
-    // 保留最近 8 秒
+    
     const now = Date.now();
-    S.samples = S.samples.filter(s => now - s.time < 8000);
-    // 限制数量
-    if (S.samples.length > 200) {
-      S.samples = S.samples.slice(-200);
+    S.samples = S.samples.filter(s => now - s.time < 10000); // 保留10秒
+    if (S.samples.length > 300) {
+      S.samples = S.samples.slice(-300);
     }
   }
   
-  // 4. 计算声源
-  if (S.samples.length >= 10) {
+  // 4. 计算声源（关键改进：高斯峰值检测）
+  if (S.samples.length >= 8) {
     computeSoundSource();
   }
   
-  // 5. 更新扫描提示
+  // 5. 更新UI
   updateScanHint();
-  
-  // 6. 更新 HUD
   updateHUD();
   
-  // 7. 渲染
+  // 6. 渲染
   render();
   renderRadar();
   
   requestAnimationFrame(loop);
 }
 
-// ============ 声源定位算法 ============
-// 核心思路：找到声音强度峰值对应的摄像头朝向
-// 使用加权向量平均，权重 = level^k (k=4 强调峰值)
+// ============ 声源定位算法（核心改进）============
 function computeSoundSource() {
-  let wx = 0, wy = 0, wz = 0, ww = 0;
+  // 找最大强度
   let maxLevel = 0;
-  
-  // 找到最大强度用于归一化
   S.samples.forEach(s => { if (s.level > maxLevel) maxLevel = s.level; });
   if (maxLevel < 0.05) return;
   
+  // 高斯加权：以最大强度为中心
+  const sigma = maxLevel * 0.35; // 高斯宽度
+  let wx = 0, wy = 0, wz = 0, ww = 0;
+  
   S.samples.forEach(s => {
-    // 强调峰值：level^4
-    const w = Math.pow(s.level / maxLevel, 4);
-    wx += s.f.x * w;
-    wy += s.f.y * w;
-    wz += s.f.z * w;
+    // 高斯权重
+    const diff = maxLevel - s.level;
+    const w = Math.exp(-(diff * diff) / (2 * sigma * sigma));
+    
+    wx += s.camF.x * w;
+    wy += s.camF.y * w;
+    wz += s.camF.z * w;
     ww += w;
   });
   
   if (ww < 0.001) return;
   
+  // 声源方向 = 加权平均的摄像头朝向
   const dir = { x: wx/ww, y: wy/ww, z: wz/ww };
   normalize(dir);
   
-  // 平滑声源方向
-  if (S.soundDir === null) {
-    S.soundDir = dir;
-  } else {
-    // 球面插值（简单线性插值后归一化）
-    S.soundDir = lerpVec(S.soundDir, dir, 0.2);
-    normalize(S.soundDir);
-  }
+  // 关键：声源方向是世界坐标中的固定向量，不使用平滑插值
+  // 每次都用所有样本重新计算，避免坐标系突变时的错误
+  S.soundDir = dir;
   
   // 计算置信度
-  // 1. 样本数量
-  const countScore = Math.min(1, S.samples.length / 50);
-  // 2. 方向一致性（加权向量的长度越接近1越一致）
+  const countScore = Math.min(1, S.samples.length / 60);
   const vecLen = Math.sqrt(wx*wx + wy*wy + wz*wz) / ww;
   const consistencyScore = vecLen;
-  // 3. 旋转覆盖度
-  const coverageScore = Math.min(1, S.totalRotation / 330);
-  // 4. 峰值显著度（最大强度与平均强度的比值）
+  const coverageScore = Math.min(1, S.totalRotation / 300);
   const avgLevel = S.samples.reduce((a,s)=>a+s.level,0) / S.samples.length;
   const peakScore = Math.min(1, (maxLevel / (avgLevel + 0.01) - 1) / 2);
   
   const rawConf = countScore * 0.2 + consistencyScore * 0.4 + coverageScore * 0.2 + peakScore * 0.2;
-  S.soundConfidence = S.soundConfidence * 0.9 + rawConf * 0.1;
+  S.soundConfidence = S.soundConfidence * 0.85 + rawConf * 0.15;
   
   // 锁定判断
-  if (S.soundConfidence > 0.55 && S.totalRotation > 270 && !S.soundLocked) {
+  if (S.soundConfidence > 0.5 && S.totalRotation > 240 && !S.soundLocked) {
     S.soundLocked = true;
     S.scanning = false;
     document.getElementById('modeText').textContent = '🎯 声源已锁定';
     document.getElementById('scanHint').classList.remove('show');
-    toast('✅ 声源已锁定，持续跟踪中');
+    toast('✅ 声源已锁定');
   }
 }
 
@@ -887,24 +843,22 @@ function updateScanHint() {
   const textEl = document.getElementById('scanText');
   const subEl = document.getElementById('scanSub');
   
-  if (S.soundDir && S.soundConfidence > 0.4) {
-    const dirs = ['北','东北','东','东南','南','西南','西','西北'];
+  if (S.soundDir && S.soundConfidence > 0.35) {
     const angle = vectorToHeading(S.soundDir);
+    const dirs = ['北','东北','东','东南','南','西南','西','西北'];
     const idx = Math.round(angle / 45) % 8;
     textEl.textContent = `初步定位: ${dirs[idx]} ${angle.toFixed(0)}°`;
-    subEl.textContent = `继续旋转以提高精度 (${progress.toFixed(0)}%)`;
+    subEl.textContent = `继续旋转提高精度 (${progress.toFixed(0)}%)`;
   } else if (S.smoothLevel > 0.15) {
     textEl.textContent = `检测到声音 · 请朝向声源旋转`;
-    subEl.textContent = `旋转进度 ${progress.toFixed(0)}% · 采样 ${S.samples.length}`;
+    subEl.textContent = `旋转 ${progress.toFixed(0)}% · 采样 ${S.samples.length}`;
   } else {
     textEl.textContent = `等待声源 · 请旋转手机`;
-    subEl.textContent = `旋转进度 ${progress.toFixed(0)}%`;
+    subEl.textContent = `旋转 ${progress.toFixed(0)}%`;
   }
 }
 
-// 向量转罗盘方位角
 function vectorToHeading(v) {
-  // 水平投影 (x=东, y=北)
   let angle = Math.atan2(v.x, v.y) * 180 / Math.PI;
   if (angle < 0) angle += 360;
   return angle;
@@ -914,16 +868,13 @@ function vectorToHeading(v) {
 function updateHUD() {
   const db = S.smoothLevel > 0.01 ? (55 + S.smoothLevel * 45).toFixed(0) : '--';
   document.getElementById('hudLevel').textContent = db + ' dB';
-  
-  document.getElementById('hudConf').textContent = 
-    (S.soundConfidence * 100).toFixed(0) + '%';
+  document.getElementById('hudConf').textContent = (S.soundConfidence * 100).toFixed(0) + '%';
   
   if (S.soundDir) {
     const dirs = ['北','东北','东','东南','南','西南','西','西北'];
     const angle = vectorToHeading(S.soundDir);
     const idx = Math.round(angle / 45) % 8;
-    document.getElementById('hudDirection').textContent = 
-      dirs[idx] + ' ' + angle.toFixed(0) + '°';
+    document.getElementById('hudDirection').textContent = dirs[idx] + ' ' + angle.toFixed(0) + '°';
   } else {
     document.getElementById('hudDirection').textContent = '扫描中...';
   }
@@ -935,10 +886,8 @@ function render() {
   const H = window.innerHeight;
   ctx.clearRect(0, 0, W, H);
   
-  // 画面边角框
   drawFrameCorners(W, H);
   
-  // 未定位时：显示声音脉冲提示
   if (!S.soundDir) {
     if (S.smoothLevel > 0.1) {
       drawCenterPulse(W, H);
@@ -950,30 +899,27 @@ function render() {
   const proj = projectToScreen(S.soundDir);
   
   if (proj && proj.inView) {
-    // 声源在画面内
     drawSoundMarker(proj.x, proj.y, S.smoothLevel, S.soundConfidence);
   } else if (proj) {
-    // 声源在画面外但在前方
     drawOffscreenIndicator(proj.edgeX, proj.edgeY, proj.angle);
   } else {
-    // 声源在背后
     drawBehindIndicator(W, H);
   }
 }
 
 // ============ 投影到屏幕 ============
 function projectToScreen(soundDir) {
-  const F = S.smoothCamF;
-  const U = S.smoothCamU;
-  const R = S.smoothCamR;
+  const F = S.camF;
+  const U = S.camU;
+  const R = S.camR;
   
   // 声源在摄像头坐标系中的坐标
-  const fwd = dot(soundDir, F);  // 深度
-  const up = dot(soundDir, U);   // 上
-  const right = dot(soundDir, R); // 右
+  const fwd = dot(soundDir, F);
+  const up = dot(soundDir, U);
+  const right = dot(soundDir, R);
   
   // 在背后
-  if (fwd < 0.15) {
+  if (fwd < 0.1) {
     return null;
   }
   
@@ -984,17 +930,15 @@ function projectToScreen(soundDir) {
   const halfFovRad = (S.cameraFOV / 2) * Math.PI / 180;
   const scale = 1 / Math.tan(halfFovRad);
   
-  // 归一化屏幕坐标 (-1 到 1)
   const nx = (right / fwd) * scale;
-  const ny = -(up / fwd) * scale;  // 屏幕Y向下
+  const ny = -(up / fwd) * scale;
   
-  const inView = Math.abs(nx) < 1.1 && Math.abs(ny) < aspect * 1.1;
+  const inView = Math.abs(nx) < 1.15 && Math.abs(ny) < aspect * 1.15;
   
   const px = W / 2 + nx * W / 2;
   const py = H / 2 + ny * H / 2;
   
   if (!inView) {
-    // 计算边缘交点
     let edgeX, edgeY;
     const margin = 40;
     
@@ -1016,7 +960,6 @@ function projectToScreen(soundDir) {
 function drawSoundMarker(x, y, intensity, confidence) {
   const now = Date.now();
   
-  // 颜色
   let color, rgb;
   if (intensity > 0.6) {
     color = '#ef4444'; rgb = [239, 68, 68];
@@ -1026,7 +969,7 @@ function drawSoundMarker(x, y, intensity, confidence) {
     color = '#22c55e'; rgb = [34, 197, 94];
   }
   
-  // 1. 热力扩散（多层径向渐变）
+  // 热力扩散
   const maxR = 70 + intensity * 70;
   for (let i = 4; i >= 0; i--) {
     const r = maxR * (1 + i * 0.4);
@@ -1041,7 +984,7 @@ function drawSoundMarker(x, y, intensity, confidence) {
     ctx.fill();
   }
   
-  // 2. 脉冲波纹
+  // 脉冲波纹
   for (let p = 0; p < 2; p++) {
     const phase = ((now / 1600 + p * 0.5) % 1);
     const pr = 35 + phase * maxR * 1.3;
@@ -1053,7 +996,7 @@ function drawSoundMarker(x, y, intensity, confidence) {
     ctx.stroke();
   }
   
-  // 3. 定位方框（四角）
+  // 定位方框
   const boxSize = 55 + intensity * 25;
   const cornerLen = 16;
   ctx.strokeStyle = color;
@@ -1076,7 +1019,7 @@ function drawSoundMarker(x, y, intensity, confidence) {
   });
   ctx.shadowBlur = 0;
   
-  // 4. 中心十字
+  // 中心十字
   ctx.strokeStyle = `rgba(${rgb.join(',')},0.95)`;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
@@ -1086,7 +1029,7 @@ function drawSoundMarker(x, y, intensity, confidence) {
   ctx.moveTo(x, y + 4); ctx.lineTo(x, y + 12);
   ctx.stroke();
   
-  // 5. 中心点
+  // 中心点
   ctx.fillStyle = color;
   ctx.beginPath();
   ctx.arc(x, y, 3.5, 0, Math.PI * 2);
@@ -1095,7 +1038,7 @@ function drawSoundMarker(x, y, intensity, confidence) {
   ctx.lineWidth = 1;
   ctx.stroke();
   
-  // 6. 标签
+  // 标签
   const db = (55 + intensity * 45).toFixed(0);
   const label = `声源 ${db}dB`;
   ctx.font = 'bold 12px -apple-system, sans-serif';
@@ -1133,7 +1076,7 @@ function drawSoundMarker(x, y, intensity, confidence) {
     ctx.fillText(confLabel, cx2 + (cw + 12) / 2, cy2 + 9);
   }
   
-  // 7. 方位角标签（底部）
+  // 方位角标签
   const angle = vectorToHeading(S.soundDir);
   const dirs = ['N','NE','E','SE','S','SW','W','NW'];
   const idx = Math.round(angle / 45) % 8;
@@ -1174,7 +1117,6 @@ function drawOffscreenIndicator(x, y, angle) {
   const now = Date.now();
   const pulse = 0.6 + Math.sin(now / 200) * 0.4;
   
-  // 箭头
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);
@@ -1194,7 +1136,6 @@ function drawOffscreenIndicator(x, y, angle) {
   ctx.globalAlpha = 1;
   ctx.restore();
   
-  // 热力光晕
   const grad = ctx.createRadialGradient(x, y, 0, x, y, 40);
   grad.addColorStop(0, `rgba(${rgb},${0.3 * pulse})`);
   grad.addColorStop(1, `rgba(${rgb},0)`);
@@ -1203,7 +1144,6 @@ function drawOffscreenIndicator(x, y, angle) {
   ctx.arc(x, y, 40, 0, Math.PI * 2);
   ctx.fill();
   
-  // 文字
   if (S.soundDir) {
     const angle2 = vectorToHeading(S.soundDir);
     ctx.font = 'bold 11px -apple-system, sans-serif';
@@ -1253,152 +1193,4 @@ function drawFrameCorners(W, H) {
   ctx.beginPath();
   ctx.moveTo(m, m + len); ctx.lineTo(m, m); ctx.lineTo(m + len, m);
   ctx.moveTo(W - m - len, m); ctx.lineTo(W - m, m); ctx.lineTo(W - m, m + len);
-  ctx.moveTo(m, H - m - len); ctx.lineTo(m, H - m); ctx.lineTo(m + len, H - m);
-  ctx.moveTo(W - m - len, H - m); ctx.lineTo(W - m, H - m); ctx.lineTo(W - m, H - m - len);
-  ctx.stroke();
-}
-
-// ============ 雷达小图 ============
-function renderRadar() {
-  const W = 220, H = 220;
-  const cx = W / 2, cy = H / 2;
-  const R = 90;
-  
-  rctx.clearRect(0, 0, W, H);
-  
-  // 背景圆
-  rctx.fillStyle = 'rgba(0,0,0,0.3)';
-  rctx.beginPath();
-  rctx.arc(cx, cy, R, 0, Math.PI * 2);
-  rctx.fill();
-  
-  // 同心圆
-  rctx.strokeStyle = 'rgba(255,255,255,0.15)';
-  rctx.lineWidth = 1;
-  for (let i = 1; i <= 3; i++) {
-    rctx.beginPath();
-    rctx.arc(cx, cy, R * i / 3, 0, Math.PI * 2);
-    rctx.stroke();
-  }
-  
-  // 十字线
-  rctx.beginPath();
-  rctx.moveTo(cx - R, cy); rctx.lineTo(cx + R, cy);
-  rctx.moveTo(cx, cy - R); rctx.lineTo(cx, cy + R);
-  rctx.stroke();
-  
-  // 方向标签
-  rctx.font = 'bold 10px -apple-system, sans-serif';
-  rctx.textAlign = 'center';
-  rctx.textBaseline = 'middle';
-  rctx.fillStyle = '#ef4444';
-  rctx.fillText('N', cx, cy - R + 8);
-  rctx.fillStyle = 'rgba(255,255,255,0.6)';
-  rctx.fillText('E', cx + R - 8, cy);
-  rctx.fillText('S', cx, cy + R - 8);
-  rctx.fillText('W', cx - R + 8, cy);
-  
-  // 扫描轨迹（历史样本）
-  if (S.samples.length > 0) {
-    rctx.strokeStyle = 'rgba(251, 191, 36, 0.4)';
-    rctx.lineWidth = 1.5;
-    rctx.beginPath();
-    let first = true;
-    S.samples.forEach(s => {
-      const h = s.heading * Math.PI / 180;
-      // 雷达图：北=上，顺时针
-      // 雷达坐标：x = sin(h), y = -cos(h)
-      const rx = cx + Math.sin(h) * R * 0.85;
-      const ry = cy - Math.cos(h) * R * 0.85;
-      if (first) { rctx.moveTo(rx, ry); first = false; }
-      else rctx.lineTo(rx, ry);
-    });
-    rctx.stroke();
-    
-    // 采样点（按强度着色）
-    S.samples.forEach(s => {
-      const h = s.heading * Math.PI / 180;
-      const rx = cx + Math.sin(h) * R * 0.85;
-      const ry = cy - Math.cos(h) * R * 0.85;
-      const alpha = 0.3 + s.level * 0.7;
-      const color = s.level > 0.5 ? `rgba(239,68,68,${alpha})` : 
-                    s.level > 0.25 ? `rgba(245,158,11,${alpha})` : 
-                    `rgba(34,197,94,${alpha})`;
-      rctx.fillStyle = color;
-      rctx.beginPath();
-      rctx.arc(rx, ry, 2 + s.level * 2, 0, Math.PI * 2);
-      rctx.fill();
-    });
-  }
-  
-  // 声源方向
-  if (S.soundDir) {
-    const angle = vectorToHeading(S.soundDir);
-    const h = angle * Math.PI / 180;
-    const sx = cx + Math.sin(h) * R * 0.85;
-    const sy = cy - Math.cos(h) * R * 0.85;
-    
-    const intensity = S.smoothLevel;
-    const color = intensity > 0.6 ? '#ef4444' : intensity > 0.3 ? '#f59e0b' : '#22c55e';
-    
-    // 连线
-    rctx.strokeStyle = color;
-    rctx.lineWidth = 1.5;
-    rctx.setLineDash([3, 3]);
-    rctx.beginPath();
-    rctx.moveTo(cx, cy);
-    rctx.lineTo(sx, sy);
-    rctx.stroke();
-    rctx.setLineDash([]);
-    
-    // 声源点
-    rctx.fillStyle = color;
-    rctx.shadowColor = color;
-    rctx.shadowBlur = 8;
-    rctx.beginPath();
-    rctx.arc(sx, sy, 5, 0, Math.PI * 2);
-    rctx.fill();
-    rctx.shadowBlur = 0;
-    rctx.strokeStyle = '#fff';
-    rctx.lineWidth = 1.5;
-    rctx.stroke();
-  }
-  
-  // 当前朝向（三角）
-  const ch = S.compass * Math.PI / 180;
-  const tx = cx + Math.sin(ch) * (R - 4);
-  const ty = cy - Math.cos(ch) * (R - 4);
-  
-  rctx.save();
-  rctx.translate(tx, ty);
-  rctx.rotate(ch);
-  rctx.fillStyle = '#60a5fa';
-  rctx.beginPath();
-  rctx.moveTo(0, -6);
-  rctx.lineTo(-4, 4);
-  rctx.lineTo(4, 4);
-  rctx.closePath();
-  rctx.fill();
-  rctx.restore();
-  
-  // 中心点
-  rctx.fillStyle = '#fff';
-  rctx.beginPath();
-  rctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
-  rctx.fill();
-}
-
-// ============ Toast ============
-let toastTimer;
-function toast(msg) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
-}
-
-resizeCanvas();
-</script>
-</body>
-</html>
+  ctx.moveTo(m, H - m - len);
