@@ -14,6 +14,8 @@
     color: #fff;
     font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
     touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
   }
   
   #cameraVideo {
@@ -32,60 +34,71 @@
     pointer-events: none;
   }
   
-  /* 顶部信息栏 - 类似执法抓拍 */
+  #radarCanvas {
+    position: fixed;
+    top: max(90px, calc(env(safe-area-inset-top) + 90px));
+    right: 12px;
+    width: 110px;
+    height: 110px;
+    z-index: 10;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.55);
+    border: 1px solid rgba(255,255,255,0.15);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  
   .hud-top {
     position: fixed;
     top: 0; left: 0; right: 0;
     z-index: 10;
-    padding: 10px 14px;
+    padding: 10px 12px;
     padding-top: max(10px, env(safe-area-inset-top));
-    background: linear-gradient(to bottom, rgba(0,0,0,0.75), rgba(0,0,0,0.3), transparent);
+    background: linear-gradient(to bottom, rgba(0,0,0,0.75), rgba(0,0,0,0.2), transparent);
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-    gap: 8px;
+    gap: 6px;
   }
   
   .hud-block {
     background: rgba(0,0,0,0.5);
-    border: 1px solid rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.12);
     border-radius: 8px;
     padding: 6px 10px;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
+    flex: 1;
+    min-width: 0;
   }
   
   .hud-label {
     font-size: 9px;
     color: #94a3b8;
-    letter-spacing: 1px;
-    text-transform: uppercase;
+    letter-spacing: 0.5px;
     margin-bottom: 2px;
   }
   
   .hud-value {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 700;
     font-family: 'Courier New', monospace;
     color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   
-  .hud-value.highlight {
-    color: #fbbf24;
-  }
+  .hud-value.highlight { color: #fbbf24; }
+  .hud-value.danger { color: #f87171; }
+  .hud-value.success { color: #4ade80; }
   
-  .hud-value.danger {
-    color: #f87171;
-  }
-  
-  /* 底部控制栏 */
   .hud-bottom {
     position: fixed;
     bottom: 0; left: 0; right: 0;
     z-index: 10;
-    padding: 14px;
-    padding-bottom: max(14px, env(safe-area-inset-bottom));
-    background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+    padding: 12px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    background: linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.3), transparent);
   }
   
   .status-row {
@@ -94,19 +107,25 @@
     align-items: center;
     margin-bottom: 10px;
     font-size: 11px;
+    color: #cbd5e1;
+  }
+  
+  .status-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
   }
   
   .status-dot {
-    display: inline-block;
     width: 6px; height: 6px;
     border-radius: 50%;
-    margin-right: 5px;
     background: #22c55e;
     box-shadow: 0 0 6px #22c55e;
     animation: blink 1.5s infinite;
   }
   
   .status-dot.off { background: #64748b; box-shadow: none; animation: none; }
+  .status-dot.warn { background: #fbbf24; box-shadow: 0 0 6px #fbbf24; }
   
   @keyframes blink {
     0%, 100% { opacity: 1; }
@@ -120,26 +139,26 @@
   
   .btn {
     flex: 1;
-    padding: 12px;
+    padding: 13px;
     border: none;
     border-radius: 10px;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: transform 0.1s;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
   }
   
+  .btn:active { transform: scale(0.97); }
+  
   .btn-primary {
     background: linear-gradient(135deg, #ef4444, #dc2626);
     color: #fff;
-    box-shadow: 0 4px 12px rgba(239,68,68,0.4);
+    box-shadow: 0 4px 14px rgba(239,68,68,0.4);
   }
-  
-  .btn-primary:active { transform: scale(0.97); }
   
   .btn-secondary {
     background: rgba(255,255,255,0.12);
@@ -149,11 +168,98 @@
   }
   
   .btn-stop {
-    background: linear-gradient(135deg, #64748b, #475569);
+    background: linear-gradient(135deg, #475569, #334155);
     color: #fff;
   }
   
-  /* 启动画面 */
+  .scan-hint {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 15;
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  
+  .scan-hint.show { opacity: 1; }
+  
+  .scan-ring {
+    width: 140px; height: 140px;
+    margin: 0 auto 16px;
+    position: relative;
+  }
+  
+  .scan-ring-circle {
+    position: absolute;
+    inset: 0;
+    border: 2px dashed rgba(251,191,36,0.5);
+    border-radius: 50%;
+    animation: rotate 6s linear infinite;
+  }
+  
+  .scan-ring-progress {
+    position: absolute;
+    inset: 0;
+    border: 3px solid transparent;
+    border-top-color: #fbbf24;
+    border-radius: 50%;
+    transition: transform 0.3s;
+  }
+  
+  .scan-ring-icon {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+  }
+  
+  @keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  
+  .scan-text {
+    background: rgba(0,0,0,0.75);
+    padding: 10px 18px;
+    border-radius: 22px;
+    font-size: 13px;
+    backdrop-filter: blur(8px);
+    color: #fbbf24;
+    border: 1px solid rgba(251,191,36,0.3);
+    display: inline-block;
+    max-width: 280px;
+  }
+  
+  .scan-sub {
+    margin-top: 8px;
+    font-size: 11px;
+    color: #94a3b8;
+  }
+  
+  .toast {
+    position: fixed;
+    top: 30%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 50;
+    background: rgba(0,0,0,0.85);
+    padding: 12px 24px;
+    border-radius: 20px;
+    font-size: 14px;
+    backdrop-filter: blur(10px);
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  
+  .toast.show { opacity: 1; }
+  
   .startup {
     position: fixed;
     inset: 0;
@@ -163,34 +269,35 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 32px;
+    padding: 28px;
     text-align: center;
+    overflow-y: auto;
   }
   
   .startup.hidden { display: none; }
   
   .startup-logo {
-    width: 80px; height: 80px;
+    width: 76px; height: 76px;
     border-radius: 20px;
     background: linear-gradient(135deg, #ef4444, #f59e0b);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 40px;
-    margin-bottom: 20px;
+    font-size: 38px;
+    margin-bottom: 18px;
     box-shadow: 0 8px 32px rgba(239,68,68,0.4);
   }
   
   .startup h1 {
-    font-size: 22px;
+    font-size: 21px;
     margin-bottom: 8px;
     letter-spacing: 1px;
   }
   
   .startup p {
-    font-size: 13px;
+    font-size: 12.5px;
     color: #94a3b8;
-    margin-bottom: 24px;
+    margin-bottom: 22px;
     line-height: 1.6;
     max-width: 300px;
   }
@@ -198,7 +305,7 @@
   .info-grid {
     width: 100%;
     max-width: 320px;
-    margin-bottom: 28px;
+    margin-bottom: 24px;
     text-align: left;
   }
   
@@ -227,12 +334,7 @@
   .info-row .txt {
     color: #cbd5e1;
     flex: 1;
-  }
-  
-  .info-row .val {
-    color: #fbbf24;
-    font-weight: 600;
-    font-size: 11px;
+    line-height: 1.4;
   }
   
   .start-btn {
@@ -251,76 +353,14 @@
   .start-btn:active { transform: scale(0.96); }
   .start-btn:disabled { opacity: 0.5; }
   
-  /* 扫描提示 */
-  .scan-hint {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 15;
-    text-align: center;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s;
-  }
-  
-  .scan-hint.show { opacity: 1; }
-  
-  .scan-hint .ring {
-    width: 120px; height: 120px;
-    border: 2px dashed rgba(251,191,36,0.6);
-    border-radius: 50%;
-    margin: 0 auto 12px;
-    animation: rotate 4s linear infinite;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 36px;
-  }
-  
-  @keyframes rotate {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-  
-  .scan-hint .txt {
-    background: rgba(0,0,0,0.7);
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-size: 13px;
-    backdrop-filter: blur(8px);
-    color: #fbbf24;
-  }
-  
-  /* Toast */
-  .toast {
-    position: fixed;
-    top: 30%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 50;
-    background: rgba(0,0,0,0.85);
-    padding: 12px 24px;
-    border-radius: 20px;
-    font-size: 14px;
-    backdrop-filter: blur(10px);
-    opacity: 0;
-    transition: opacity 0.3s;
-    pointer-events: none;
-    border: 1px solid rgba(255,255,255,0.1);
-  }
-  
-  .toast.show { opacity: 1; }
-  
-  /* 十字准心 */
   .crosshair {
     position: fixed;
     top: 50%; left: 50%;
     transform: translate(-50%, -50%);
-    width: 40px; height: 40px;
+    width: 36px; height: 36px;
     z-index: 3;
     pointer-events: none;
-    opacity: 0.4;
+    opacity: 0.35;
   }
   
   .crosshair::before, .crosshair::after {
@@ -346,34 +386,42 @@
 
 <video id="cameraVideo" autoplay playsinline muted></video>
 <canvas id="overlayCanvas"></canvas>
+<canvas id="radarCanvas" width="220" height="220"></canvas>
 <div class="crosshair"></div>
 
 <div class="hud-top">
   <div class="hud-block">
-    <div class="hud-label">方位</div>
+    <div class="hud-label">声源方位</div>
     <div class="hud-value highlight" id="hudDirection">--</div>
   </div>
   <div class="hud-block" style="text-align:center">
-    <div class="hud-label">声源强度</div>
+    <div class="hud-label">强度</div>
     <div class="hud-value danger" id="hudLevel">-- dB</div>
   </div>
   <div class="hud-block" style="text-align:right">
-    <div class="hud-label">朝向</div>
-    <div class="hud-value" id="hudHeading">--°</div>
+    <div class="hud-label">置信度</div>
+    <div class="hud-value success" id="hudConf">--%</div>
   </div>
 </div>
 
 <div class="scan-hint" id="scanHint">
-  <div class="ring">🎯</div>
-  <div class="txt" id="scanText">请缓慢水平旋转手机 360°</div>
+  <div class="scan-ring">
+    <div class="scan-ring-circle"></div>
+    <div class="scan-ring-progress" id="scanProgress"></div>
+    <div class="scan-ring-icon">🎯</div>
+  </div>
+  <div>
+    <div class="scan-text" id="scanText">请水平旋转手机 360°</div>
+    <div class="scan-sub" id="scanSub">保持手机高度不变，寻找声源方向</div>
+  </div>
 </div>
 
 <div class="hud-bottom">
   <div class="status-row">
-    <span><span class="status-dot off" id="dotMic"></span>麦克风</span>
-    <span><span class="status-dot off" id="dotCam"></span>摄像头</span>
-    <span><span class="status-dot off" id="dotSen"></span>传感器</span>
-    <span id="modeText" style="color:#94a3b8">待机</span>
+    <div class="status-item"><span class="status-dot off" id="dotMic"></span>麦克风</div>
+    <div class="status-item"><span class="status-dot off" id="dotCam"></span>摄像头</div>
+    <div class="status-item"><span class="status-dot off" id="dotSen"></span>传感器</div>
+    <div id="modeText" style="color:#94a3b8;font-weight:600">待机</div>
   </div>
   <div class="btn-row">
     <button class="btn btn-primary" id="btnMain" onclick="toggleMain()">▶ 启动抓拍</button>
@@ -386,63 +434,71 @@
 <div class="startup" id="startup">
   <div class="startup-logo">🎯</div>
   <h1>声源定位抓拍系统</h1>
-  <p>类似交通鸣笛抓拍摄像头<br>实时标记画面中的声源位置</p>
+  <p>借鉴交通鸣笛抓拍原理<br>通过旋转手机扫描定位声源方向</p>
   <div class="info-grid">
     <div class="info-row">
-      <div class="ico">🎤</div>
-      <div class="txt">通过声音强度与手机朝向定位声源</div>
-    </div>
-    <div class="info-row">
-      <div class="ico">📷</div>
-      <div class="txt">在摄像头画面上叠加声源热力标记</div>
+      <div class="ico">🔄</div>
+      <div class="txt">保持手机高度，水平旋转360°扫描声源</div>
     </div>
     <div class="info-row">
       <div class="ico">🧭</div>
-      <div class="txt">手机旋转时标记自动跟踪真实声源</div>
+      <div class="txt">融合陀螺仪、加速度计、磁力计计算真实朝向</div>
     </div>
     <div class="info-row">
-      <div class="ico">🔴</div>
-      <div class="txt">红/黄/绿三色表示声源强度等级</div>
+      <div class="ico">🎤</div>
+      <div class="txt">根据旋转过程中声音强度峰值锁定声源</div>
+    </div>
+    <div class="info-row">
+      <div class="ico">📷</div>
+      <div class="txt">在摄像头画面上实时叠加声源标记</div>
     </div>
   </div>
   <button class="start-btn" id="btnStart" onclick="boot()">启 动 系 统</button>
 </div>
 
 <script>
-// ========== 全局状态 ==========
+// ============ 全局状态 ============
 const S = {
-  // 传感器
-  heading: 0,           // 手机朝向 (0-360, 北=0)
-  pitch: 0,             // 俯仰角
-  roll: 0,
+  // 传感器原始数据
+  orient: { alpha: 0, beta: 0, gamma: 0, absolute: false },
+  compass: 0,           // 罗盘朝向（0=北，顺时针，度）
+  compassReady: false,
   hasSensor: false,
+  
+  // 计算出的摄像头坐标系（世界坐标：X=东, Y=北, Z=天）
+  camF: { x: 0, y: 1, z: 0 },   // forward (摄像头指向)
+  camU: { x: 0, y: 0, z: 1 },   // up (手机顶部方向)
+  camR: { x: 1, y: 0, z: 0 },   // right
+  
+  // 平滑后的朝向
+  smoothCamF: { x: 0, y: 1, z: 0 },
+  smoothCamU: { x: 0, y: 0, z: 1 },
+  smoothCamR: { x: 1, y: 0, z: 0 },
   
   // 音频
   audioCtx: null,
   analyser: null,
   micStream: null,
+  smoothLevel: 0,
   
-  // 声源（真实世界方位，固定不变）
-  soundWorldAngle: null,    // 声源在真实世界的方位角（度）
-  soundConfidence: 0,       // 定位置信度 0-1
-  soundIntensity: 0,        // 当前强度 0-1
-  soundPitchOffset: 0,      // 声源相对水平面的俯仰偏移
+  // 声源（世界坐标方向向量）
+  soundDir: null,        // 声源世界方向（单位向量）
+  soundConfidence: 0,    // 0-1
+  soundLocked: false,
   
   // 扫描数据
-  scanSamples: [],          // {heading, level, pitch}
+  samples: [],           // {f: {x,y,z}, level, time, heading}
   scanning: false,
-  lastScanHeading: null,
   totalRotation: 0,
+  lastHeading: null,
+  scanStartTime: 0,
   
-  // 状态
+  // 运行状态
   running: false,
-  cameraReady: false,
-  
-  // 摄像头 FOV（水平视角，度）
-  cameraFOV: 65,
+  cameraFOV: 70,         // 水平视角（度）
 };
 
-// ========== 启动 ==========
+// ============ 启动 ============
 async function boot() {
   const btn = document.getElementById('btnStart');
   btn.disabled = true;
@@ -462,7 +518,7 @@ async function boot() {
     
     setTimeout(() => {
       document.getElementById('startup').classList.add('hidden');
-      toast('✅ 系统就绪，点击启动抓拍');
+      toast('✅ 系统就绪');
     }, 400);
     
   } catch (err) {
@@ -479,17 +535,16 @@ function setDot(id, on) {
   else el.classList.add('off');
 }
 
-// ========== 摄像头 ==========
+// ============ 摄像头 ============
 async function initCamera() {
   const stream = await navigator.mediaDevices.getUserMedia({
     video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
     audio: false
   });
   document.getElementById('cameraVideo').srcObject = stream;
-  S.cameraReady = true;
 }
 
-// ========== 麦克风 ==========
+// ============ 麦克风 ============
 async function initMic() {
   S.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   S.micStream = await navigator.mediaDevices.getUserMedia({
@@ -502,13 +557,13 @@ async function initMic() {
   const src = S.audioCtx.createMediaStreamSource(S.micStream);
   S.analyser = S.audioCtx.createAnalyser();
   S.analyser.fftSize = 2048;
-  S.analyser.smoothingTimeConstant = 0.6;
+  S.analyser.smoothingTimeConstant = 0.5;
   src.connect(S.analyser);
 }
 
-// ========== 传感器 ==========
+// ============ 传感器 ============
 async function initSensors() {
-  // iOS 权限请求
+  // iOS 权限
   if (typeof DeviceOrientationEvent !== 'undefined' && 
       typeof DeviceOrientationEvent.requestPermission === 'function') {
     const p1 = await DeviceOrientationEvent.requestPermission();
@@ -520,40 +575,120 @@ async function initSensors() {
     if (p2 !== 'granted') throw new Error('运动传感器权限被拒绝');
   }
   
+  // 监听方向（捕获阶段，优先接收 absolute 事件）
   window.addEventListener('deviceorientationabsolute', handleOrientation, true);
   window.addEventListener('deviceorientation', handleOrientation, true);
-  window.addEventListener('devicemotion', handleMotion, true);
   
   S.hasSensor = true;
 }
 
 function handleOrientation(e) {
-  // webkitCompassHeading 是 iOS 上真正的罗盘朝向（顺时针，0=北）
+  // 优先使用绝对方向事件
+  if (e.absolute || e.webkitCompassHeading !== undefined) {
+    S.orient.absolute = true;
+  }
+  
+  // iOS: webkitCompassHeading 是真正的罗盘朝向（顺时针，0=北）
   if (e.webkitCompassHeading !== undefined && e.webkitCompassHeading !== null) {
-    S.heading = e.webkitCompassHeading;
+    S.compass = e.webkitCompassHeading;
+    S.compassReady = true;
+    // 同时记录 alpha 用于 beta/gamma
+    S.orient.alpha = e.alpha;
   } else if (e.absolute && e.alpha !== null) {
-    // Android: alpha 是逆时针，需要转换
-    S.heading = (360 - e.alpha) % 360;
-  } else if (e.alpha !== null) {
-    // 非绝对方向，仅用于相对变化
+    // Android absolute: alpha 是逆时针从北
+    S.compass = (360 - e.alpha) % 360;
+    S.compassReady = true;
+    S.orient.alpha = e.alpha;
+  } else if (e.alpha !== null && !S.compassReady) {
+    // 非绝对方向：用相对变化跟踪
     if (S._lastAlpha !== undefined) {
-      const delta = e.alpha - S._lastAlpha;
-      S.heading = (S.heading - delta + 360) % 360;
+      let delta = e.alpha - S._lastAlpha;
+      if (delta > 180) delta -= 360;
+      if (delta < -180) delta += 360;
+      S.compass = (S.compass - delta + 360) % 360;
     }
     S._lastAlpha = e.alpha;
   }
   
-  if (e.beta !== null) S.pitch = e.beta;
-  if (e.gamma !== null) S.roll = e.gamma;
+  if (e.beta !== null) S.orient.beta = e.beta;
+  if (e.gamma !== null) S.orient.gamma = e.gamma;
+  
+  // 计算摄像头坐标系
+  computeCameraVectors();
 }
 
-function handleMotion(e) {
-  // 可用于检测快速旋转
+// ============ 计算摄像头坐标系 ============
+// 世界坐标：X=东, Y=北, Z=天（右手系）
+// 设备坐标：X=右, Y=屏幕顶, Z=屏幕外
+// 摄像头指向 = 屏幕背面法线 = 设备坐标 (0, 0, -1)
+// 手机顶部 = 设备坐标 (0, 1, 0)
+function computeCameraVectors() {
+  const h = S.compass * Math.PI / 180;
+  const b = S.orient.beta * Math.PI / 180;
+  const g = S.orient.gamma * Math.PI / 180;
+  
+  const ch = Math.cos(h), sh = Math.sin(h);
+  const cb = Math.cos(b), sb = Math.sin(b);
+  const cg = Math.cos(g), sg = Math.sin(g);
+  
+  // 摄像头指向（推导自 R = Rz(alpha) * Rx(beta) * Ry(gamma) 作用于 (0,0,-1)）
+  // 用 heading 替代 alpha（alpha = 360-heading）
+  const camF = {
+    x: ch*sg + sh*cg*sb,
+    y: -sh*sg + ch*cg*sb,
+    z: -cg*cb
+  };
+  
+  // 手机顶部方向（设备坐标 (0,1,0) 经旋转）
+  const camU = {
+    x: sh * cb,
+    y: ch * cb,
+    z: sb
+  };
+  
+  // 归一化
+  normalize(camF);
+  normalize(camU);
+  
+  // 右侧 = forward × up
+  const camR = {
+    x: camF.y * camU.z - camF.z * camU.y,
+    y: camF.z * camU.x - camF.x * camU.z,
+    z: camF.x * camU.y - camF.y * camU.x
+  };
+  normalize(camR);
+  
+  S.camF = camF;
+  S.camU = camU;
+  S.camR = camR;
+  
+  // 平滑（低通滤波）
+  const alpha = 0.3;
+  S.smoothCamF = lerpVec(S.smoothCamF, camF, alpha);
+  S.smoothCamU = lerpVec(S.smoothCamU, camU, alpha);
+  S.smoothCamR = lerpVec(S.smoothCamR, camR, alpha);
+  normalize(S.smoothCamF);
+  normalize(S.smoothCamU);
+  normalize(S.smoothCamR);
 }
 
-// ========== Canvas ==========
+function normalize(v) {
+  const len = Math.sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+  if (len > 0.0001) { v.x /= len; v.y /= len; v.z /= len; }
+  return v;
+}
+
+function lerpVec(a, b, t) {
+  return { x: a.x*(1-t)+b.x*t, y: a.y*(1-t)+b.y*t, z: a.z*(1-t)+b.z*t };
+}
+
+function dot(a, b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
+
+// ============ Canvas ============
 const canvas = document.getElementById('overlayCanvas');
 const ctx = canvas.getContext('2d');
+const radar = document.getElementById('radarCanvas');
+const rctx = radar.getContext('2d');
 
 function resizeCanvas() {
   const dpr = window.devicePixelRatio || 1;
@@ -565,23 +700,22 @@ function resizeCanvas() {
 }
 window.addEventListener('resize', resizeCanvas);
 
-// ========== 主控制 ==========
+// ============ 主控制 ============
 function toggleMain() {
-  if (S.running) {
-    stop();
-  } else {
-    start();
-  }
+  if (S.running) stop();
+  else start();
 }
 
 function start() {
   S.running = true;
   S.scanning = true;
-  S.scanSamples = [];
+  S.samples = [];
   S.totalRotation = 0;
-  S.lastScanHeading = S.heading;
-  S.soundWorldAngle = null;
+  S.lastHeading = S.compass;
+  S.soundDir = null;
   S.soundConfidence = 0;
+  S.soundLocked = false;
+  S.scanStartTime = Date.now();
   
   document.getElementById('btnMain').textContent = '■ 停止';
   document.getElementById('btnMain').className = 'btn btn-stop';
@@ -602,246 +736,305 @@ function stop() {
 }
 
 function resetScan() {
-  S.scanSamples = [];
-  S.soundWorldAngle = null;
+  S.samples = [];
+  S.soundDir = null;
   S.soundConfidence = 0;
+  S.soundLocked = false;
   S.totalRotation = 0;
-  S.lastScanHeading = S.heading;
-  toast('已重置扫描数据');
+  S.lastHeading = S.compass;
+  S.scanStartTime = Date.now();
+  if (S.running) {
+    S.scanning = true;
+    document.getElementById('modeText').textContent = '扫描定位中';
+    document.getElementById('scanHint').classList.add('show');
+  }
+  toast('已重置');
 }
 
-// ========== 主循环 ==========
+// ============ 主循环 ============
 function loop() {
   if (!S.running) return;
   
-  // 1. 读取音频强度
+  // 1. 读取音频
   const levelData = new Uint8Array(S.analyser.frequencyBinCount);
   S.analyser.getByteFrequencyData(levelData);
   
-  // 计算总体强度
-  let sum = 0;
-  for (let i = 0; i < levelData.length; i++) sum += levelData[i];
-  const avgLevel = sum / levelData.length;
-  
-  // 计算鸣笛频段强度 (1000Hz - 5000Hz)
+  // 鸣笛频段 (800Hz - 4500Hz)
   const sampleRate = S.audioCtx.sampleRate;
   const binHz = sampleRate / S.analyser.fftSize;
-  const lo = Math.floor(1000 / binHz);
-  const hi = Math.min(Math.floor(5000 / binHz), levelData.length - 1);
+  const lo = Math.floor(800 / binHz);
+  const hi = Math.min(Math.floor(4500 / binHz), levelData.length - 1);
   let hornSum = 0;
   for (let i = lo; i <= hi; i++) hornSum += levelData[i];
   const hornLevel = hornSum / (hi - lo + 1);
   
-  // 归一化强度 (0-1)
-  const intensity = Math.min(1, hornLevel / 140);
-  S.soundIntensity = S.soundIntensity * 0.7 + intensity * 0.3; // 平滑
+  // 归一化 0-1
+  const rawIntensity = Math.min(1, hornLevel / 130);
+  S.smoothLevel = S.smoothLevel * 0.6 + rawIntensity * 0.4;
   
-  // 2. 扫描阶段：收集数据，确定声源世界方位
-  if (S.scanning) {
-    // 跟踪旋转量
-    if (S.lastScanHeading !== null) {
-      let delta = S.heading - S.lastScanHeading;
-      if (delta > 180) delta -= 360;
-      if (delta < -180) delta += 360;
-      S.totalRotation += Math.abs(delta);
-    }
-    S.lastScanHeading = S.heading;
-    
-    // 只在有显著声音时采样
-    if (S.soundIntensity > 0.15) {
-      S.scanSamples.push({
-        heading: S.heading,
-        level: S.soundIntensity,
-        pitch: S.pitch,
-        time: Date.now()
-      });
-      // 只保留最近 6 秒
-      const now = Date.now();
-      S.scanSamples = S.scanSamples.filter(s => now - s.time < 6000);
-    }
-    
-    // 计算声源方位
-    if (S.scanSamples.length >= 8) {
-      computeSoundSource();
-    }
-    
-    // 更新扫描提示
-    const progress = Math.min(100, (S.totalRotation / 360) * 100);
-    if (S.soundWorldAngle !== null && S.soundConfidence > 0.5) {
-      document.getElementById('scanText').textContent = 
-        `✓ 声源已锁定 (${(S.soundConfidence * 100).toFixed(0)}%)`;
-    } else {
-      document.getElementById('scanText').textContent = 
-        `旋转 ${progress.toFixed(0)}% · 请朝向声源方向转动`;
-    }
-    
-    // 扫描足够后退出扫描模式
-    if (S.totalRotation > 330 && S.soundWorldAngle !== null) {
-      S.scanning = false;
-      document.getElementById('modeText').textContent = '实时跟踪中';
-      document.getElementById('scanHint').classList.remove('show');
-      toast('🎯 声源已锁定，跟踪中');
+  // 2. 跟踪旋转量
+  if (S.lastHeading !== null) {
+    let delta = S.compass - S.lastHeading;
+    if (delta > 180) delta -= 360;
+    if (delta < -180) delta += 360;
+    S.totalRotation += Math.abs(delta);
+  }
+  S.lastHeading = S.compass;
+  
+  // 3. 采样（只在有显著声音时）
+  if (S.scanning && S.smoothLevel > 0.12) {
+    S.samples.push({
+      f: { ...S.smoothCamF },
+      u: { ...S.smoothCamU },
+      level: S.smoothLevel,
+      heading: S.compass,
+      time: Date.now()
+    });
+    // 保留最近 8 秒
+    const now = Date.now();
+    S.samples = S.samples.filter(s => now - s.time < 8000);
+    // 限制数量
+    if (S.samples.length > 200) {
+      S.samples = S.samples.slice(-200);
     }
   }
   
-  // 3. 更新 HUD
+  // 4. 计算声源
+  if (S.samples.length >= 10) {
+    computeSoundSource();
+  }
+  
+  // 5. 更新扫描提示
+  updateScanHint();
+  
+  // 6. 更新 HUD
   updateHUD();
   
-  // 4. 渲染叠加层
+  // 7. 渲染
   render();
+  renderRadar();
   
   requestAnimationFrame(loop);
 }
 
-// ========== 计算声源世界方位 ==========
+// ============ 声源定位算法 ============
+// 核心思路：找到声音强度峰值对应的摄像头朝向
+// 使用加权向量平均，权重 = level^k (k=4 强调峰值)
 function computeSoundSource() {
-  // 加权平均：用强度的平方作为权重，计算声源方位
-  let wx = 0, wy = 0, ww = 0;
-  let wpitch = 0;
+  let wx = 0, wy = 0, wz = 0, ww = 0;
+  let maxLevel = 0;
   
-  S.scanSamples.forEach(s => {
-    const rad = s.heading * Math.PI / 180;
-    const w = Math.pow(s.level, 2);
-    wx += Math.sin(rad) * w;
-    wy += Math.cos(rad) * w;
-    wpitch += s.pitch * w;
+  // 找到最大强度用于归一化
+  S.samples.forEach(s => { if (s.level > maxLevel) maxLevel = s.level; });
+  if (maxLevel < 0.05) return;
+  
+  S.samples.forEach(s => {
+    // 强调峰值：level^4
+    const w = Math.pow(s.level / maxLevel, 4);
+    wx += s.f.x * w;
+    wy += s.f.y * w;
+    wz += s.f.z * w;
     ww += w;
   });
   
-  if (ww < 0.01) return;
+  if (ww < 0.001) return;
   
-  wx /= ww;
-  wy /= ww;
-  wpitch /= ww;
+  const dir = { x: wx/ww, y: wy/ww, z: wz/ww };
+  normalize(dir);
   
-  let angle = Math.atan2(wx, wy) * 180 / Math.PI;
-  if (angle < 0) angle += 360;
-  
-  // 平滑
-  if (S.soundWorldAngle === null) {
-    S.soundWorldAngle = angle;
-    S.soundPitchOffset = wpitch - 45; // 相对水平
+  // 平滑声源方向
+  if (S.soundDir === null) {
+    S.soundDir = dir;
   } else {
-    // 处理环绕
-    let diff = angle - S.soundWorldAngle;
-    if (diff > 180) diff -= 360;
-    if (diff < -180) diff += 360;
-    S.soundWorldAngle = (S.soundWorldAngle + diff * 0.25 + 360) % 360;
-    S.soundPitchOffset = S.soundPitchOffset * 0.8 + (wpitch - 45) * 0.2;
+    // 球面插值（简单线性插值后归一化）
+    S.soundDir = lerpVec(S.soundDir, dir, 0.2);
+    normalize(S.soundDir);
   }
   
-  // 置信度：基于采样数量与强度一致性
-  const levels = S.scanSamples.map(s => s.level);
-  const avgL = levels.reduce((a,b)=>a+b,0) / levels.length;
-  const variance = levels.reduce((a,b)=>a+Math.pow(b-avgL,2),0) / levels.length;
-  const consistency = Math.max(0, 1 - variance * 4);
-  const coverage = Math.min(1, S.scanSamples.length / 40);
-  S.soundConfidence = S.soundConfidence * 0.9 + (consistency * 0.6 + coverage * 0.4) * 0.1 + S.soundConfidence * 0.9;
-  S.soundConfidence = Math.min(1, S.soundConfidence);
+  // 计算置信度
+  // 1. 样本数量
+  const countScore = Math.min(1, S.samples.length / 50);
+  // 2. 方向一致性（加权向量的长度越接近1越一致）
+  const vecLen = Math.sqrt(wx*wx + wy*wy + wz*wz) / ww;
+  const consistencyScore = vecLen;
+  // 3. 旋转覆盖度
+  const coverageScore = Math.min(1, S.totalRotation / 330);
+  // 4. 峰值显著度（最大强度与平均强度的比值）
+  const avgLevel = S.samples.reduce((a,s)=>a+s.level,0) / S.samples.length;
+  const peakScore = Math.min(1, (maxLevel / (avgLevel + 0.01) - 1) / 2);
+  
+  const rawConf = countScore * 0.2 + consistencyScore * 0.4 + coverageScore * 0.2 + peakScore * 0.2;
+  S.soundConfidence = S.soundConfidence * 0.9 + rawConf * 0.1;
+  
+  // 锁定判断
+  if (S.soundConfidence > 0.55 && S.totalRotation > 270 && !S.soundLocked) {
+    S.soundLocked = true;
+    S.scanning = false;
+    document.getElementById('modeText').textContent = '🎯 声源已锁定';
+    document.getElementById('scanHint').classList.remove('show');
+    toast('✅ 声源已锁定，持续跟踪中');
+  }
 }
 
-// ========== HUD 更新 ==========
-function updateHUD() {
-  document.getElementById('hudHeading').textContent = S.heading.toFixed(0) + '°';
+// ============ 扫描提示 ============
+function updateScanHint() {
+  if (!S.scanning) return;
   
-  const db = S.soundIntensity > 0.01 ? (60 + S.soundIntensity * 40).toFixed(0) : '--';
+  const progress = Math.min(100, (S.totalRotation / 360) * 100);
+  const rotEl = document.getElementById('scanProgress');
+  rotEl.style.transform = `rotate(${progress * 3.6}deg)`;
+  
+  const textEl = document.getElementById('scanText');
+  const subEl = document.getElementById('scanSub');
+  
+  if (S.soundDir && S.soundConfidence > 0.4) {
+    const dirs = ['北','东北','东','东南','南','西南','西','西北'];
+    const angle = vectorToHeading(S.soundDir);
+    const idx = Math.round(angle / 45) % 8;
+    textEl.textContent = `初步定位: ${dirs[idx]} ${angle.toFixed(0)}°`;
+    subEl.textContent = `继续旋转以提高精度 (${progress.toFixed(0)}%)`;
+  } else if (S.smoothLevel > 0.15) {
+    textEl.textContent = `检测到声音 · 请朝向声源旋转`;
+    subEl.textContent = `旋转进度 ${progress.toFixed(0)}% · 采样 ${S.samples.length}`;
+  } else {
+    textEl.textContent = `等待声源 · 请旋转手机`;
+    subEl.textContent = `旋转进度 ${progress.toFixed(0)}%`;
+  }
+}
+
+// 向量转罗盘方位角
+function vectorToHeading(v) {
+  // 水平投影 (x=东, y=北)
+  let angle = Math.atan2(v.x, v.y) * 180 / Math.PI;
+  if (angle < 0) angle += 360;
+  return angle;
+}
+
+// ============ HUD ============
+function updateHUD() {
+  const db = S.smoothLevel > 0.01 ? (55 + S.smoothLevel * 45).toFixed(0) : '--';
   document.getElementById('hudLevel').textContent = db + ' dB';
   
-  if (S.soundWorldAngle !== null) {
+  document.getElementById('hudConf').textContent = 
+    (S.soundConfidence * 100).toFixed(0) + '%';
+  
+  if (S.soundDir) {
     const dirs = ['北','东北','东','东南','南','西南','西','西北'];
-    const idx = Math.round(S.soundWorldAngle / 45) % 8;
+    const angle = vectorToHeading(S.soundDir);
+    const idx = Math.round(angle / 45) % 8;
     document.getElementById('hudDirection').textContent = 
-      dirs[idx] + ' ' + S.soundWorldAngle.toFixed(0) + '°';
+      dirs[idx] + ' ' + angle.toFixed(0) + '°';
   } else {
     document.getElementById('hudDirection').textContent = '扫描中...';
   }
 }
 
-// ========== 渲染 ==========
+// ============ 渲染主画布 ============
 function render() {
   const W = window.innerWidth;
   const H = window.innerHeight;
   ctx.clearRect(0, 0, W, H);
   
-  // 绘制瞄准框边角
+  // 画面边角框
   drawFrameCorners(W, H);
   
-  // 如果没有声源信息，只绘制弱信号提示
-  if (S.soundWorldAngle === null) {
-    if (S.soundIntensity > 0.1) {
-      drawCenterPulse(W, H, S.soundIntensity);
+  // 未定位时：显示声音脉冲提示
+  if (!S.soundDir) {
+    if (S.smoothLevel > 0.1) {
+      drawCenterPulse(W, H);
     }
     return;
   }
   
-  // 计算声源相对于画面中心的角度差
-  let relAngle = S.soundWorldAngle - S.heading;
-  if (relAngle > 180) relAngle -= 360;
-  if (relAngle < -180) relAngle += 360;
+  // 投影声源到屏幕
+  const proj = projectToScreen(S.soundDir);
   
-  // 判断是否在画面内（考虑 FOV）
-  const halfFOV = S.cameraFOV / 2;
-  const inView = Math.abs(relAngle) < halfFOV + 15; // 稍大于 FOV 时显示边缘指示
-  
-  if (inView) {
-    // 计算屏幕位置
-    // relAngle = 0 在中心，±halfFOV 在边缘
-    const aspect = W / H;
-    const horizFOV = S.cameraFOV;
-    const vertFOV = horizFOV / aspect;
-    
-    const screenX = W / 2 + (relAngle / halfFOV) * (W / 2);
-    
-    // 垂直位置：基于声源俯仰与当前手机俯仰的差
-    const pitchDiff = S.soundPitchOffset - (S.pitch - 45); // 45 是典型手持角度
-    const screenY = H / 2 - (pitchDiff / (vertFOV / 2)) * (H / 2);
-    
-    // 限制在屏幕内
-    const clampedX = Math.max(40, Math.min(W - 40, screenX));
-    const clampedY = Math.max(100, Math.min(H - 140, screenY));
-    
-    // 绘制声源标记
-    drawSoundMarker(clampedX, clampedY, S.soundIntensity, S.soundConfidence, W, H);
-    
-    // 如果在边缘，绘制方向指示箭头
-    if (Math.abs(relAngle) > halfFOV - 5) {
-      drawEdgeArrow(relAngle > 0 ? 1 : -1, W, H, S.soundIntensity);
-    }
+  if (proj && proj.inView) {
+    // 声源在画面内
+    drawSoundMarker(proj.x, proj.y, S.smoothLevel, S.soundConfidence);
+  } else if (proj) {
+    // 声源在画面外但在前方
+    drawOffscreenIndicator(proj.edgeX, proj.edgeY, proj.angle);
   } else {
-    // 声源在画面外，绘制边缘指示
-    drawOffscreenIndicator(relAngle, W, H);
+    // 声源在背后
+    drawBehindIndicator(W, H);
   }
-  
-  // 绘制底部方向条
-  drawDirectionBar(W, H);
 }
 
-// ========== 绘制声源标记（核心） ==========
-function drawSoundMarker(x, y, intensity, confidence, W, H) {
-  const now = Date.now();
+// ============ 投影到屏幕 ============
+function projectToScreen(soundDir) {
+  const F = S.smoothCamF;
+  const U = S.smoothCamU;
+  const R = S.smoothCamR;
   
-  // 颜色：根据强度
-  let color, colorRGB;
-  if (intensity > 0.65) {
-    color = '#ef4444';
-    colorRGB = [239, 68, 68];
-  } else if (intensity > 0.35) {
-    color = '#f59e0b';
-    colorRGB = [245, 158, 11];
-  } else {
-    color = '#22c55e';
-    colorRGB = [34, 197, 94];
+  // 声源在摄像头坐标系中的坐标
+  const fwd = dot(soundDir, F);  // 深度
+  const up = dot(soundDir, U);   // 上
+  const right = dot(soundDir, R); // 右
+  
+  // 在背后
+  if (fwd < 0.15) {
+    return null;
   }
   
-  // 1. 外层热力扩散圈（多层）
-  const maxR = 60 + intensity * 60;
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  const aspect = W / H;
+  
+  const halfFovRad = (S.cameraFOV / 2) * Math.PI / 180;
+  const scale = 1 / Math.tan(halfFovRad);
+  
+  // 归一化屏幕坐标 (-1 到 1)
+  const nx = (right / fwd) * scale;
+  const ny = -(up / fwd) * scale;  // 屏幕Y向下
+  
+  const inView = Math.abs(nx) < 1.1 && Math.abs(ny) < aspect * 1.1;
+  
+  const px = W / 2 + nx * W / 2;
+  const py = H / 2 + ny * H / 2;
+  
+  if (!inView) {
+    // 计算边缘交点
+    let edgeX, edgeY;
+    const margin = 40;
+    
+    if (Math.abs(nx) > 1) {
+      edgeX = nx > 0 ? W - margin : margin;
+      edgeY = Math.max(margin + 50, Math.min(H - margin - 80, py));
+    } else {
+      edgeX = Math.max(margin, Math.min(W - margin, px));
+      edgeY = ny > 0 ? H - margin - 80 : margin + 50;
+    }
+    
+    return { inView: false, edgeX, edgeY, angle: Math.atan2(ny, nx) };
+  }
+  
+  return { inView: true, x: px, y: py };
+}
+
+// ============ 声源标记 ============
+function drawSoundMarker(x, y, intensity, confidence) {
+  const now = Date.now();
+  
+  // 颜色
+  let color, rgb;
+  if (intensity > 0.6) {
+    color = '#ef4444'; rgb = [239, 68, 68];
+  } else if (intensity > 0.3) {
+    color = '#f59e0b'; rgb = [245, 158, 11];
+  } else {
+    color = '#22c55e'; rgb = [34, 197, 94];
+  }
+  
+  // 1. 热力扩散（多层径向渐变）
+  const maxR = 70 + intensity * 70;
   for (let i = 4; i >= 0; i--) {
     const r = maxR * (1 + i * 0.4);
-    const alpha = intensity * 0.12 * (1 - i * 0.18) * confidence;
+    const alpha = intensity * 0.15 * (1 - i * 0.18) * confidence;
     const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
-    grad.addColorStop(0, `rgba(${colorRGB.join(',')},${alpha * 1.5})`);
-    grad.addColorStop(0.5, `rgba(${colorRGB.join(',')},${alpha * 0.6})`);
-    grad.addColorStop(1, `rgba(${colorRGB.join(',')},0)`);
+    grad.addColorStop(0, `rgba(${rgb.join(',')},${alpha * 1.6})`);
+    grad.addColorStop(0.5, `rgba(${rgb.join(',')},${alpha * 0.5})`);
+    grad.addColorStop(1, `rgba(${rgb.join(',')},0)`);
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -849,27 +1042,25 @@ function drawSoundMarker(x, y, intensity, confidence, W, H) {
   }
   
   // 2. 脉冲波纹
-  const pulsePhase = (now % 1800) / 1800;
   for (let p = 0; p < 2; p++) {
-    const phase = (pulsePhase + p * 0.5) % 1;
-    const pr = 30 + phase * maxR * 1.2;
-    const pa = (1 - phase) * intensity * 0.6 * confidence;
-    ctx.strokeStyle = `rgba(${colorRGB.join(',')},${pa})`;
-    ctx.lineWidth = 2;
+    const phase = ((now / 1600 + p * 0.5) % 1);
+    const pr = 35 + phase * maxR * 1.3;
+    const pa = (1 - phase) * intensity * 0.7 * confidence;
+    ctx.strokeStyle = `rgba(${rgb.join(',')},${pa})`;
+    ctx.lineWidth = 2.5;
     ctx.beginPath();
     ctx.arc(x, y, pr, 0, Math.PI * 2);
     ctx.stroke();
   }
   
-  // 3. 定位框（类似抓拍的方框）
-  const boxSize = 50 + intensity * 30;
-  const cornerLen = 14;
+  // 3. 定位方框（四角）
+  const boxSize = 55 + intensity * 25;
+  const cornerLen = 16;
   ctx.strokeStyle = color;
   ctx.lineWidth = 3;
   ctx.shadowColor = color;
-  ctx.shadowBlur = 10;
+  ctx.shadowBlur = 12;
   
-  // 四个角
   const corners = [
     [x - boxSize, y - boxSize, 1, 1],
     [x + boxSize, y - boxSize, -1, 1],
@@ -886,56 +1077,78 @@ function drawSoundMarker(x, y, intensity, confidence, W, H) {
   ctx.shadowBlur = 0;
   
   // 4. 中心十字
-  ctx.strokeStyle = `rgba(${colorRGB.join(',')},0.9)`;
+  ctx.strokeStyle = `rgba(${rgb.join(',')},0.95)`;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.moveTo(x - 10, y); ctx.lineTo(x - 3, y);
-  ctx.moveTo(x + 3, y); ctx.lineTo(x + 10, y);
-  ctx.moveTo(x, y - 10); ctx.lineTo(x, y - 3);
-  ctx.moveTo(x, y + 3); ctx.lineTo(x, y + 10);
+  ctx.moveTo(x - 12, y); ctx.lineTo(x - 4, y);
+  ctx.moveTo(x + 4, y); ctx.lineTo(x + 12, y);
+  ctx.moveTo(x, y - 12); ctx.lineTo(x, y - 4);
+  ctx.moveTo(x, y + 4); ctx.lineTo(x, y + 12);
   ctx.stroke();
   
   // 5. 中心点
   ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.arc(x, y, 3, 0, Math.PI * 2);
+  ctx.arc(x, y, 3.5, 0, Math.PI * 2);
   ctx.fill();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1;
+  ctx.stroke();
   
   // 6. 标签
-  const db = (60 + intensity * 40).toFixed(0);
+  const db = (55 + intensity * 45).toFixed(0);
   const label = `声源 ${db}dB`;
   ctx.font = 'bold 12px -apple-system, sans-serif';
   const tw = ctx.measureText(label).width;
   
-  // 标签背景
-  ctx.fillStyle = color;
   const lx = x - boxSize;
-  const ly = y - boxSize - 24;
-  roundRect(ctx, lx, ly, tw + 16, 20, 4);
+  const ly = y - boxSize - 26;
+  
+  ctx.fillStyle = color;
+  roundRect(ctx, lx, ly, tw + 18, 22, 4);
   ctx.fill();
   
-  // 标签文字
   ctx.fillStyle = '#fff';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillText(label, lx + 8, ly + 10);
+  ctx.fillText(label, lx + 9, ly + 11);
   
-  // 置信度小标签
-  if (confidence > 0.3) {
+  // 置信度标签
+  if (confidence > 0.2) {
     const confLabel = `${(confidence * 100).toFixed(0)}%`;
     ctx.font = 'bold 10px -apple-system, sans-serif';
     const cw = ctx.measureText(confLabel).width;
-    ctx.fillStyle = 'rgba(0,0,0,0.7)';
-    roundRect(ctx, x + boxSize - cw - 8, y - boxSize - 20, cw + 12, 16, 3);
+    const cx2 = x + boxSize - cw - 6;
+    const cy2 = y - boxSize - 22;
+    
+    ctx.fillStyle = 'rgba(0,0,0,0.75)';
+    roundRect(ctx, cx2, cy2, cw + 12, 18, 3);
     ctx.fill();
     ctx.strokeStyle = color;
     ctx.lineWidth = 1;
-    roundRect(ctx, x + boxSize - cw - 8, y - boxSize - 20, cw + 12, 16, 3);
+    roundRect(ctx, cx2, cy2, cw + 12, 18, 3);
     ctx.stroke();
     ctx.fillStyle = color;
     ctx.textAlign = 'center';
-    ctx.fillText(confLabel, x + boxSize - cw/2 - 2, y - boxSize - 12);
+    ctx.fillText(confLabel, cx2 + (cw + 12) / 2, cy2 + 9);
   }
+  
+  // 7. 方位角标签（底部）
+  const angle = vectorToHeading(S.soundDir);
+  const dirs = ['N','NE','E','SE','S','SW','W','NW'];
+  const idx = Math.round(angle / 45) % 8;
+  const angleLabel = `${dirs[idx]} ${angle.toFixed(0)}°`;
+  ctx.font = '11px -apple-system, sans-serif';
+  const aw = ctx.measureText(angleLabel).width;
+  const ax = x - aw / 2 - 6;
+  const ay = y + boxSize + 8;
+  
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  roundRect(ctx, ax, ay, aw + 12, 18, 3);
+  ctx.fill();
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center';
+  ctx.fillText(angleLabel, x, ay + 9);
 }
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -952,189 +1165,230 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-// ========== 画面边角框 ==========
-function drawFrameCorners(W, H) {
-  const len = 30;
-  const m = 16;
-  ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-  ctx.lineWidth = 2;
+// ============ 画面外指示 ============
+function drawOffscreenIndicator(x, y, angle) {
+  const intensity = S.smoothLevel;
+  const color = intensity > 0.6 ? '#ef4444' : intensity > 0.3 ? '#f59e0b' : '#22c55e';
+  const rgb = intensity > 0.6 ? '239,68,68' : intensity > 0.3 ? '245,158,11' : '34,197,94';
   
-  // 左上
-  ctx.beginPath();
-  ctx.moveTo(m, m + len); ctx.lineTo(m, m); ctx.lineTo(m + len, m);
-  // 右上
-  ctx.moveTo(W - m - len, m); ctx.lineTo(W - m, m); ctx.lineTo(W - m, m + len);
-  // 左下
-  ctx.moveTo(m, H - m - len); ctx.lineTo(m, H - m); ctx.lineTo(m + len, H - m);
-  // 右下
-  ctx.moveTo(W - m - len, H - m); ctx.lineTo(W - m, H - m); ctx.lineTo(W - m, H - m - len);
-  ctx.stroke();
-}
-
-// ========== 中心脉冲（未定位时） ==========
-function drawCenterPulse(W, H, intensity) {
-  const cx = W / 2, cy = H / 2;
   const now = Date.now();
-  const phase = (now % 1500) / 1500;
-  const r = 20 + phase * 60;
-  const a = (1 - phase) * intensity * 0.6;
-  
-  ctx.strokeStyle = `rgba(251, 191, 36, ${a})`;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.stroke();
-  
-  ctx.font = '12px -apple-system, sans-serif';
-  ctx.fillStyle = 'rgba(251, 191, 36, 0.8)';
-  ctx.textAlign = 'center';
-  ctx.fillText('检测到声音 · 请旋转手机定位', cx, cy + 60);
-}
-
-// ========== 边缘箭头 ==========
-function drawEdgeArrow(dir, W, H, intensity) {
-  const y = H / 2;
-  const x = dir > 0 ? W - 30 : 30;
-  const color = intensity > 0.65 ? '#ef4444' : intensity > 0.35 ? '#f59e0b' : '#22c55e';
-  
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  if (dir > 0) {
-    ctx.moveTo(x + 10, y);
-    ctx.lineTo(x - 6, y - 10);
-    ctx.lineTo(x - 6, y + 10);
-  } else {
-    ctx.moveTo(x - 10, y);
-    ctx.lineTo(x + 6, y - 10);
-    ctx.lineTo(x + 6, y + 10);
-  }
-  ctx.closePath();
-  ctx.fill();
-}
-
-// ========== 画面外指示器 ==========
-function drawOffscreenIndicator(relAngle, W, H) {
-  // 在屏幕边缘绘制指向声源的箭头
-  const cx = W / 2, cy = H / 2;
-  
-  // 将角度转换为屏幕方向（relAngle 是水平角度）
-  // 正 = 声源在右边，负 = 左边
-  const margin = 40;
-  let ax, ay;
-  
-  if (relAngle > 0) {
-    ax = W - margin;
-    ay = Math.max(margin + 40, Math.min(H - margin - 80, cy));
-  } else {
-    ax = margin;
-    ay = Math.max(margin + 40, Math.min(H - margin - 80, cy));
-  }
-  
-  const intensity = S.soundIntensity;
-  const color = intensity > 0.65 ? '#ef4444' : intensity > 0.35 ? '#f59e0b' : '#22c55e';
+  const pulse = 0.6 + Math.sin(now / 200) * 0.4;
   
   // 箭头
-  const now = Date.now();
-  const pulse = 0.7 + Math.sin(now / 200) * 0.3;
-  
   ctx.save();
-  ctx.translate(ax, ay);
-  ctx.rotate(relAngle > 0 ? 0 : Math.PI);
+  ctx.translate(x, y);
+  ctx.rotate(angle);
   
-  ctx.fillStyle = color;
   ctx.globalAlpha = pulse;
+  ctx.fillStyle = color;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 10;
   ctx.beginPath();
-  ctx.moveTo(18, 0);
+  ctx.moveTo(20, 0);
   ctx.lineTo(-8, -12);
   ctx.lineTo(-3, 0);
   ctx.lineTo(-8, 12);
   ctx.closePath();
   ctx.fill();
-  
+  ctx.shadowBlur = 0;
   ctx.globalAlpha = 1;
   ctx.restore();
   
+  // 热力光晕
+  const grad = ctx.createRadialGradient(x, y, 0, x, y, 40);
+  grad.addColorStop(0, `rgba(${rgb},${0.3 * pulse})`);
+  grad.addColorStop(1, `rgba(${rgb},0)`);
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(x, y, 40, 0, Math.PI * 2);
+  ctx.fill();
+  
   // 文字
-  ctx.font = 'bold 11px -apple-system, sans-serif';
-  ctx.fillStyle = color;
-  ctx.textAlign = 'center';
-  ctx.fillText(`声源 ${Math.abs(relAngle).toFixed(0)}°`, ax, ay + 26);
+  if (S.soundDir) {
+    const angle2 = vectorToHeading(S.soundDir);
+    ctx.font = 'bold 11px -apple-system, sans-serif';
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.fillText(`声源 ${angle2.toFixed(0)}°`, x, y + 28);
+  }
 }
 
-// ========== 底部方向条 ==========
-function drawDirectionBar(W, H) {
-  if (S.soundWorldAngle === null) return;
-  
-  const barY = H - 90;
-  const barH = 4;
-  const barW = W - 40;
-  const barX = 20;
-  
-  // 背景
-  ctx.fillStyle = 'rgba(0,0,0,0.5)';
-  roundRect(ctx, barX - 4, barY - 14, barW + 8, barH + 28, 6);
-  ctx.fill();
-  
-  // 刻度
-  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-  ctx.lineWidth = 1;
-  ctx.fillStyle = 'rgba(255,255,255,0.5)';
-  ctx.font = '9px -apple-system, sans-serif';
+function drawBehindIndicator(W, H) {
+  ctx.font = 'bold 13px -apple-system, sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
   ctx.textAlign = 'center';
+  ctx.fillText('声源在背后 · 请转身', W / 2, H / 2 + 80);
+}
+
+// ============ 中心脉冲 ============
+function drawCenterPulse(W, H) {
+  const cx = W / 2, cy = H / 2;
+  const now = Date.now();
+  const intensity = S.smoothLevel;
   
-  for (let a = 0; a < 360; a += 45) {
-    const px = barX + (a / 360) * barW;
+  for (let i = 0; i < 2; i++) {
+    const phase = ((now / 1400 + i * 0.5) % 1);
+    const r = 25 + phase * 70;
+    const a = (1 - phase) * intensity * 0.7;
+    ctx.strokeStyle = `rgba(251, 191, 36, ${a})`;
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(px, barY);
-    ctx.lineTo(px, barY + barH);
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.stroke();
-    
-    const dirs = ['N','NE','E','SE','S','SW','W','NW'];
-    ctx.fillText(dirs[a/45], px, barY - 4);
   }
   
-  // 当前朝向（白色三角）
-  const headX = barX + (S.heading / 360) * barW;
-  ctx.fillStyle = '#fff';
+  ctx.font = '12px -apple-system, sans-serif';
+  ctx.fillStyle = 'rgba(251, 191, 36, 0.85)';
+  ctx.textAlign = 'center';
+  ctx.fillText('检测到声音 · 请水平旋转手机', cx, cy + 70);
+}
+
+// ============ 画面边角 ============
+function drawFrameCorners(W, H) {
+  const len = 28;
+  const m = 14;
+  ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+  ctx.lineWidth = 2;
+  
   ctx.beginPath();
-  ctx.moveTo(headX, barY + barH + 2);
-  ctx.lineTo(headX - 4, barY + barH + 8);
-  ctx.lineTo(headX + 4, barY + barH + 8);
-  ctx.closePath();
-  ctx.fill();
-  
-  // FOV 范围（半透明）
-  const fovLeft = barX + (((S.heading - S.cameraFOV/2 + 360) % 360) / 360) * barW;
-  const fovRight = barX + (((S.heading + S.cameraFOV/2) % 360) / 360) * barW;
-  ctx.fillStyle = 'rgba(96, 165, 250, 0.2)';
-  if (fovRight > fovLeft) {
-    ctx.fillRect(fovLeft, barY, fovRight - fovLeft, barH);
-  } else {
-    ctx.fillRect(fovLeft, barY, barX + barW - fovLeft, barH);
-    ctx.fillRect(barX, barY, fovRight - barX, barH);
-  }
-  
-  // 声源位置（彩色圆点）
-  const srcX = barX + (S.soundWorldAngle / 360) * barW;
-  const intensity = S.soundIntensity;
-  const color = intensity > 0.65 ? '#ef4444' : intensity > 0.35 ? '#f59e0b' : '#22c55e';
-  
-  ctx.fillStyle = color;
-  ctx.shadowColor = color;
-  ctx.shadowBlur = 8;
-  ctx.beginPath();
-  ctx.arc(srcX, barY + barH / 2, 5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.shadowBlur = 0;
-  
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.arc(srcX, barY + barH / 2, 5, 0, Math.PI * 2);
+  ctx.moveTo(m, m + len); ctx.lineTo(m, m); ctx.lineTo(m + len, m);
+  ctx.moveTo(W - m - len, m); ctx.lineTo(W - m, m); ctx.lineTo(W - m, m + len);
+  ctx.moveTo(m, H - m - len); ctx.lineTo(m, H - m); ctx.lineTo(m + len, H - m);
+  ctx.moveTo(W - m - len, H - m); ctx.lineTo(W - m, H - m); ctx.lineTo(W - m, H - m - len);
   ctx.stroke();
 }
 
-// ========== Toast ==========
+// ============ 雷达小图 ============
+function renderRadar() {
+  const W = 220, H = 220;
+  const cx = W / 2, cy = H / 2;
+  const R = 90;
+  
+  rctx.clearRect(0, 0, W, H);
+  
+  // 背景圆
+  rctx.fillStyle = 'rgba(0,0,0,0.3)';
+  rctx.beginPath();
+  rctx.arc(cx, cy, R, 0, Math.PI * 2);
+  rctx.fill();
+  
+  // 同心圆
+  rctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  rctx.lineWidth = 1;
+  for (let i = 1; i <= 3; i++) {
+    rctx.beginPath();
+    rctx.arc(cx, cy, R * i / 3, 0, Math.PI * 2);
+    rctx.stroke();
+  }
+  
+  // 十字线
+  rctx.beginPath();
+  rctx.moveTo(cx - R, cy); rctx.lineTo(cx + R, cy);
+  rctx.moveTo(cx, cy - R); rctx.lineTo(cx, cy + R);
+  rctx.stroke();
+  
+  // 方向标签
+  rctx.font = 'bold 10px -apple-system, sans-serif';
+  rctx.textAlign = 'center';
+  rctx.textBaseline = 'middle';
+  rctx.fillStyle = '#ef4444';
+  rctx.fillText('N', cx, cy - R + 8);
+  rctx.fillStyle = 'rgba(255,255,255,0.6)';
+  rctx.fillText('E', cx + R - 8, cy);
+  rctx.fillText('S', cx, cy + R - 8);
+  rctx.fillText('W', cx - R + 8, cy);
+  
+  // 扫描轨迹（历史样本）
+  if (S.samples.length > 0) {
+    rctx.strokeStyle = 'rgba(251, 191, 36, 0.4)';
+    rctx.lineWidth = 1.5;
+    rctx.beginPath();
+    let first = true;
+    S.samples.forEach(s => {
+      const h = s.heading * Math.PI / 180;
+      // 雷达图：北=上，顺时针
+      // 雷达坐标：x = sin(h), y = -cos(h)
+      const rx = cx + Math.sin(h) * R * 0.85;
+      const ry = cy - Math.cos(h) * R * 0.85;
+      if (first) { rctx.moveTo(rx, ry); first = false; }
+      else rctx.lineTo(rx, ry);
+    });
+    rctx.stroke();
+    
+    // 采样点（按强度着色）
+    S.samples.forEach(s => {
+      const h = s.heading * Math.PI / 180;
+      const rx = cx + Math.sin(h) * R * 0.85;
+      const ry = cy - Math.cos(h) * R * 0.85;
+      const alpha = 0.3 + s.level * 0.7;
+      const color = s.level > 0.5 ? `rgba(239,68,68,${alpha})` : 
+                    s.level > 0.25 ? `rgba(245,158,11,${alpha})` : 
+                    `rgba(34,197,94,${alpha})`;
+      rctx.fillStyle = color;
+      rctx.beginPath();
+      rctx.arc(rx, ry, 2 + s.level * 2, 0, Math.PI * 2);
+      rctx.fill();
+    });
+  }
+  
+  // 声源方向
+  if (S.soundDir) {
+    const angle = vectorToHeading(S.soundDir);
+    const h = angle * Math.PI / 180;
+    const sx = cx + Math.sin(h) * R * 0.85;
+    const sy = cy - Math.cos(h) * R * 0.85;
+    
+    const intensity = S.smoothLevel;
+    const color = intensity > 0.6 ? '#ef4444' : intensity > 0.3 ? '#f59e0b' : '#22c55e';
+    
+    // 连线
+    rctx.strokeStyle = color;
+    rctx.lineWidth = 1.5;
+    rctx.setLineDash([3, 3]);
+    rctx.beginPath();
+    rctx.moveTo(cx, cy);
+    rctx.lineTo(sx, sy);
+    rctx.stroke();
+    rctx.setLineDash([]);
+    
+    // 声源点
+    rctx.fillStyle = color;
+    rctx.shadowColor = color;
+    rctx.shadowBlur = 8;
+    rctx.beginPath();
+    rctx.arc(sx, sy, 5, 0, Math.PI * 2);
+    rctx.fill();
+    rctx.shadowBlur = 0;
+    rctx.strokeStyle = '#fff';
+    rctx.lineWidth = 1.5;
+    rctx.stroke();
+  }
+  
+  // 当前朝向（三角）
+  const ch = S.compass * Math.PI / 180;
+  const tx = cx + Math.sin(ch) * (R - 4);
+  const ty = cy - Math.cos(ch) * (R - 4);
+  
+  rctx.save();
+  rctx.translate(tx, ty);
+  rctx.rotate(ch);
+  rctx.fillStyle = '#60a5fa';
+  rctx.beginPath();
+  rctx.moveTo(0, -6);
+  rctx.lineTo(-4, 4);
+  rctx.lineTo(4, 4);
+  rctx.closePath();
+  rctx.fill();
+  rctx.restore();
+  
+  // 中心点
+  rctx.fillStyle = '#fff';
+  rctx.beginPath();
+  rctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
+  rctx.fill();
+}
+
+// ============ Toast ============
 let toastTimer;
 function toast(msg) {
   const el = document.getElementById('toast');
@@ -1144,7 +1398,6 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
 }
 
-// 初始化 canvas
 resizeCanvas();
 </script>
 </body>
