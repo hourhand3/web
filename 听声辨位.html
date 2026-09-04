@@ -1,0 +1,1270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>声源定位检测器</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #000;
+    color: #fff;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    position: relative;
+  }
+  
+  #cameraVideo {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    z-index: 1;
+  }
+  
+  #overlayCanvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 2;
+    pointer-events: none;
+  }
+  
+  #compassCanvas {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 3;
+    pointer-events: none;
+    opacity: 0.9;
+  }
+  
+  .top-bar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    z-index: 10;
+    padding: 12px 16px;
+    padding-top: max(12px, env(safe-area-inset-top));
+    background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  
+  .device-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    opacity: 0.9;
+  }
+  
+  .device-info .icon {
+    width: 16px; height: 16px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  
+  .status-badges {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  
+  .badge {
+    padding: 3px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  
+  .badge.active { background: rgba(34, 197, 94, 0.3); color: #4ade80; }
+  .badge.inactive { background: rgba(239, 68, 68, 0.3); color: #f87171; }
+  .badge.warning { background: rgba(234, 179, 8, 0.3); color: #facc15; }
+  
+  .badge .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  
+  .bottom-panel {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    z-index: 10;
+    padding: 16px;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+  }
+  
+  .mode-indicator {
+    text-align: center;
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: #94a3b8;
+  }
+  
+  .mode-indicator strong {
+    color: #60a5fa;
+  }
+  
+  .controls {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+  }
+  
+  .btn {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 24px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  
+  .btn-primary {
+    background: #3b82f6;
+    color: #fff;
+  }
+  
+  .btn-primary:active {
+    background: #2563eb;
+    transform: scale(0.95);
+  }
+  
+  .btn-secondary {
+    background: rgba(255,255,255,0.15);
+    color: #fff;
+    backdrop-filter: blur(10px);
+  }
+  
+  .btn-danger {
+    background: #ef4444;
+    color: #fff;
+  }
+  
+  .btn:disabled {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  
+  .scan-guide {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 15;
+    text-align: center;
+    pointer-events: none;
+    display: none;
+  }
+  
+  .scan-guide.active { display: block; }
+  
+  .scan-guide .arrow {
+    font-size: 48px;
+    animation: pulse 1.5s infinite;
+    margin-bottom: 8px;
+  }
+  
+  .scan-guide .text {
+    font-size: 16px;
+    background: rgba(0,0,0,0.6);
+    padding: 8px 16px;
+    border-radius: 20px;
+    backdrop-filter: blur(10px);
+  }
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.1); }
+  }
+  
+  .level-meter {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+    width: 24px;
+    height: 200px;
+    background: rgba(0,0,0,0.4);
+    border-radius: 12px;
+    overflow: hidden;
+    backdrop-filter: blur(10px);
+  }
+  
+  .level-meter-fill {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: linear-gradient(to top, #22c55e, #eab308, #ef4444);
+    transition: height 0.1s;
+    border-radius: 12px;
+  }
+  
+  .level-meter-label {
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: #94a3b8;
+    white-space: nowrap;
+  }
+  
+  .direction-info {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+    background: rgba(0,0,0,0.5);
+    padding: 8px 12px;
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+    font-size: 11px;
+    line-height: 1.6;
+  }
+  
+  .direction-info .label {
+    color: #94a3b8;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .direction-info .value {
+    color: #fff;
+    font-weight: 600;
+    font-size: 13px;
+  }
+  
+  .startup-screen {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 100;
+    background: linear-gradient(135deg, #0f172a, #1e293b);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+    text-align: center;
+  }
+  
+  .startup-screen.hidden { display: none; }
+  
+  .startup-screen h1 {
+    font-size: 24px;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #60a5fa, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  
+  .startup-screen p {
+    font-size: 13px;
+    color: #94a3b8;
+    margin-bottom: 24px;
+    line-height: 1.6;
+  }
+  
+  .startup-screen .features {
+    text-align: left;
+    margin-bottom: 32px;
+    width: 100%;
+    max-width: 300px;
+  }
+  
+  .startup-screen .feature-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    font-size: 13px;
+    color: #cbd5e1;
+  }
+  
+  .startup-screen .feature-icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: rgba(96, 165, 250, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  
+  .permission-list {
+    width: 100%;
+    max-width: 300px;
+    margin-bottom: 24px;
+  }
+  
+  .permission-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 10px;
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+  
+  .permission-status {
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  
+  .permission-status.granted { background: rgba(34,197,94,0.2); color: #4ade80; }
+  .permission-status.pending { background: rgba(234,179,8,0.2); color: #facc15; }
+  .permission-status.denied { background: rgba(239,68,68,0.2); color: #f87171; }
+  
+  .start-btn {
+    padding: 14px 40px;
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    border: none;
+    border-radius: 28px;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  
+  .start-btn:active {
+    transform: scale(0.95);
+  }
+  
+  .start-btn:disabled {
+    opacity: 0.5;
+  }
+  
+  .mic-positions {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 4;
+    pointer-events: none;
+  }
+  
+  .mic-dot {
+    position: absolute;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #60a5fa;
+    border: 2px solid #fff;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 8px rgba(96,165,250,0.5);
+  }
+  
+  .mic-dot::after {
+    content: attr(data-label);
+    position: absolute;
+    top: -16px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 8px;
+    color: #60a5fa;
+    white-space: nowrap;
+    background: rgba(0,0,0,0.6);
+    padding: 1px 4px;
+    border-radius: 4px;
+  }
+  
+  .toast {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 50;
+    background: rgba(0,0,0,0.8);
+    padding: 12px 24px;
+    border-radius: 20px;
+    font-size: 14px;
+    backdrop-filter: blur(10px);
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<video id="cameraVideo" autoplay playsinline muted></video>
+<canvas id="overlayCanvas"></canvas>
+<canvas id="compassCanvas" width="120" height="120"></canvas>
+
+<div class="mic-positions" id="micPositions"></div>
+
+<div class="top-bar">
+  <div class="device-info">
+    <span class="icon">📱</span>
+    <span id="deviceName">检测设备中...</span>
+  </div>
+  <div class="status-badges" id="statusBadges"></div>
+</div>
+
+<div class="direction-info" id="directionInfo">
+  <div><span class="label">声源方位</span></div>
+  <div class="value" id="soundDirection">--</div>
+  <div style="margin-top:4px"><span class="label">声音强度</span></div>
+  <div class="value" id="soundLevel">-- dB</div>
+  <div style="margin-top:4px"><span class="label">手机朝向</span></div>
+  <div class="value" id="phoneHeading">--°</div>
+</div>
+
+<div class="level-meter">
+  <div class="level-meter-fill" id="levelFill" style="height:0%"></div>
+  <div class="level-meter-label">音量</div>
+</div>
+
+<div class="scan-guide" id="scanGuide">
+  <div class="arrow" id="scanArrow">↻</div>
+  <div class="text" id="scanText">请缓慢旋转手机</div>
+</div>
+
+<div class="bottom-panel">
+  <div class="mode-indicator" id="modeIndicator">
+    模式: <strong id="modeText">等待启动</strong>
+  </div>
+  <div class="controls">
+    <button class="btn btn-primary" id="btnStart" onclick="startDetection()">🎯 开始检测</button>
+    <button class="btn btn-secondary" id="btnCalibrate" onclick="startCalibration()" disabled>📐 校准</button>
+    <button class="btn btn-secondary" id="btnSettings" onclick="toggleSettings()">⚙️</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="startup-screen" id="startupScreen">
+  <h1>🎯 声源定位检测器</h1>
+  <p>利用手机多麦克风和传感器<br>精准定位声源方向</p>
+  <div class="features">
+    <div class="feature-item">
+      <div class="feature-icon">🎤</div>
+      <span>多麦克风阵列分析</span>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon">📷</div>
+      <span>摄像头画面实时叠加</span>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon">🧭</div>
+      <span>陀螺仪方向感知</span>
+    </div>
+    <div class="feature-item">
+      <div class="feature-icon">🔄</div>
+      <span>旋转扫描定位模式</span>
+    </div>
+  </div>
+  <div class="permission-list" id="permissionList">
+    <div class="permission-item">
+      <span>📷 摄像头权限</span>
+      <span class="permission-status pending" id="permCamera">待授权</span>
+    </div>
+    <div class="permission-item">
+      <span>🎤 麦克风权限</span>
+      <span class="permission-status pending" id="permMic">待授权</span>
+    </div>
+    <div class="permission-item">
+      <span>🧭 传感器权限</span>
+      <span class="permission-status pending" id="permSensor">待授权</span>
+    </div>
+  </div>
+  <button class="start-btn" id="btnInit" onclick="initializeApp()">启动应用</button>
+</div>
+
+<script>
+// ===== 全局状态 =====
+const state = {
+  device: null,
+  micCount: 0,
+  micPositions: [],
+  audioContext: null,
+  analyserNodes: [],
+  mediaStreams: [],
+  cameraStream: null,
+  isDetecting: false,
+  isCalibrating: false,
+  orientation: { alpha: 0, beta: 0, gamma: 0 },
+  motion: { x: 0, y: 0, z: 0 },
+  soundSources: [],
+  scanData: [],
+  lastHeading: 0,
+  mode: 'idle' // idle, multi_mic, scan
+};
+
+// ===== 手机型号数据库 =====
+const phoneDatabase = {
+  'iPhone': {
+    mics: [
+      { name: '底部', x: 50, y: 97, sensitivity: 1.0 },
+      { name: '顶部', x: 50, y: 3, sensitivity: 0.9 },
+      { name: '后置', x: 35, y: 12, sensitivity: 0.85 }
+    ],
+    detect: (ua) => /iPhone/.test(ua)
+  },
+  'iPhone Pro': {
+    mics: [
+      { name: '底部', x: 50, y: 97, sensitivity: 1.0 },
+      { name: '顶部', x: 50, y: 3, sensitivity: 0.95 },
+      { name: '后置', x: 30, y: 10, sensitivity: 0.9 },
+      { name: 'LiDAR旁', x: 35, y: 14, sensitivity: 0.85 }
+    ],
+    detect: (ua) => /iPhone.*Pro/.test(ua) || /iPhone1[3-6],/.test(ua)
+  },
+  'Samsung Galaxy': {
+    mics: [
+      { name: '底部', x: 50, y: 97, sensitivity: 1.0 },
+      { name: '顶部', x: 50, y: 3, sensitivity: 0.9 }
+    ],
+    detect: (ua) => /SM-|Samsung|Galaxy/i.test(ua)
+  },
+  'Huawei': {
+    mics: [
+      { name: '底部', x: 50, y: 97, sensitivity: 1.0 },
+      { name: '顶部', x: 50, y: 3, sensitivity: 0.9 },
+      { name: '后置', x: 50, y: 15, sensitivity: 0.85 }
+    ],
+    detect: (ua) => /Huawei|HUAWEI|ALN|NOH/i.test(ua)
+  },
+  'Xiaomi': {
+    mics: [
+      { name: '底部', x: 50, y: 97, sensitivity: 1.0 },
+      { name: '顶部', x: 50, y: 3, sensitivity: 0.9 }
+    ],
+    detect: (ua) => /Xiaomi|Redmi|MI\s/i.test(ua)
+  },
+  'Generic Android': {
+    mics: [
+      { name: '底部', x: 50, y: 97, sensitivity: 1.0 },
+      { name: '顶部', x: 50, y: 3, sensitivity: 0.85 }
+    ],
+    detect: () => true
+  }
+};
+
+// ===== 设备检测 =====
+function detectDevice() {
+  const ua = navigator.userAgent;
+  for (const [name, info] of Object.entries(phoneDatabase)) {
+    if (info.detect(ua)) {
+      return { name, ...info };
+    }
+  }
+  return { name: '未知设备', ...phoneDatabase['Generic Android'] };
+}
+
+// ===== 初始化 =====
+async function initializeApp() {
+  const btn = document.getElementById('btnInit');
+  btn.disabled = true;
+  btn.textContent = '初始化中...';
+  
+  try {
+    // 检测摄像头
+    await initCamera();
+    document.getElementById('permCamera').textContent = '已授权';
+    document.getElementById('permCamera').className = 'permission-status granted';
+    
+    // 检测麦克风
+    await initMicrophones();
+    document.getElementById('permMic').textContent = '已授权';
+    document.getElementById('permMic').className = 'permission-status granted';
+    
+    // 检测传感器
+    await initSensors();
+    document.getElementById('permSensor').textContent = '已授权';
+    document.getElementById('permSensor').className = 'permission-status granted';
+    
+    // 检测设备
+    state.device = detectDevice();
+    state.micPositions = state.device.mics;
+    state.micCount = state.device.mics.length;
+    
+    document.getElementById('deviceName').textContent = state.device.name;
+    updateStatusBadges();
+    renderMicPositions();
+    
+    // 隐藏启动画面
+    setTimeout(() => {
+      document.getElementById('startupScreen').classList.add('hidden');
+    }, 500);
+    
+    showToast('✅ 初始化完成');
+    
+  } catch (err) {
+    console.error('初始化失败:', err);
+    showToast('❌ ' + err.message);
+    btn.disabled = false;
+    btn.textContent = '重试';
+  }
+}
+
+// ===== 摄像头初始化 =====
+async function initCamera() {
+  const constraints = {
+    video: {
+      facingMode: 'environment',
+      width: { ideal: 1920 },
+      height: { ideal: 1080 }
+    }
+  };
+  
+  state.cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+  const video = document.getElementById('cameraVideo');
+  video.srcObject = state.cameraStream;
+  
+  // 设置Canvas尺寸
+  setTimeout(() => {
+    resizeCanvases();
+  }, 500);
+}
+
+// ===== 麦克风初始化 =====
+async function initMicrophones() {
+  state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  
+  // 尝试获取多个麦克风
+  // 注意：浏览器通常只允许访问一个麦克风流
+  // 但我们可以通过枚举设备来检测可用麦克风数量
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  const audioInputs = devices.filter(d => d.kind === 'audioinput');
+  
+  console.log('检测到的音频输入设备:', audioInputs.length);
+  
+  // 获取主麦克风流
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: {
+      echoCancellation: false,
+      noiseSuppression: false,
+      autoGainControl: false,
+      channelCount: Math.max(1, audioInputs.length)
+    }
+  });
+  
+  state.mediaStreams.push(stream);
+  
+  // 创建分析器
+  const source = state.audioContext.createMediaStreamSource(stream);
+  const channelCount = source.channelCount || 1;
+  
+  console.log('音频通道数:', channelCount);
+  
+  // 为每个通道创建分析器
+  const splitter = state.audioContext.createChannelSplitter(channelCount);
+  source.connect(splitter);
+  
+  for (let i = 0; i < Math.min(channelCount, state.micPositions.length); i++) {
+    const analyser = state.audioContext.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.8;
+    splitter.connect(analyser, i);
+    state.analyserNodes.push(analyser);
+  }
+  
+  // 如果没有多通道，至少有一个分析器
+  if (state.analyserNodes.length === 0) {
+    const analyser = state.audioContext.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.8;
+    source.connect(analyser);
+    state.analyserNodes.push(analyser);
+  }
+  
+  state.micCount = Math.max(state.analyserNodes.length, 1);
+}
+
+// ===== 传感器初始化 =====
+async function initSensors() {
+  // 请求方向传感器权限（iOS需要）
+  if (typeof DeviceOrientationEvent !== 'undefined' && 
+      typeof DeviceOrientationEvent.requestPermission === 'function') {
+    const perm = await DeviceOrientationEvent.requestPermission();
+    if (perm !== 'granted') {
+      throw new Error('方向传感器权限被拒绝');
+    }
+  }
+  
+  if (typeof DeviceMotionEvent !== 'undefined' && 
+      typeof DeviceMotionEvent.requestPermission === 'function') {
+    const perm = await DeviceMotionEvent.requestPermission();
+    if (perm !== 'granted') {
+      throw new Error('运动传感器权限被拒绝');
+    }
+  }
+  
+  // 监听方向
+  window.addEventListener('deviceorientation', (e) => {
+    state.orientation.alpha = e.alpha || 0;  // 罗盘方向 0-360
+    state.orientation.beta = e.beta || 0;     // 前后倾斜 -180 to 180
+    state.orientation.gamma = e.gamma || 0;   // 左右倾斜 -90 to 90
+  });
+  
+  // 监听绝对方向（如果有）
+  window.addEventListener('deviceorientationabsolute', (e) => {
+    if (e.absolute) {
+      state.orientation.alpha = e.alpha || 0;
+    }
+  });
+  
+  // 监听运动
+  window.addEventListener('devicemotion', (e) => {
+    const acc = e.accelerationIncludingGravity || {};
+    state.motion.x = acc.x || 0;
+    state.motion.y = acc.y || 0;
+    state.motion.z = acc.z || 0;
+    
+    // 检测旋转动作
+    const rot = e.rotationRate || {};
+    state.rotationRate = {
+      alpha: rot.alpha || 0,
+      beta: rot.beta || 0,
+      gamma: rot.gamma || 0
+    };
+  });
+}
+
+// ===== Canvas 尺寸调整 =====
+function resizeCanvases() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  
+  const overlay = document.getElementById('overlayCanvas');
+  overlay.width = w;
+  overlay.height = h;
+  
+  const compass = document.getElementById('compassCanvas');
+  compass.width = 120;
+  compass.height = 120;
+}
+
+window.addEventListener('resize', resizeCanvases);
+
+// ===== 状态徽章更新 =====
+function updateStatusBadges() {
+  const container = document.getElementById('statusBadges');
+  container.innerHTML = `
+    <div class="badge active"><span class="dot"></span>🎤 ${state.micCount}个麦克风</div>
+    <div class="badge active"><span class="dot"></span>📷 摄像头</div>
+    <div class="badge active"><span class="dot"></span>🧭 传感器</div>
+    ${state.micCount >= 3 ? 
+      '<div class="badge active"><span class="dot"></span>多麦阵列</div>' : 
+      '<div class="badge warning"><span class="dot"></span>需旋转扫描</div>'
+    }
+  `;
+}
+
+// ===== 渲染麦克风位置 =====
+function renderMicPositions() {
+  const container = document.getElementById('micPositions');
+  container.innerHTML = '';
+  
+  state.micPositions.forEach((mic, i) => {
+    const dot = document.createElement('div');
+    dot.className = 'mic-dot';
+    dot.setAttribute('data-label', mic.name);
+    dot.style.left = mic.x + '%';
+    dot.style.top = mic.y + '%';
+    container.appendChild(dot);
+  });
+}
+
+// ===== 开始检测 =====
+function startDetection() {
+  if (state.isDetecting) {
+    stopDetection();
+    return;
+  }
+  
+  state.isDetecting = true;
+  document.getElementById('btnStart').textContent = '⏹ 停止';
+  document.getElementById('btnStart').className = 'btn btn-danger';
+  document.getElementById('btnCalibrate').disabled = false;
+  
+  if (state.micCount >= 3) {
+    state.mode = 'multi_mic';
+    document.getElementById('modeText').textContent = '多麦克风阵列模式';
+    showToast('🎯 多麦克风阵列模式已启动');
+  } else {
+    state.mode = 'scan';
+    document.getElementById('modeText').textContent = '旋转扫描模式';
+    document.getElementById('scanGuide').classList.add('active');
+    showToast('🔄 请缓慢旋转手机扫描声源');
+  }
+  
+  requestAnimationFrame(detectionLoop);
+}
+
+function stopDetection() {
+  state.isDetecting = false;
+  state.isCalibrating = false;
+  document.getElementById('btnStart').textContent = '🎯 开始检测';
+  document.getElementById('btnStart').className = 'btn btn-primary';
+  document.getElementById('scanGuide').classList.remove('active');
+  state.mode = 'idle';
+  document.getElementById('modeText').textContent = '已停止';
+  
+  // 清除画布
+  const canvas = document.getElementById('overlayCanvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+// ===== 校准模式 =====
+function startCalibration() {
+  state.isCalibrating = !state.isCalibrating;
+  const btn = document.getElementById('btnCalibrate');
+  
+  if (state.isCalibrating) {
+    btn.textContent = '⏹ 停止校准';
+    btn.className = 'btn btn-danger';
+    state.scanData = [];
+    showToast('📐 请缓慢旋转手机360°进行校准');
+  } else {
+    btn.textContent = '📐 校准';
+    btn.className = 'btn btn-secondary';
+    showToast('✅ 校准完成');
+  }
+}
+
+// ===== 核心检测循环 =====
+function detectionLoop() {
+  if (!state.isDetecting) return;
+  
+  // 获取音频数据
+  const levels = state.analyserNodes.map(analyser => {
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(data);
+    
+    // 计算总体音量
+    let sum = 0;
+    for (let i = 0; i < data.length; i++) {
+      sum += data[i];
+    }
+    const avg = sum / data.length;
+    
+    // 检测高频成分（鸣笛通常在2000-5000Hz）
+    const sampleRate = state.audioContext.sampleRate;
+    const binSize = sampleRate / analyser.fftSize;
+    const lowBin = Math.floor(2000 / binSize);
+    const highBin = Math.floor(5000 / binSize);
+    
+    let highSum = 0;
+    let highCount = 0;
+    for (let i = lowBin; i <= Math.min(highBin, data.length - 1); i++) {
+      highSum += data[i];
+      highCount++;
+    }
+    const highAvg = highCount > 0 ? highSum / highCount : 0;
+    
+    return { overall: avg, highFreq: highAvg, data: Array.from(data) };
+  });
+  
+  // 更新UI
+  const maxLevel = Math.max(...levels.map(l => l.overall));
+  const dbLevel = maxLevel > 0 ? 20 * Math.log10(maxLevel / 255) + 90 : 0;
+  
+  document.getElementById('levelFill').style.height = (maxLevel / 255 * 100) + '%';
+  document.getElementById('soundLevel').textContent = dbLevel.toFixed(1) + ' dB';
+  
+  // 更新手机朝向
+  const heading = state.orientation.alpha;
+  document.getElementById('phoneHeading').textContent = heading.toFixed(0) + '°';
+  
+  // 声源定位
+  if (state.mode === 'multi_mic') {
+    processMultiMicMode(levels, heading);
+  } else if (state.mode === 'scan') {
+    processScanMode(levels, heading);
+  }
+  
+  // 渲染
+  renderOverlay();
+  renderCompass();
+  
+  requestAnimationFrame(detectionLoop);
+}
+
+// ===== 多麦克风模式处理 =====
+function processMultiMicMode(levels, heading) {
+  if (levels.length < 2) {
+    // 单麦克风退化为扫描模式
+    processScanMode(levels, heading);
+    return;
+  }
+  
+  // 计算各麦克风之间的强度差
+  const maxLevel = Math.max(...levels.map(l => l.highFreq));
+  
+  if (maxLevel < 30) {
+    // 声音太弱，不处理
+    state.soundSources = [];
+    document.getElementById('soundDirection').textContent = '无信号';
+    return;
+  }
+  
+  // 使用强度差估算方向
+  // 结合麦克风位置信息
+  let dirX = 0, dirY = 0, totalWeight = 0;
+  
+  levels.forEach((level, i) => {
+    if (i < state.micPositions.length) {
+      const mic = state.micPositions[i];
+      const weight = level.highFreq / 255;
+      
+      // 麦克风位置归一化到 -1 ~ 1
+      const mx = (mic.x - 50) / 50;
+      const my = (mic.y - 50) / 50;
+      
+      dirX += mx * weight;
+      dirY += my * weight;
+      totalWeight += weight;
+    }
+  });
+  
+  if (totalWeight > 0) {
+    dirX /= totalWeight;
+    dirY /= totalWeight;
+  }
+  
+  // 计算角度（相对于手机）
+  let angle = Math.atan2(dirX, -dirY) * 180 / Math.PI;
+  
+  // 结合手机朝向得到绝对方向
+  let absoluteAngle = (angle + heading) % 360;
+  if (absoluteAngle < 0) absoluteAngle += 360;
+  
+  // 强度
+  const intensity = maxLevel / 255;
+  
+  // 更新声源
+  state.soundSources = [{
+    angle: absoluteAngle,
+    relativeAngle: angle,
+    intensity: intensity,
+    x: 0.5 + dirX * 0.3,
+    y: 0.5 + dirY * 0.3,
+    freq: maxLevel
+  }];
+  
+  // 更新UI
+  const dirNames = ['北', '东北', '东', '东南', '南', '西南', '西', '西北'];
+  const dirIndex = Math.round(absoluteAngle / 45) % 8;
+  document.getElementById('soundDirection').textContent = 
+    `${dirNames[dirIndex]} ${absoluteAngle.toFixed(0)}°`;
+}
+
+// ===== 扫描模式处理 =====
+function processScanMode(levels, heading) {
+  const maxLevel = Math.max(...levels.map(l => l.highFreq));
+  
+  if (maxLevel < 25) {
+    document.getElementById('soundDirection').textContent = '等待声源...';
+    return;
+  }
+  
+  // 记录当前朝向和音量
+  const now = Date.now();
+  state.scanData.push({
+    heading: heading,
+    level: maxLevel,
+    time: now
+  });
+  
+  // 只保留最近5秒的数据
+  state.scanData = state.scanData.filter(d => now - d.time < 5000);
+  
+  // 找到音量最大的方向
+  if (state.scanData.length >= 10) {
+    let maxDir = 0, maxVal = 0;
+    let weightedX = 0, weightedY = 0, totalW = 0;
+    
+    state.scanData.forEach(d => {
+      const rad = d.heading * Math.PI / 180;
+      const w = Math.pow(d.level / 255, 2); // 平方加权
+      weightedX += Math.sin(rad) * w;
+      weightedY += Math.cos(rad) * w;
+      totalW += w;
+      
+      if (d.level > maxVal) {
+        maxVal = d.level;
+        maxDir = d.heading;
+      }
+    });
+    
+    if (totalW > 0) {
+      weightedX /= totalW;
+      weightedY /= totalW;
+      
+      let bestAngle = Math.atan2(weightedX, weightedY) * 180 / Math.PI;
+      if (bestAngle < 0) bestAngle += 360;
+      
+      const intensity = maxVal / 255;
+      
+      state.soundSources = [{
+        angle: bestAngle,
+        relativeAngle: (bestAngle - heading + 360) % 360,
+        intensity: intensity,
+        x: 0.5 + Math.sin(bestAngle * Math.PI / 180) * 0.3 * intensity,
+        y: 0.5 - Math.cos(bestAngle * Math.PI / 180) * 0.3 * intensity,
+        freq: maxVal,
+        confidence: Math.min(1, state.scanData.length / 30)
+      }];
+      
+      const dirNames = ['北', '东北', '东', '东南', '南', '西南', '西', '西北'];
+      const dirIndex = Math.round(bestAngle / 45) % 8;
+      document.getElementById('soundDirection').textContent = 
+        `${dirNames[dirIndex]} ${bestAngle.toFixed(0)}°`;
+    }
+  }
+  
+  // 更新扫描引导
+  if (state.scanData.length < 30) {
+    const progress = Math.min(100, (state.scanData.length / 30 * 100)).toFixed(0);
+    document.getElementById('scanText').textContent = 
+      `扫描中... ${progress}% 请旋转手机`;
+    document.getElementById('scanArrow').textContent = '↻';
+  } else {
+    document.getElementById('scanText').textContent = '✅ 声源已定位';
+    document.getElementById('scanArrow').textContent = '🎯';
+  }
+}
+
+// ===== 渲染叠加层 =====
+function renderOverlay() {
+  const canvas = document.getElementById('overlayCanvas');
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+  
+  ctx.clearRect(0, 0, w, h);
+  
+  if (state.soundSources.length === 0) return;
+  
+  state.soundSources.forEach(source => {
+    const cx = source.x * w;
+    const cy = source.y * h;
+    const intensity = source.intensity;
+    const radius = 30 + intensity * 80;
+    
+    // 根据强度选择颜色
+    let color, glowColor;
+    if (intensity > 0.7) {
+      color = 'rgba(239, 68, 68, '; // 红色 - 强
+      glowColor = '#ef4444';
+    } else if (intensity > 0.4) {
+      color = 'rgba(234, 179, 8, '; // 黄色 - 中
+      glowColor = '#eab308';
+    } else {
+      color = 'rgba(34, 197, 94, '; // 绿色 - 弱
+      glowColor = '#22c55e';
+    }
+    
+    // 绘制热力圈（多层渐变）
+    for (let i = 3; i >= 0; i--) {
+      const r = radius * (1 + i * 0.3);
+      const alpha = intensity * 0.15 * (1 - i * 0.2);
+      
+      const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      gradient.addColorStop(0, color + (alpha * 2) + ')');
+      gradient.addColorStop(0.5, color + alpha + ')');
+      gradient.addColorStop(1, color + '0)');
+      
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fillStyle = gradient;
+      ctx.fill();
+    }
+    
+    // 绘制中心点
+    ctx.beginPath();
+    ctx.arc(cx, cy, 6 + intensity * 4, 0, Math.PI * 2);
+    ctx.fillStyle = glowColor;
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    // 绘制方向箭头
+    if (source.relativeAngle !== undefined) {
+      const arrowLen = 40 + intensity * 30;
+      const angleRad = (source.relativeAngle - 90) * Math.PI / 180;
+      const ax = cx + Math.cos(angleRad) * arrowLen;
+      const ay = cy + Math.sin(angleRad) * arrowLen;
+      
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(ax, ay);
+      ctx.strokeStyle = color + '0.8)';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      
+      // 箭头头部
+      const headLen = 12;
+      const headAngle = 0.4;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(
+        ax - headLen * Math.cos(angleRad - headAngle),
+        ay - headLen * Math.sin(angleRad - headAngle)
+      );
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(
+        ax - headLen * Math.cos(angleRad + headAngle),
+        ay - headLen * Math.sin(angleRad + headAngle)
+      );
+      ctx.stroke();
+    }
+    
+    // 绘制强度标签
+    ctx.font = 'bold 12px sans-serif';
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    const dbVal = (20 * Math.log10(intensity) + 60).toFixed(0);
+    ctx.fillText(`${dbVal}dB`, cx, cy - radius * 0.5 - 10);
+    
+    // 脉冲动画
+    const pulsePhase = (Date.now() % 1500) / 1500;
+    const pulseR = radius * (1 + pulsePhase * 0.5);
+    const pulseAlpha = intensity * 0.3 * (1 - pulsePhase);
+    
+    ctx.beginPath();
+    ctx.arc(cx, cy, pulseR, 0, Math.PI * 2);
+    ctx.strokeStyle = color + pulseAlpha + ')';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  });
+}
+
+// ===== 渲染罗盘 =====
+function renderCompass() {
+  const canvas = document.getElementById('compassCanvas');
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+  const cx = w / 2;
+  const cy = h / 2;
+  const r = 50;
+  
+  ctx.clearRect(0, 0, w, h);
+  
+  // 背景
+  ctx.beginPath();
+  ctx.arc(cx, cy, r + 5, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  
+  // 方向刻度
+  const directions = ['N', 'E', 'S', 'W'];
+  const heading = state.orientation.alpha;
+  
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-heading * Math.PI / 180);
+  
+  for (let i = 0; i < 360; i += 30) {
+    const rad = i * Math.PI / 180;
+    const inner = i % 90 === 0 ? r - 12 : r - 6;
+    
+    ctx.beginPath();
+    ctx.moveTo(Math.sin(rad) * inner, -Math.cos(rad) * inner);
+    ctx.lineTo(Math.sin(rad) * r, -Math.cos(rad) * r);
+    ctx.strokeStyle = i % 90 === 0 ? '#fff' : 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = i % 90 === 0 ? 2 : 1;
+    ctx.stroke();
+  }
+  
+  // 方向文字
+  ctx.font = 'bold 10px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  
+  directions.forEach((dir, i) => {
+    const rad = i * 90 * Math.PI / 180;
+    const tx = Math.sin(rad) * (r - 20);
+    const ty = -Math.cos(rad) * (r - 20);
+    ctx.fillStyle = dir === 'N' ? '#ef4444' : '#fff';
+    ctx.fillText(dir, tx, ty);
+  });
+  
+  // 声源方向指示
+  state.soundSources.forEach(source => {
+    const srcRad = source.angle * Math.PI / 180;
+    const sx = Math.sin(srcRad) * (r + 2);
+    const sy = -Math.cos(srcRad) * (r + 2);
+    
+    ctx.beginPath();
+    ctx.arc(sx, sy, 4, 0, Math.PI * 2);
+    
+    if (source.intensity > 0.7) {
+      ctx.fillStyle = '#ef4444';
+    } else if (source.intensity > 0.4) {
+      ctx.fillStyle = '#eab308';
+    } else {
+      ctx.fillStyle = '#22c55e';
+    }
+    ctx.fill();
+  });
+  
+  ctx.restore();
+  
+  // 中心点（手机位置）
+  ctx.beginPath();
+  ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+  ctx.fillStyle = '#3b82f6';
+  ctx.fill();
+  
+  // 手机朝向三角
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - 12);
+  ctx.lineTo(cx - 5, cy - 4);
+  ctx.lineTo(cx + 5, cy - 4);
+  ctx.closePath();
+  ctx.fillStyle = '#60a5fa';
+  ctx.fill();
+}
+
+// ===== 工具函数 =====
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+function toggleSettings() {
+  showToast('⚙️ 设置功能开发中');
+}
+
+// ===== 初始化Canvas尺寸 =====
+window.addEventListener('load', () => {
+  resizeCanvases();
+});
+
+// 防止双击缩放
+document.addEventListener('dblclick', (e) => e.preventDefault());
+</script>
+</body>
+</html>
