@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HTML 源码转纯文本工具</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.0/index.css">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 24px;
+    color: #1a1a2e;
+  }
+  .container { max-width: 1400px; margin: 0 auto; }
+  .header { text-align: center; color: #fff; margin-bottom: 28px; }
+  .header h1 { font-size: 2.2rem; font-weight: 700; margin-bottom: 8px; }
+  .header p { font-size: 1rem; opacity: 0.9; }
+  .toolbar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; justify-content: space-between; align-items: center; }
+  .btn-group { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn {
+    padding: 10px 18px; border: none; border-radius: 10px; font-size: 0.92rem;
+    font-weight: 600; cursor: pointer; transition: all 0.2s ease;
+    display: inline-flex; align-items: center; gap: 6px; font-family: inherit;
+  }
+  .btn-primary { background: #fff; color: #667eea; box-shadow: 0 4px 14px rgba(0,0,0,0.1); }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.15); }
+  .btn-secondary { background: rgba(255,255,255,0.2); color: #fff; border: 1px solid rgba(255,255,255,0.3); }
+  .btn-secondary:hover { background: rgba(255,255,255,0.3); }
+  .btn-accent { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: #fff; box-shadow: 0 4px 14px rgba(245,87,108,0.3); }
+  .btn-accent:hover { transform: translateY(-2px); }
+  .stats { color: #fff; font-size: 0.88rem; opacity: 0.95; display: flex; gap: 16px; flex-wrap: wrap; }
+  .stats span { font-weight: 600; }
+  .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 900px) { .panels { grid-template-columns: 1fr; } }
+  .panel { background: #fff; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); overflow: hidden; display: flex; flex-direction: column; }
+  .panel-header { padding: 14px 20px; background: linear-gradient(135deg, #f8f9ff 0%, #eef1ff 100%); border-bottom: 1px solid #e5e7f0; display: flex; justify-content: space-between; align-items: center; }
+  .panel-title { font-weight: 700; font-size: 1rem; color: #2d3748; display: flex; align-items: center; gap: 8px; }
+  .panel-title::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+  .panel-badge { font-size: 0.75rem; padding: 3px 10px; border-radius: 20px; background: #fff; color: #667eea; font-weight: 600; border: 1px solid #e5e7f0; }
+  textarea {
+    width: 100%; min-height: 520px; padding: 18px 20px; border: none; outline: none;
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace; font-size: 0.88rem;
+    line-height: 1.6; resize: vertical; color: #2d3748; background: #fff;
+  }
+  textarea::placeholder { color: #a0aec0; }
+  .output-area {
+    min-height: 520px; padding: 18px 20px; font-family: 'Inter', -apple-system, sans-serif;
+    font-size: 0.95rem; line-height: 1.7; color: #2d3748; overflow-y: auto;
+    white-space: pre-wrap; word-break: break-word; background: #fff;
+  }
+  .output-area.empty { color: #a0aec0; font-style: italic; display: flex; align-items: center; justify-content: center; }
+  .options { padding: 12px 20px; background: #fafbff; border-top: 1px solid #e5e7f0; display: flex; gap: 18px; flex-wrap: wrap; font-size: 0.85rem; }
+  .option { display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; color: #4a5568; }
+  .option input { cursor: pointer; accent-color: #667eea; }
+  .toast {
+    position: fixed; top: 24px; left: 50%; transform: translateX(-50%) translateY(-100px);
+    background: #2d3748; color: #fff; padding: 12px 24px; border-radius: 10px;
+    font-size: 0.9rem; font-weight: 500; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    transition: transform 0.3s ease; z-index: 1000;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.success { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
+  .toast.error { background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%); }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>🧹 HTML 源码转纯文本工具</h1>
+    <p>粘贴任意 HTML 源码（含残缺标签），一键提取浏览器可见文本</p>
+  </div>
+
+  <div class="toolbar">
+    <div class="btn-group">
+      <button class="btn btn-primary" id="convertBtn">⚡ 立即转换</button>
+      <button class="btn btn-accent" id="copyBtn">📋 复制结果</button>
+      <button class="btn btn-secondary" id="clearBtn">🗑️ 清空</button>
+      <button class="btn btn-secondary" id="sampleBtn">📄 载入示例</button>
+    </div>
+    <div class="stats">
+      <div>输入：<span id="inputLen">0</span> 字符</div>
+      <div>输出：<span id="outputLen">0</span> 字符</div>
+      <div>清除标签：<span id="tagCount">0</span> 个</div>
+    </div>
+  </div>
+
+  <div class="panels">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">输入 HTML 源码</div>
+        <div class="panel-badge">支持残缺标签</div>
+      </div>
+      <textarea id="input" placeholder="在此粘贴 HTML 源码..."></textarea>
+      <div class="options">
+        <label class="option"><input type="checkbox" id="optScript" checked>移除 script/style</label>
+        <label class="option"><input type="checkbox" id="optSpace" checked>合并多余空白</label>
+        <label class="option"><input type="checkbox" id="optDecode" checked>解码 HTML 实体</label>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">输出纯文本</div>
+        <div class="panel-badge">浏览器可见内容</div>
+      </div>
+      <div class="output-area empty" id="output">转换后的文本将显示在这里...</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function() {
+  var inputEl = document.getElementById('input');
+  var outputEl = document.getElementById('output');
+  var convertBtn = document.getElementById('convertBtn');
+  var copyBtn = document.getElementById('copyBtn');
+  var clearBtn = document.getElementById('clearBtn');
+  var sampleBtn = document.getElementById('sampleBtn');
+  var inputLenEl = document.getElementById('inputLen');
+  var outputLenEl = document.getElementById('outputLen');
+  var tagCountEl = document.getElementById('tagCount');
+  var toastEl = document.getElementById('toast');
+  var lastOutput = '';
+
+  function showToast(msg, type) {
+    toastEl.textContent = msg;
+    toastEl.className = 'toast show ' + (type || '');
+    setTimeout(function() { toastEl.className = 'toast'; }, 2000);
+  }
+
+  function decodeEntities(str) {
+    var entities = {
+      '&amp;': '&',
+      '&lt;': '<',
+      '&gt;': '>',
+      '&quot;': '"',
+      '&#39;': "'",
+      '&apos;': "'",
+      '&nbsp;': ' ',
+      '&copy;': '©',
+      '&reg;': '®',
+      '&trade;': '™',
+      '&mdash;': '—',
+      '&ndash;': '–',
+      '&hellip;': '…',
+      '&laquo;': '«',
+      '&raquo;': '»'
+    };
+    var result = str;
+    var key;
+    for (key in entities) {
+      if (entities.hasOwnProperty(key)) {
+        result = result.split(key).join(entities[key]);
+      }
+    }
+    result = result.replace(/&#(\d+);/g, function(match, num) {
+      return String.fromCharCode(parseInt(num, 10));
+    });
+    result = result.replace(/&#x([0-9a-fA-F]+);/g, function(match, hex) {
+      return String.fromCharCode(parseInt(hex, 16));
+    });
+    return result;
+  }
+
+  function htmlToText(html, options) {
+    var tagCount = 0;
+    var text = html;
+
+    // 1. 移除 script/style/noscript 标签及其内容（包括跨行）
+    if (options.script) {
+      text = text.replace(/<script[\s\S]*?<\/script\s*>/gi, function() { tagCount++; return ''; });
+      text = text.replace(/<style[\s\S]*?<\/style\s*>/gi, function() { tagCount++; return ''; });
+      text = text.replace(/<noscript[\s\S]*?<\/noscript\s*>/gi, function() { tagCount++; return ''; });
+    }
+
+    // 2. 移除 HTML 注释
+    text = text.replace(/<!--[\s\S]*?-->/g, function() { tagCount++; return ''; });
+
+    // 3. 将 <br> 和 <br/> 替换为换行
+    text = text.replace(/<br\s*\/?>/gi, function() { tagCount++; return '\n'; });
+
+    // 4. 将块级元素的开始/结束标签替换为换行（保留段落结构）
+    var blockTags = 'p|div|h[1-6]|li|tr|td|th|blockquote|pre|section|article|header|footer|nav|aside|main|figure|figcaption|table|thead|tbody|tfoot|dl|dt|dd|form|fieldset|hr|ul|ol|caption';
+    var blockRegex = new RegExp('<\\/?(' + blockTags + ')[\\s>][^>]*>|<\\/?(' + blockTags + ')\\s*>', 'gi');
+    text = text.replace(blockRegex, function() { tagCount++; return '\n'; });
+
+    // 5. 处理不完整标签：从某个 < 开始到字符串末尾没有 > 的部分
+    var incompleteMatch = text.match(/<[^>]*$/);
+    if (incompleteMatch) {
+      tagCount++;
+      text = text.substring(0, text.length - incompleteMatch[0].length);
+    }
+
+    // 6. 移除所有剩余的 HTML 标签
+    text = text.replace(/<[^>]*>/g, function() { tagCount++; return ''; });
+
+    // 7. 解码 HTML 实体
+    if (options.decode) {
+      text = decodeEntities(text);
+    }
+
+    // 8. 清理空白（保留换行结构）
+    if (options.space) {
+      // 合并同行内的多余空格/制表符
+      text = text.replace(/[ \t]+/g, ' ');
+      // 清理每行开头/结尾的空格
+      text = text.replace(/^[ \t]+|[ \t]+$/gm, '');
+      // 合并 3 个及以上连续换行为 2 个
+      text = text.replace(/\n{3,}/g, '\n\n');
+      // 去除首尾空白
+      text = text.trim();
+    }
+
+    return { text: text, tagCount: tagCount };
+  }
+
+  function convert() {
+    var html = inputEl.value;
+    if (!html.trim()) {
+      outputEl.textContent = '转换后的文本将显示在这里...';
+      outputEl.className = 'output-area empty';
+      lastOutput = '';
+      outputLenEl.textContent = '0';
+      tagCountEl.textContent = '0';
+      return;
+    }
+
+    var options = {
+      script: document.getElementById('optScript').checked,
+      space: document.getElementById('optSpace').checked,
+      decode: document.getElementById('optDecode').checked
+    };
+
+    var result = htmlToText(html, options);
+    lastOutput = result.text;
+
+    if (result.text) {
+      outputEl.textContent = result.text;
+      outputEl.className = 'output-area';
+    } else {
+      outputEl.textContent = '（未提取到可见文本）';
+      outputEl.className = 'output-area empty';
+    }
+
+    outputLenEl.textContent = result.text.length;
+    tagCountEl.textContent = result.tagCount;
+    showToast('转换完成 ✓', 'success');
+  }
+
+  function copyResult() {
+    if (!lastOutput) {
+      showToast('没有可复制的内容', 'error');
+      return;
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(lastOutput).then(function() {
+        showToast('已复制到剪贴板 ✓', 'success');
+      }).catch(function() {
+        fallbackCopy();
+      });
+    } else {
+      fallbackCopy();
+    }
+  }
+
+  function fallbackCopy() {
+    var ta = document.createElement('textarea');
+    ta.value = lastOutput;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand('copy');
+      showToast('已复制到剪贴板 ✓', 'success');
+    } catch (e) {
+      showToast('复制失败', 'error');
+    }
+    document.body.removeChild(ta);
+  }
+
+  function clearAll() {
+    inputEl.value = '';
+    outputEl.textContent = '转换后的文本将显示在这里...';
+    outputEl.className = 'output-area empty';
+    lastOutput = '';
+    inputLenEl.textContent = '0';
+    outputLenEl.textContent = '0';
+    tagCountEl.textContent = '0';
+  }
+
+  function loadSample() {
+    var s = '<html>\n<head>\n  <title>示例页面</title>\n  <style>body { color: red; }</style>\n  <scr' + 'ipt>console.log("hello");</scr' + 'ipt>\n</head>\n<body>\n  <h1>欢迎来到我的网站</h1>\n  <p>这是一段<b>重要</b>的文字，包含 <a href="#">链接</a>。</p>\n  <ul>\n    <li>项目一</li>\n    <li>项目二</li>\n  </ul>\n  <div style="color:blue">蓝色文本 &amp; 实体测试 &lt;tag&gt;</div>\n  <div class="incomplete" style="wid:';
+    inputEl.value = s;
+    inputLenEl.textContent = inputEl.value.length;
+    showToast('已载入示例', 'success');
+  }
+
+  convertBtn.addEventListener('click', convert);
+  copyBtn.addEventListener('click', copyResult);
+  clearBtn.addEventListener('click', clearAll);
+  sampleBtn.addEventListener('click', loadSample);
+
+  inputEl.addEventListener('input', function() {
+    inputLenEl.textContent = inputEl.value.length;
+  });
+
+  inputEl.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      convert();
+    }
+  });
+})();
+</script>
+</body>
+</html>
