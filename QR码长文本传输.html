@@ -11,9 +11,12 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Noto Sans SC','Microsoft YaHei',sans-serif;background:linear-gradient(135deg,#0f0c29,#302b63,#24243e);min-height:100vh;color:#e0e0e0}
 .container{max-width:1200px;margin:0 auto;padding:16px}
-header{text-align:center;padding:24px 0 12px}
+header{text-align:center;padding:24px 0 12px;position:relative}
 header h1{font-size:1.8em;background:linear-gradient(90deg,#a78bfa,#60a5fa,#34d399);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px}
 header p{color:#94a3b8;font-size:.95em}
+.version-tag{position:absolute;top:24px;right:0;background:linear-gradient(135deg,rgba(124,58,237,.25),rgba(59,130,246,.25));border:1px solid rgba(124,58,237,.4);color:#c4b5fd;padding:4px 12px;border-radius:20px;font-size:.78em;font-weight:600;letter-spacing:.5px}
+.version-tag .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#34d399;margin-right:6px;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 .mode-switch{display:flex;justify-content:center;gap:0;margin:18px 0 22px}
 .mode-btn{padding:11px 36px;border:none;font-size:1em;cursor:pointer;transition:all .3s;font-weight:600;color:#cbd5e1;background:rgba(255,255,255,.07);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1)}
 .mode-btn:first-child{border-radius:50px 0 0 50px}
@@ -111,7 +114,6 @@ textarea.input-area::placeholder{color:#64748b}
 .scan-status{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;font-size:.85em;color:#64748b}
 .scan-dot{width:8px;height:8px;border-radius:50%;background:#475569}
 .scan-dot.active{background:#34d399;animation:pulse 1s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 .notification{position:fixed;top:16px;right:16px;padding:12px 22px;border-radius:12px;color:#fff;font-weight:600;font-size:.9em;z-index:9999;animation:notifIn .3s ease;box-shadow:0 8px 30px rgba(0,0,0,.3);max-width:340px}
 .notification.success{background:linear-gradient(135deg,rgba(5,150,105,.9),rgba(52,211,153,.9))}
 .notification.warning{background:linear-gradient(135deg,rgba(217,119,6,.9),rgba(251,191,36,.9))}
@@ -128,6 +130,7 @@ textarea.input-area::placeholder{color:#64748b}
 <header>
 <h1>📱 QR码长文本传输工具</h1>
 <p>将长文本智能分割为多个二维码 · 扫码自动识别重组 · 纯离线本地处理</p>
+<div class="version-tag"><span class="dot"></span><span id="versionDisplay">v2.2</span></div>
 </header>
 <div class="mode-switch">
 <button class="mode-btn active" onclick="switchMode('send')">📤 发送端</button>
@@ -214,473 +217,457 @@ textarea.input-area::placeholder{color:#64748b}
 <canvas id="scanCanvas" style="display:none"></canvas>
 
 <script>
-let scanning=false,videoStream=null,scanTimerId=null;
-let scannedChunks={},expectedTotal=0,dupCount=0;
-let lastData='',lastTime=0;
+// ============ 版本号 ============
+const APP_VERSION = 'v2.2';
+const APP_BUILD = '20240615';
+console.log(`%c📱 QR码长文本传输工具 ${APP_VERSION} (build ${APP_BUILD})`, 'color:#a78bfa;font-size:14px;font-weight:bold');
+console.log(`%c✓ 页面加载成功，所有脚本已就绪`, 'color:#34d399');
+document.getElementById('versionDisplay').textContent = APP_VERSION;
+
+// ============ 全局状态 ============
+let scanning=false, videoStream=null, scanAnimId=null;
+let scannedChunks={}, expectedTotal=0, dupCount=0;
+let lastData='', lastTime=0, lastScanT=0;
 let qrChunksData=[];
 let currentModalIdx=0;
 let audioCtx=null;
-let decoderType='none'; // 'barcodeDetector' | 'jsqr' | 'none'
+let decoderType='none';
 let barcodeDetector=null;
-let scanFrameCount=0;
+let decodeBusy=false; // 防止并发解码
 
 function switchMode(m){
-document.querySelectorAll('.mode-btn').forEach((b,i)=>{b.classList.toggle('active',(m==='send'&&i===0)||(m==='receive'&&i===1))});
-document.getElementById('sendPanel').classList.toggle('active',m==='send');
-document.getElementById('receivePanel').classList.toggle('active',m==='receive');
-if(m==='send'&&scanning)stopScan();
+  document.querySelectorAll('.mode-btn').forEach((b,i)=>{b.classList.toggle('active',(m==='send'&&i===0)||(m==='receive'&&i===1))});
+  document.getElementById('sendPanel').classList.toggle('active',m==='send');
+  document.getElementById('receivePanel').classList.toggle('active',m==='receive');
+  if(m==='send'&&scanning)stopScan();
 }
 
 document.getElementById('inputText').addEventListener('input',function(){
-const t=this.value;
-document.getElementById('charCount').textContent=t.length;
-document.getElementById('byteCount').textContent=new TextEncoder().encode(t).length;
+  const t=this.value;
+  document.getElementById('charCount').textContent=t.length;
+  document.getElementById('byteCount').textContent=new TextEncoder().encode(t).length;
 });
 
 function splitText(text,maxB){
-const enc=new TextEncoder(),dec=new TextDecoder();
-const reserve=14;
-const contentMax=maxB-reserve;
-if(contentMax<=0)throw new Error('分块大小太小，请增大数值');
-const bytes=enc.encode(text);
-const chunks=[];
-let s=0;
-while(s<bytes.length){
-let e=Math.min(s+contentMax,bytes.length);
-if(e<bytes.length){while(e>s&&(bytes[e]&0xC0)===0x80)e--;}
-chunks.push(dec.decode(bytes.slice(s,e)));
-s=e;
-}
-const total=chunks.length;
-const maxPrefixLen=enc.encode(`[${total}/${total}]`).length;
-if(maxPrefixLen>reserve){
-const newContentMax=maxB-maxPrefixLen;
-if(newContentMax<=0)throw new Error('分块大小太小');
-chunks.length=0;
-s=0;
-while(s<bytes.length){
-let e=Math.min(s+newContentMax,bytes.length);
-if(e<bytes.length){while(e>s&&(bytes[e]&0xC0)===0x80)e--;}
-chunks.push(dec.decode(bytes.slice(s,e)));
-s=e;
-}
-}
-const t2=chunks.length;
-return chunks.map((c,i)=>`[${i+1}/${t2}]${c}`);
+  const enc=new TextEncoder(),dec=new TextDecoder();
+  const reserve=14;
+  const contentMax=maxB-reserve;
+  if(contentMax<=0)throw new Error('分块大小太小，请增大数值');
+  const bytes=enc.encode(text);
+  const chunks=[];
+  let s=0;
+  while(s<bytes.length){
+    let e=Math.min(s+contentMax,bytes.length);
+    if(e<bytes.length){while(e>s&&(bytes[e]&0xC0)===0x80)e--;}
+    chunks.push(dec.decode(bytes.slice(s,e)));
+    s=e;
+  }
+  const total=chunks.length;
+  const maxPrefixLen=enc.encode(`[${total}/${total}]`).length;
+  if(maxPrefixLen>reserve){
+    const newContentMax=maxB-maxPrefixLen;
+    if(newContentMax<=0)throw new Error('分块大小太小');
+    chunks.length=0;
+    s=0;
+    while(s<bytes.length){
+      let e=Math.min(s+newContentMax,bytes.length);
+      if(e<bytes.length){while(e>s&&(bytes[e]&0xC0)===0x80)e--;}
+      chunks.push(dec.decode(bytes.slice(s,e)));
+      s=e;
+    }
+  }
+  const t2=chunks.length;
+  return chunks.map((c,i)=>`[${i+1}/${t2}]${c}`);
 }
 
 function generateQRCodes(){
-const text=document.getElementById('inputText').value.trim();
-if(!text){notify('请先输入文本内容','warning');return;}
-const cs=parseInt(document.getElementById('chunkSize').value);
-if(cs<30){notify('分块大小不能小于30字节','warning');return;}
-try{
-const encoded=splitText(text,cs);
-qrChunksData=encoded;
-showPreview(encoded,text);
-renderQRGrid(encoded);
-notify(`成功生成 ${encoded.length} 个二维码`,'success');
-}catch(e){notify(e.message,'error');}
+  const text=document.getElementById('inputText').value.trim();
+  if(!text){notify('请先输入文本内容','warning');return;}
+  const cs=parseInt(document.getElementById('chunkSize').value);
+  if(cs<30){notify('分块大小不能小于30字节','warning');return;}
+  try{
+    const encoded=splitText(text,cs);
+    qrChunksData=encoded;
+    showPreview(encoded,text);
+    renderQRGrid(encoded);
+    notify(`成功生成 ${encoded.length} 个二维码`,'success');
+  }catch(e){notify(e.message,'error');}
 }
 
 function showPreview(chunks,origText){
-const pa=document.getElementById('previewArea');
-const totalBytes=new TextEncoder().encode(origText).length;
-pa.innerHTML=`<div class="preview-info">
-<div class="preview-chip">原文 <strong>${origText.length}</strong> 字符 / <strong>${totalBytes}</strong> 字节</div>
-<div class="preview-chip">分为 <strong>${chunks.length}</strong> 块</div>
-<div class="preview-chip">每块约 <strong>${Math.ceil(totalBytes/chunks.length)}</strong> 字节</div>
-</div>`;
+  const pa=document.getElementById('previewArea');
+  const totalBytes=new TextEncoder().encode(origText).length;
+  pa.innerHTML=`<div class="preview-info">
+    <div class="preview-chip">原文 <strong>${origText.length}</strong> 字符 / <strong>${totalBytes}</strong> 字节</div>
+    <div class="preview-chip">分为 <strong>${chunks.length}</strong> 块</div>
+    <div class="preview-chip">每块约 <strong>${Math.ceil(totalBytes/chunks.length)}</strong> 字节</div>
+  </div>`;
 }
 
 function renderQRGrid(chunks){
-const c=document.getElementById('qrResult');
-c.innerHTML=`<div class="section-title">📱 二维码 (共 ${chunks.length} 个) · 点击可放大查看</div>`;
-const grid=document.createElement('div');
-grid.className='qr-grid';
-chunks.forEach((chunk,i)=>{
-const card=document.createElement('div');
-card.className='qr-card';
-card.onclick=()=>openModal(i);
-try{
-const qr=qrcode(0,'M');
-qr.addData(chunk,'Byte');
-qr.make();
-const url=qr.createDataURL(8,2);
-const byteLen=new TextEncoder().encode(chunk).length;
-card.innerHTML=`<span class="zoom-hint">🔍 点击放大</span><img src="${url}" alt="QR ${i+1}"><div class="qr-label">第 ${i+1} / ${chunks.length} 块</div><div class="qr-size">${byteLen} 字节</div>`;
-}catch(e){
-card.innerHTML=`<div style="padding:20px;color:#f87171">生成失败</div><div class="qr-label">第 ${i+1} / ${chunks.length} 块</div>`;
-}
-grid.appendChild(card);
-});
-c.appendChild(grid);
+  const c=document.getElementById('qrResult');
+  c.innerHTML=`<div class="section-title">📱 二维码 (共 ${chunks.length} 个) · 点击可放大查看</div>`;
+  const grid=document.createElement('div');
+  grid.className='qr-grid';
+  chunks.forEach((chunk,i)=>{
+    const card=document.createElement('div');
+    card.className='qr-card';
+    card.onclick=()=>openModal(i);
+    try{
+      const qr=qrcode(0,'M');
+      qr.addData(chunk,'Byte');
+      qr.make();
+      const url=qr.createDataURL(8,2);
+      const byteLen=new TextEncoder().encode(chunk).length;
+      card.innerHTML=`<span class="zoom-hint">🔍 点击放大</span><img src="${url}" alt="QR ${i+1}"><div class="qr-label">第 ${i+1} / ${chunks.length} 块</div><div class="qr-size">${byteLen} 字节</div>`;
+    }catch(e){
+      card.innerHTML=`<div style="padding:20px;color:#f87171">生成失败</div><div class="qr-label">第 ${i+1} / ${chunks.length} 块</div>`;
+    }
+    grid.appendChild(card);
+  });
+  c.appendChild(grid);
 }
 
+// ========= 放大模态框 =========
 function openModal(idx){currentModalIdx=idx;renderModal();document.getElementById('qrModal').classList.add('active');}
 function closeModal(){document.getElementById('qrModal').classList.remove('active');}
 function renderModal(){
-const total=qrChunksData.length;
-const chunk=qrChunksData[currentModalIdx];
-document.getElementById('modalTitle').textContent=`第 ${currentModalIdx+1} / ${total} 块`;
-document.getElementById('modalNavInfo').textContent=`${currentModalIdx+1} / ${total}`;
-document.getElementById('btnPrev').disabled=currentModalIdx===0;
-document.getElementById('btnNext').disabled=currentModalIdx===total-1;
-const qr=qrcode(0,'M');
-qr.addData(chunk,'Byte');
-qr.make();
-const url=qr.createDataURL(14,2);
-const byteLen=new TextEncoder().encode(chunk).length;
-document.getElementById('modalQr').innerHTML=`<img src="${url}" alt="QR ${currentModalIdx+1}" style="width:100%;max-width:520px;height:auto"><div style="margin-top:10px;color:#64748b;font-size:.85em">${byteLen} 字节</div>`;
+  const total=qrChunksData.length;
+  const chunk=qrChunksData[currentModalIdx];
+  document.getElementById('modalTitle').textContent=`第 ${currentModalIdx+1} / ${total} 块`;
+  document.getElementById('modalNavInfo').textContent=`${currentModalIdx+1} / ${total}`;
+  document.getElementById('btnPrev').disabled=currentModalIdx===0;
+  document.getElementById('btnNext').disabled=currentModalIdx===total-1;
+  const qr=qrcode(0,'M');
+  qr.addData(chunk,'Byte');
+  qr.make();
+  const url=qr.createDataURL(14,2);
+  const byteLen=new TextEncoder().encode(chunk).length;
+  document.getElementById('modalQr').innerHTML=`<img src="${url}" alt="QR ${currentModalIdx+1}" style="width:100%;max-width:520px;height:auto"><div style="margin-top:10px;color:#64748b;font-size:.85em">${byteLen} 字节</div>`;
 }
 function navModal(dir){
-const newIdx=currentModalIdx+dir;
-if(newIdx<0||newIdx>=qrChunksData.length)return;
-currentModalIdx=newIdx;
-renderModal();
+  const newIdx=currentModalIdx+dir;
+  if(newIdx<0||newIdx>=qrChunksData.length)return;
+  currentModalIdx=newIdx;
+  renderModal();
 }
 
 document.addEventListener('keydown',function(e){
-if(!document.getElementById('qrModal').classList.contains('active'))return;
-if(e.key==='ArrowLeft'){e.preventDefault();navModal(-1);}
-else if(e.key==='ArrowRight'){e.preventDefault();navModal(1);}
-else if(e.key==='Escape'){e.preventDefault();closeModal();}
+  if(!document.getElementById('qrModal').classList.contains('active'))return;
+  if(e.key==='ArrowLeft'){e.preventDefault();navModal(-1);}
+  else if(e.key==='ArrowRight'){e.preventDefault();navModal(1);}
+  else if(e.key==='Escape'){e.preventDefault();closeModal();}
 });
 
 // ========= 提示音 =========
 function playBeep(type){
-if(!document.getElementById('soundEnabled').checked)return;
-try{
-if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-if(audioCtx.state==='suspended')audioCtx.resume();
-const osc=audioCtx.createOscillator();
-const gain=audioCtx.createGain();
-osc.connect(gain);gain.connect(audioCtx.destination);
-if(type==='ok'){
-osc.type='sine';
-osc.frequency.setValueAtTime(880,audioCtx.currentTime);
-osc.frequency.setValueAtTime(1320,audioCtx.currentTime+0.08);
-gain.gain.setValueAtTime(0.25,audioCtx.currentTime);
-gain.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.2);
-osc.start(audioCtx.currentTime);osc.stop(audioCtx.currentTime+0.2);
-}else if(type==='dup'){
-osc.type='square';
-osc.frequency.setValueAtTime(300,audioCtx.currentTime);
-gain.gain.setValueAtTime(0.15,audioCtx.currentTime);
-gain.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.15);
-osc.start(audioCtx.currentTime);osc.stop(audioCtx.currentTime+0.15);
-}else if(type==='complete'){
-osc.type='sine';
-osc.frequency.setValueAtTime(660,audioCtx.currentTime);
-osc.frequency.setValueAtTime(880,audioCtx.currentTime+0.12);
-osc.frequency.setValueAtTime(1320,audioCtx.currentTime+0.24);
-gain.gain.setValueAtTime(0.3,audioCtx.currentTime);
-gain.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.4);
-osc.start(audioCtx.currentTime);osc.stop(audioCtx.currentTime+0.4);
-}
-}catch(e){}
+  if(!document.getElementById('soundEnabled').checked)return;
+  try{
+    if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state==='suspended')audioCtx.resume();
+    const osc=audioCtx.createOscillator();
+    const gain=audioCtx.createGain();
+    osc.connect(gain);gain.connect(audioCtx.destination);
+    if(type==='ok'){
+      osc.type='sine';
+      osc.frequency.setValueAtTime(880,audioCtx.currentTime);
+      osc.frequency.setValueAtTime(1320,audioCtx.currentTime+0.08);
+      gain.gain.setValueAtTime(0.25,audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.2);
+      osc.start(audioCtx.currentTime);osc.stop(audioCtx.currentTime+0.2);
+    }else if(type==='dup'){
+      osc.type='square';
+      osc.frequency.setValueAtTime(300,audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.15,audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.15);
+      osc.start(audioCtx.currentTime);osc.stop(audioCtx.currentTime+0.15);
+    }else if(type==='complete'){
+      osc.type='sine';
+      osc.frequency.setValueAtTime(660,audioCtx.currentTime);
+      osc.frequency.setValueAtTime(880,audioCtx.currentTime+0.12);
+      osc.frequency.setValueAtTime(1320,audioCtx.currentTime+0.24);
+      gain.gain.setValueAtTime(0.3,audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.4);
+      osc.start(audioCtx.currentTime);osc.stop(audioCtx.currentTime+0.4);
+    }
+  }catch(e){}
 }
 
 function showScanToast(text,isDup){
-const t=document.getElementById('scanToast');
-t.textContent=text;
-t.classList.toggle('dup',!!isDup);
-t.classList.add('show');
-setTimeout(()=>t.classList.remove('show'),1200);
+  const t=document.getElementById('scanToast');
+  t.textContent=text;
+  t.classList.toggle('dup',!!isDup);
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),1200);
 }
 
 // ========= 解码器初始化 =========
 function initDecoder(){
-// 优先使用原生 BarcodeDetector API（Chrome/Edge Android 支持）
-if('BarcodeDetector' in window){
-try{
-barcodeDetector=new BarcodeDetector({formats:['qr_code']});
-decoderType='barcodeDetector';
-document.getElementById('decoderInfo').innerHTML='解码引擎: <span class="tag">BarcodeDetector (原生)</span> 识别率高';
-addLog('使用原生 BarcodeDetector 解码器','ok');
-return;
-}catch(e){}
-}
-// 回退到 jsQR
-decoderType='jsqr';
-document.getElementById('decoderInfo').innerHTML='解码引擎: <span class="tag">jsQR</span> 兼容模式';
-addLog('使用 jsQR 解码器','info');
+  // 优先尝试原生 BarcodeDetector（Chrome/Edge Android 支持）
+  if('BarcodeDetector' in window){
+    try{
+      barcodeDetector=new BarcodeDetector({formats:['qr_code']});
+      decoderType='barcodeDetector';
+      document.getElementById('decoderInfo').innerHTML='解码引擎: <span class="tag">BarcodeDetector 原生</span> + <span class="tag">jsQR 备用</span>';
+      addLog('✓ 使用原生 BarcodeDetector 解码器（识别率最高）','ok');
+      return;
+    }catch(e){
+      console.warn('BarcodeDetector 初始化失败:',e);
+    }
+  }
+  // 回退到 jsQR
+  decoderType='jsqr';
+  document.getElementById('decoderInfo').innerHTML='解码引擎: <span class="tag">jsQR</span>';
+  addLog('✓ 使用 jsQR 解码器','info');
 }
 
 // ========= 从视频帧解码 =========
 async function decodeFrame(video){
-if(video.readyState<video.HAVE_CURRENT_DATA)return null;
-const vw=video.videoWidth,vh=video.videoHeight;
-if(!vw||!vh)return null;
+  if(video.readyState<video.HAVE_CURRENT_DATA)return null;
+  const vw=video.videoWidth, vh=video.videoHeight;
+  if(!vw||!vh)return null;
 
-// 缩放到合理尺寸以提升识别速度和准确率
-// 目标宽度 640px，保持比例
-const targetW=640;
-const scale=targetW/vw;
-const sw=Math.round(vw*scale);
-const sh=Math.round(vh*scale);
+  // 方案1: BarcodeDetector（原生API，可直接传 video 元素，识别率最高）
+  if(decoderType==='barcodeDetector'&&barcodeDetector){
+    try{
+      const results=await barcodeDetector.detect(video);
+      if(results&&results.length>0){
+        for(const r of results){
+          if(r.rawValue)return r.rawValue;
+        }
+      }
+    }catch(e){
+      // 静默失败，回退到 jsQR
+    }
+  }
 
-const canvas=document.getElementById('scanCanvas');
-canvas.width=sw;
-canvas.height=sh;
-const ctx=canvas.getContext('2d',{willReadFrequently:true});
-// 使用高质量缩放
-ctx.imageSmoothingEnabled=true;
-ctx.imageSmoothingQuality='high';
-ctx.drawImage(video,0,0,sw,sh);
+  // 方案2: jsQR（使用原始视频分辨率，与第一版一致）
+  const canvas=document.getElementById('scanCanvas');
+  canvas.width=vw;
+  canvas.height=vh;
+  const ctx=canvas.getContext('2d');
+  ctx.drawImage(video,0,0,vw,vh);
+  try{
+    const imgData=ctx.getImageData(0,0,vw,vh);
+    const code=jsQR(imgData.data,imgData.width,imgData.height,{inversionAttempts:'dontInvert'});
+    if(code&&code.data)return code.data;
+  }catch(e){}
 
-// 方案1: BarcodeDetector（原生API，直接传 video 或 canvas）
-if(decoderType==='barcodeDetector'&&barcodeDetector){
-try{
-// 优先传 video 元素（某些浏览器对 video 直接识别更好）
-let results=await barcodeDetector.detect(video);
-if(!results||results.length===0){
-results=await barcodeDetector.detect(canvas);
-}
-if(results&&results.length>0){
-for(const r of results){
-if(r.rawValue)return r.rawValue;
-}
-}
-}catch(e){
-// BarcodeDetector 失败时回退到 jsQR
-}
+  return null;
 }
 
-// 方案2: jsQR
-if(decoderType==='jsqr'||decoderType==='barcodeDetector'){
-try{
-const imgData=ctx.getImageData(0,0,sw,sh);
-// 尝试多种模式
-let code=jsQR(imgData.data,imgData.width,imgData.height,{inversionAttempts:'attemptBoth'});
-if(code&&code.data)return code.data;
-}catch(e){}
-}
-
-return null;
-}
-
-// ========= 扫描循环 =========
-async function scanTick(){
-if(!scanning)return;
-const video=document.getElementById('camVideo');
-scanFrameCount++;
-
-// 更新扫描状态指示
-if(scanFrameCount%10===0){
-document.getElementById('scanStatusText').textContent='扫描中... 帧#'+scanFrameCount;
-}
-
-try{
-const result=await decodeFrame(video);
-if(result){
-processQR(result);
-}
-}catch(e){
-// 静默处理解码错误
-}
-
-if(scanning){
-// 使用 setTimeout 控制扫描频率，避免阻塞
-// 300ms 间隔 = 约 3.3 次/秒，给解码器足够时间
-scanTimerId=setTimeout(scanTick,300);
-}
+// ========= 扫描循环（保持第一版的 requestAnimationFrame 方式） =========
+function scanLoop(){
+  if(!scanning)return;
+  const now=Date.now();
+  // 节流：300ms 一次，避免 CPU 过载
+  if(now-lastScanT>=300 && !decodeBusy){
+    lastScanT=now;
+    const v=document.getElementById('camVideo');
+    if(v.readyState>=v.HAVE_CURRENT_DATA){
+      decodeBusy=true;
+      decodeFrame(v).then(result=>{
+        decodeBusy=false;
+        if(result)processQR(result);
+      }).catch(()=>{decodeBusy=false;});
+    }
+  }
+  scanAnimId=requestAnimationFrame(scanLoop);
 }
 
 // ========= 摄像头控制 =========
 async function startScan(){
-try{
-const constraints={
-video:{
-facingMode:'environment',
-width:{ideal:1280, min:640},
-height:{ideal:720, min:480}
-}
-};
-const stream=await navigator.mediaDevices.getUserMedia(constraints);
-videoStream=stream;
-const v=document.getElementById('camVideo');
-v.srcObject=stream;
-await v.play();
+  try{
+    const constraints={
+      video:{
+        facingMode:'environment',
+        width:{ideal:1280, min:640},
+        height:{ideal:720, min:480}
+      }
+    };
+    const stream=await navigator.mediaDevices.getUserMedia(constraints);
+    videoStream=stream;
+    const v=document.getElementById('camVideo');
+    v.srcObject=stream;
+    await v.play();
 
-// 初始化解码器
-initDecoder();
+    // 初始化解码器
+    initDecoder();
 
-scanning=true;
-scanFrameCount=0;
-document.getElementById('btnStart').style.display='none';
-document.getElementById('btnStop').style.display='inline-flex';
-document.getElementById('cameraBox').classList.add('scanning');
-document.getElementById('scanOverlay').classList.add('active');
-document.getElementById('scanCorners').classList.add('active');
-document.getElementById('scanDot').classList.add('active');
-document.getElementById('scanStatusText').textContent='扫描中...';
-addLog('扫描已启动，请将二维码对准摄像头','info');
+    scanning=true;
+    lastScanT=0;
+    decodeBusy=false;
+    document.getElementById('btnStart').style.display='none';
+    document.getElementById('btnStop').style.display='inline-flex';
+    document.getElementById('cameraBox').classList.add('scanning');
+    document.getElementById('scanOverlay').classList.add('active');
+    document.getElementById('scanCorners').classList.add('active');
+    document.getElementById('scanDot').classList.add('active');
+    document.getElementById('scanStatusText').textContent='扫描中...';
+    addLog('扫描已启动，请将二维码对准摄像头','info');
+    addLog(`摄像头分辨率: ${v.videoWidth}×${v.videoHeight}`,'info');
 
-// 启动扫描循环
-scanTimerId=setTimeout(scanTick,300);
+    // 启动扫描循环（与第一版相同的 requestAnimationFrame 方式）
+    scanAnimId=requestAnimationFrame(scanLoop);
 
-// 显示实际视频分辨率
-addLog(`摄像头分辨率: ${v.videoWidth}×${v.videoHeight}`,'info');
-
-}catch(e){
-notify('无法访问摄像头: '+e.message,'error');
-addLog('摄像头访问失败: '+e.message,'err');
-}
+  }catch(e){
+    notify('无法访问摄像头: '+e.message,'error');
+    addLog('摄像头访问失败: '+e.message,'err');
+  }
 }
 
 function stopScan(){
-scanning=false;
-if(scanTimerId){clearTimeout(scanTimerId);scanTimerId=null;}
-if(videoStream){videoStream.getTracks().forEach(t=>t.stop());videoStream=null;}
-document.getElementById('btnStart').style.display='inline-flex';
-document.getElementById('btnStop').style.display='none';
-document.getElementById('cameraBox').classList.remove('scanning');
-document.getElementById('scanOverlay').classList.remove('active');
-document.getElementById('scanCorners').classList.remove('active');
-document.getElementById('scanDot').classList.remove('active');
-document.getElementById('scanStatusText').textContent='已停止';
-addLog('扫描已停止','info');
+  scanning=false;
+  if(scanAnimId){cancelAnimationFrame(scanAnimId);scanAnimId=null;}
+  if(videoStream){videoStream.getTracks().forEach(t=>t.stop());videoStream=null;}
+  document.getElementById('btnStart').style.display='inline-flex';
+  document.getElementById('btnStop').style.display='none';
+  document.getElementById('cameraBox').classList.remove('scanning');
+  document.getElementById('scanOverlay').classList.remove('active');
+  document.getElementById('scanCorners').classList.remove('active');
+  document.getElementById('scanDot').classList.remove('active');
+  document.getElementById('scanStatusText').textContent='已停止';
+  addLog('扫描已停止','info');
 }
 
 function processQR(data){
-const now=Date.now();
-if(data===lastData&&now-lastTime<2000)return;
-lastData=data;lastTime=now;
-const m=data.match(/^\[(\d+)\/(\d+)\](.*)/s);
-if(!m){return;}
-const idx=parseInt(m[1]),tot=parseInt(m[2]),content=m[3];
-if(expectedTotal>0&&tot!==expectedTotal){
-addLog(`⚠ 第${idx}块总数不匹配(期望${expectedTotal},实际${tot})`,'err');
-notify('二维码来源不一致！','error');
-return;
-}
-if(scannedChunks[idx]){
-dupCount++;
-addLog(`⚠ 第 ${idx}/${tot} 块 — 重复扫描，已忽略`,'dup');
-notify(`第 ${idx} 块已扫过（重复）`,'warning');
-flashCamera('dup');
-showScanToast(`#${idx} 已扫过`,true);
-playBeep('dup');
-updateBadges();
-return;
-}
-scannedChunks[idx]=content;
-expectedTotal=tot;
-addLog(`✓ 第 ${idx}/${tot} 块 — 扫描成功`,'ok');
-notify(`✓ 第 ${idx}/${tot} 块`,'success');
-flashCamera('ok');
-showScanToast(`✓ 第 ${idx}/${tot} 块`,false);
-playBeep('ok');
-updateProgress();
-if(Object.keys(scannedChunks).length===expectedTotal){
-reassemble();
-}
+  const now=Date.now();
+  if(data===lastData&&now-lastTime<2000)return;
+  lastData=data;lastTime=now;
+  const m=data.match(/^\[(\d+)\/(\d+)\](.*)/s);
+  if(!m){return;}
+  const idx=parseInt(m[1]),tot=parseInt(m[2]),content=m[3];
+  if(expectedTotal>0&&tot!==expectedTotal){
+    addLog(`⚠ 第${idx}块总数不匹配(期望${expectedTotal},实际${tot})`,'err');
+    notify('二维码来源不一致！','error');
+    return;
+  }
+  if(scannedChunks[idx]){
+    dupCount++;
+    addLog(`⚠ 第 ${idx}/${tot} 块 — 重复扫描，已忽略`,'dup');
+    notify(`第 ${idx} 块已扫过（重复）`,'warning');
+    flashCamera('dup');
+    showScanToast(`#${idx} 已扫过`,true);
+    playBeep('dup');
+    updateBadges();
+    return;
+  }
+  scannedChunks[idx]=content;
+  expectedTotal=tot;
+  addLog(`✓ 第 ${idx}/${tot} 块 — 扫描成功`,'ok');
+  notify(`✓ 第 ${idx}/${tot} 块`,'success');
+  flashCamera('ok');
+  showScanToast(`✓ 第 ${idx}/${tot} 块`,false);
+  playBeep('ok');
+  updateProgress();
+  if(Object.keys(scannedChunks).length===expectedTotal){
+    reassemble();
+  }
 }
 
 function flashCamera(type){
-const box=document.getElementById('cameraBox');
-const cls=type==='dup'?'flash-dup':'flash-ok';
-box.classList.add(cls);
-setTimeout(()=>box.classList.remove(cls),500);
+  const box=document.getElementById('cameraBox');
+  const cls=type==='dup'?'flash-dup':'flash-ok';
+  box.classList.add(cls);
+  setTimeout(()=>box.classList.remove(cls),500);
 }
 
 function updateProgress(){
-const n=Object.keys(scannedChunks).length;
-document.getElementById('statScanned').textContent=n;
-document.getElementById('statTotal').textContent=expectedTotal||'—';
-document.getElementById('statRemain').textContent=expectedTotal?(expectedTotal-n):'—';
-const pct=expectedTotal?(n/expectedTotal*100):0;
-document.getElementById('progressBar').style.width=pct+'%';
-updateBadges();
+  const n=Object.keys(scannedChunks).length;
+  document.getElementById('statScanned').textContent=n;
+  document.getElementById('statTotal').textContent=expectedTotal||'—';
+  document.getElementById('statRemain').textContent=expectedTotal?(expectedTotal-n):'—';
+  const pct=expectedTotal?(n/expectedTotal*100):0;
+  document.getElementById('progressBar').style.width=pct+'%';
+  updateBadges();
 }
 
 function updateBadges(){
-const c=document.getElementById('chunkBadges');
-if(!expectedTotal){c.innerHTML='<span style="color:#475569;font-size:.85em">等待首次扫描...</span>';return;}
-let html='';
-for(let i=1;i<=expectedTotal;i++){
-if(scannedChunks[i])html+=`<span class="badge done">#${i} ✓</span>`;
-else html+=`<span class="badge wait">#${i}</span>`;
-}
-c.innerHTML=html;
+  const c=document.getElementById('chunkBadges');
+  if(!expectedTotal){c.innerHTML='<span style="color:#475569;font-size:.85em">等待首次扫描...</span>';return;}
+  let html='';
+  for(let i=1;i<=expectedTotal;i++){
+    if(scannedChunks[i])html+=`<span class="badge done">#${i} ✓</span>`;
+    else html+=`<span class="badge wait">#${i}</span>`;
+  }
+  c.innerHTML=html;
 }
 
 function reassemble(){
-let full='';
-for(let i=1;i<=expectedTotal;i++)full+=scannedChunks[i]||'';
-document.getElementById('resultText').value=full;
-document.getElementById('resultBox').style.display='block';
-document.getElementById('completeBanner').innerHTML=`<div class="complete-banner">
-<div class="big">🎉 全部扫描完成！</div>
-<div class="sub">已成功接收 ${expectedTotal} 个分块，共 ${full.length} 字符，文本已完整重组</div>
-</div>`;
-addLog(`🎉 全部 ${expectedTotal} 块扫描完成，文本已重组 (${full.length} 字符)`,'ok');
-notify('🎉 所有二维码已扫描完成！','success');
-playBeep('complete');
-if(scanning)stopScan();
+  let full='';
+  for(let i=1;i<=expectedTotal;i++)full+=scannedChunks[i]||'';
+  document.getElementById('resultText').value=full;
+  document.getElementById('resultBox').style.display='block';
+  document.getElementById('completeBanner').innerHTML=`<div class="complete-banner">
+    <div class="big">🎉 全部扫描完成！</div>
+    <div class="sub">已成功接收 ${expectedTotal} 个分块，共 ${full.length} 字符，文本已完整重组</div>
+  </div>`;
+  addLog(`🎉 全部 ${expectedTotal} 块扫描完成，文本已重组 (${full.length} 字符)`,'ok');
+  notify('🎉 所有二维码已扫描完成！','success');
+  playBeep('complete');
+  if(scanning)stopScan();
 }
 
 function copyResult(){
-const t=document.getElementById('resultText').value;
-if(!t){notify('没有可复制的内容','warning');return;}
-if(navigator.clipboard&&navigator.clipboard.writeText){
-navigator.clipboard.writeText(t).then(()=>notify('已复制到剪贴板 ✓','success')).catch(()=>fallbackCopy(t));
-}else{fallbackCopy(t);}
+  const t=document.getElementById('resultText').value;
+  if(!t){notify('没有可复制的内容','warning');return;}
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(()=>notify('已复制到剪贴板 ✓','success')).catch(()=>fallbackCopy(t));
+  }else{fallbackCopy(t);}
 }
 function fallbackCopy(t){
-const ta=document.getElementById('resultText');
-ta.select();ta.setSelectionRange(0,999999);
-try{document.execCommand('copy');notify('已复制到剪贴板 ✓','success');}
-catch(e){notify('复制失败，请手动选择复制','error');}
+  const ta=document.getElementById('resultText');
+  ta.select();ta.setSelectionRange(0,999999);
+  try{document.execCommand('copy');notify('已复制到剪贴板 ✓','success');}
+  catch(e){notify('复制失败，请手动选择复制','error');}
 }
 
 function downloadResult(){
-const t=document.getElementById('resultText').value;
-if(!t){notify('没有可下载的内容','warning');return;}
-const blob=new Blob([t],{type:'text/plain;charset=utf-8'});
-const a=document.createElement('a');
-a.href=URL.createObjectURL(blob);
-a.download='decoded_text_'+Date.now()+'.txt';
-a.click();
-URL.revokeObjectURL(a.href);
-notify('文件已下载 ✓','success');
+  const t=document.getElementById('resultText').value;
+  if(!t){notify('没有可下载的内容','warning');return;}
+  const blob=new Blob([t],{type:'text/plain;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='decoded_text_'+Date.now()+'.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  notify('文件已下载 ✓','success');
 }
 
 function resetScan(){
-scannedChunks={};expectedTotal=0;dupCount=0;lastData='';lastTime=0;
-document.getElementById('statScanned').textContent='0';
-document.getElementById('statTotal').textContent='—';
-document.getElementById('statRemain').textContent='—';
-document.getElementById('progressBar').style.width='0%';
-document.getElementById('chunkBadges').innerHTML='<span style="color:#475569;font-size:.85em">等待首次扫描...</span>';
-document.getElementById('resultBox').style.display='none';
-document.getElementById('completeBanner').innerHTML='';
-document.getElementById('logArea').innerHTML='<div class="log-item" style="color:#475569">等待扫描...</div>';
-document.getElementById('scanStatusText').textContent='未启动';
-notify('扫描状态已重置','info');
+  scannedChunks={};expectedTotal=0;dupCount=0;lastData='';lastTime=0;
+  document.getElementById('statScanned').textContent='0';
+  document.getElementById('statTotal').textContent='—';
+  document.getElementById('statRemain').textContent='—';
+  document.getElementById('progressBar').style.width='0%';
+  document.getElementById('chunkBadges').innerHTML='<span style="color:#475569;font-size:.85em">等待首次扫描...</span>';
+  document.getElementById('resultBox').style.display='none';
+  document.getElementById('completeBanner').innerHTML='';
+  document.getElementById('logArea').innerHTML='<div class="log-item" style="color:#475569">等待扫描...</div>';
+  document.getElementById('scanStatusText').textContent='未启动';
+  notify('扫描状态已重置','info');
 }
 
 function addLog(msg,type){
-const la=document.getElementById('logArea');
-const cls=type==='ok'?'log-ok':type==='dup'?'log-dup':type==='err'?'log-dup':'';
-const time=new Date().toLocaleTimeString();
-const div=document.createElement('div');
-div.className='log-item '+cls;
-div.textContent=`[${time}] ${msg}`;
-la.appendChild(div);
-la.scrollTop=la.scrollHeight;
+  const la=document.getElementById('logArea');
+  const cls=type==='ok'?'log-ok':type==='dup'?'log-dup':type==='err'?'log-dup':'';
+  const time=new Date().toLocaleTimeString();
+  const div=document.createElement('div');
+  div.className='log-item '+cls;
+  div.textContent=`[${time}] ${msg}`;
+  la.appendChild(div);
+  la.scrollTop=la.scrollHeight;
 }
 
 let notifTimer=null;
 function notify(msg,type){
-document.querySelectorAll('.notification').forEach(n=>n.remove());
-const d=document.createElement('div');
-d.className='notification '+type;
-d.textContent=msg;
-document.body.appendChild(d);
-if(notifTimer)clearTimeout(notifTimer);
-notifTimer=setTimeout(()=>d.remove(),2500);
+  document.querySelectorAll('.notification').forEach(n=>n.remove());
+  const d=document.createElement('div');
+  d.className='notification '+type;
+  d.textContent=msg;
+  document.body.appendChild(d);
+  if(notifTimer)clearTimeout(notifTimer);
+  notifTimer=setTimeout(()=>d.remove(),2500);
 }
 </script>
 </body>
