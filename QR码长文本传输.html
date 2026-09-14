@@ -2,15 +2,16 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>QR码长文本传输工具</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/@fontsource/inter@5.1.0/index.css" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Noto Sans SC','Microsoft YaHei',sans-serif;background:linear-gradient(135deg,#0f0c29,#302b63,#24243e);min-height:100vh;color:#e0e0e0;overflow-x:hidden}
-.container{max-width:1200px;margin:0 auto;padding:16px}
+html,body{overflow-x:hidden!important;width:100%!important;max-width:100vw!important}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Noto Sans SC','Microsoft YaHei',sans-serif;background:linear-gradient(135deg,#0f0c29,#302b63,#24243e);min-height:100vh;color:#e0e0e0}
+.container{max-width:1200px;margin:0 auto;padding:16px;width:100%;overflow:hidden}
 header{text-align:center;padding:24px 0 12px;position:relative}
 header h1{font-size:1.8em;background:linear-gradient(90deg,#a78bfa,#60a5fa,#34d399);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px}
 header p{color:#94a3b8;font-size:.95em}
@@ -22,7 +23,7 @@ header p{color:#94a3b8;font-size:.95em}
 .mode-btn:first-child{border-radius:50px 0 0 50px}
 .mode-btn:last-child{border-radius:0 50px 50px 0}
 .mode-btn.active{background:linear-gradient(135deg,#7c3aed,#3b82f6);color:#fff;border-color:transparent;box-shadow:0 4px 20px rgba(124,58,237,.4)}
-.panel{background:rgba(255,255,255,.05);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:28px;display:none;animation:fadeUp .4s ease}
+.panel{background:rgba(255,255,255,.05);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:28px;display:none;animation:fadeUp .4s ease;overflow:hidden}
 .panel.active{display:block}
 @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 .section-title{font-size:1.1em;font-weight:700;margin-bottom:14px;color:#e2e8f0;display:flex;align-items:center;gap:8px}
@@ -52,37 +53,55 @@ textarea.input-area::placeholder{color:#64748b}
 .receiver-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
 @media(max-width:800px){.receiver-grid{grid-template-columns:1fr}}
 
-/* ===== 摄像头显示修复 ===== */
+/* ===== 摄像头显示 - 严格约束防止溢出 ===== */
+.camera-wrapper{
+  position:relative;
+  width:100%;
+  max-width:100%;
+  overflow:hidden;
+  border-radius:14px;
+  background:#000;
+  contain:layout style;
+  isolation:isolate;
+}
 .camera-box{
   position:relative;
   width:100%;
-  background:#000;
-  border-radius:14px;
+  max-width:100%;
   overflow:hidden;
   border:2px solid rgba(255,255,255,.1);
-  /* 不设固定 aspect-ratio，由视频自然比例撑开 */
-  min-height:200px;
-  max-height:60vh;
-  display:flex;
-  align-items:center;
-  justify-content:center;
+  border-radius:14px;
+  background:#000;
+  /* 使用 aspect-ratio 保持固定比例，防止视频撑开 */
+  aspect-ratio:4/3;
+  contain:strict;
+  transform:translateZ(0);
+  -webkit-transform:translateZ(0);
 }
 .camera-box video{
-  width:100%;
-  height:100%;
-  display:block;
-  object-fit:contain; /* 关键：contain 防止裁切放大 */
+  position:absolute;
+  top:0;
+  left:0;
+  width:100%!important;
+  height:100%!important;
+  max-width:100%!important;
+  max-height:100%!important;
+  object-fit:contain!important;
   background:#000;
+  display:block;
+  transform:translateZ(0);
+  -webkit-transform:translateZ(0);
+  will-change:transform;
 }
 .camera-box.scanning{border-color:#7c3aed;box-shadow:0 0 20px rgba(124,58,237,.3)}
 .camera-box.flash-ok{border-color:#34d399!important;box-shadow:0 0 30px rgba(52,211,153,.6)!important}
 .camera-box.flash-dup{border-color:#fbbf24!important;box-shadow:0 0 30px rgba(251,191,36,.6)!important}
 
-.scan-overlay{position:absolute;inset:0;pointer-events:none;display:none}
+.scan-overlay{position:absolute;inset:0;pointer-events:none;display:none;z-index:2}
 .scan-overlay.active{display:block}
 .scan-overlay::before{content:'';position:absolute;left:10%;right:10%;height:2px;background:linear-gradient(90deg,transparent,#7c3aed,transparent);animation:scanMove 2s ease-in-out infinite;top:0}
 @keyframes scanMove{0%,100%{top:10%}50%{top:85%}}
-.scan-corners{position:absolute;top:15%;left:15%;right:15%;bottom:15%;border:2px solid rgba(124,58,237,.4);border-radius:8px;display:none;pointer-events:none}
+.scan-corners{position:absolute;top:15%;left:15%;right:15%;bottom:15%;border:2px solid rgba(124,58,237,.4);border-radius:8px;display:none;pointer-events:none;z-index:2}
 .scan-corners.active{display:block}
 .scan-controls{margin-top:14px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 .stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
@@ -134,17 +153,12 @@ textarea.input-area::placeholder{color:#64748b}
 .scan-dot{width:8px;height:8px;border-radius:50%;background:#475569}
 .scan-dot.active{background:#34d399;animation:pulse 1s infinite}
 .encode-info{background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);border-radius:10px;padding:10px 14px;margin:12px 0;font-size:.82em;color:#6ee7b7;line-height:1.6}
-
-/* 变焦控制 */
 .zoom-control{display:flex;align-items:center;gap:10px;margin-top:10px;justify-content:center;padding:0 10px}
 .zoom-control label{color:#94a3b8;font-size:.82em;white-space:nowrap}
 .zoom-control input[type=range]{flex:1;max-width:200px;accent-color:#7c3aed;height:4px}
 .zoom-control .zoom-val{color:#a78bfa;font-size:.82em;font-weight:600;min-width:36px;text-align:center}
-
-/* 摄像头信息 */
 .cam-info{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:8px}
 .cam-info .tag{display:inline-block;padding:2px 8px;border-radius:8px;background:rgba(124,58,237,.12);color:#a78bfa;font-size:.72em}
-
 .notification{position:fixed;top:16px;right:16px;padding:12px 22px;border-radius:12px;color:#fff;font-weight:600;font-size:.9em;z-index:9999;animation:notifIn .3s ease;box-shadow:0 8px 30px rgba(0,0,0,.3);max-width:340px}
 .notification.success{background:linear-gradient(135deg,rgba(5,150,105,.9),rgba(52,211,153,.9))}
 .notification.warning{background:linear-gradient(135deg,rgba(217,119,6,.9),rgba(251,191,36,.9))}
@@ -154,6 +168,10 @@ textarea.input-area::placeholder{color:#64748b}
 ::-webkit-scrollbar{width:5px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px}
+
+/* 防止移动端视频全屏/缩放 */
+video::-webkit-media-controls{display:none!important}
+video::-webkit-media-controls-enclosure{display:none!important}
 </style>
 </head>
 <body>
@@ -161,7 +179,7 @@ textarea.input-area::placeholder{color:#64748b}
 <header>
 <h1>📱 QR码长文本传输工具</h1>
 <p>将长文本智能分割为多个二维码 · 扫码自动识别重组 · 纯离线本地处理</p>
-<div class="version-tag"><span class="dot"></span><span id="versionDisplay">v3.1</span></div>
+<div class="version-tag"><span class="dot"></span><span id="versionDisplay">v3.2</span></div>
 </header>
 <div class="mode-switch">
 <button class="mode-btn active" onclick="switchMode('send')">📤 发送端</button>
@@ -189,15 +207,17 @@ textarea.input-area::placeholder{color:#64748b}
 <div class="receiver-grid">
 <div>
 <div class="section-title">📷 扫描二维码</div>
+<div class="camera-wrapper">
 <div class="camera-box" id="cameraBox">
 <video id="camVideo" autoplay playsinline muted></video>
 <div class="scan-overlay" id="scanOverlay"></div>
 <div class="scan-corners" id="scanCorners"></div>
 <div class="scan-toast" id="scanToast"></div>
 </div>
+</div>
 <div class="scan-controls">
 <button class="btn btn-primary" id="btnStart" onclick="startScan()">▶ 开始扫描</button>
-<button class="btn btn-danger" id="btnStop" onclick="stopScan()" style="display:none">⏹ 停止</button>
+<button class="btn btn-danger" id="btnStop" onclick="stopScan()" style="display:none"> 停止</button>
 <button class="btn btn-ghost" onclick="resetScan()">🔄 重置</button>
 </div>
 <div class="zoom-control" id="zoomControl" style="display:none">
@@ -206,7 +226,7 @@ textarea.input-area::placeholder{color:#64748b}
 <span class="zoom-val" id="zoomVal">1.0x</span>
 </div>
 <div class="sound-toggle">
-<label><input type="checkbox" id="soundEnabled" checked> 🔊 扫码成功提示音</label>
+<label><input type="checkbox" id="soundEnabled" checked>  扫码成功提示音</label>
 </div>
 <div class="scan-status">
 <span class="scan-dot" id="scanDot"></span>
@@ -256,14 +276,12 @@ textarea.input-area::placeholder{color:#64748b}
 <canvas id="scanCanvas" style="display:none"></canvas>
 
 <script>
-// ============ 版本号 ============
-const APP_VERSION = 'v3.1';
-const APP_BUILD = '20250117';
+const APP_VERSION = 'v3.2';
+const APP_BUILD = '20250118';
 console.log(`%c📱 QR码长文本传输工具 ${APP_VERSION} (build ${APP_BUILD})`, 'color:#a78bfa;font-size:14px;font-weight:bold');
 console.log(`%c✓ 页面加载成功 | jsQR: ${typeof jsQR} | qrcode: ${typeof qrcode}`, 'color:#34d399');
 document.getElementById('versionDisplay').textContent = APP_VERSION;
 
-// ============ 全局状态 ============
 let scanning = false, videoStream = null, scanAnimId = null;
 let scannedChunks = {}, expectedTotal = 0, dupCount = 0;
 let lastData = '', lastTime = 0, lastScanT = 0;
@@ -271,10 +289,9 @@ let qrChunksData = [];
 let currentModalIdx = 0;
 let audioCtx = null;
 let debugLogCount = 0;
-let currentTrack = null; // 当前视频轨道，用于控制变焦
-let zoomCapabilities = null; // 变焦能力信息
+let currentTrack = null;
+let zoomCapabilities = null;
 
-// ============ Base64 编解码 ============
 function textToBase64(text) {
   const bytes = new TextEncoder().encode(text);
   let binary = '';
@@ -289,13 +306,10 @@ function textToBase64(text) {
 function base64ToText(b64) {
   const binary = atob(b64);
   const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return new TextDecoder('utf-8').decode(bytes);
 }
 
-// ============ 模式切换 ============
 function switchMode(m) {
   document.querySelectorAll('.mode-btn').forEach((b, i) => {
     b.classList.toggle('active', (m === 'send' && i === 0) || (m === 'receive' && i === 1));
@@ -311,12 +325,9 @@ document.getElementById('inputText').addEventListener('input', function () {
   document.getElementById('byteCount').textContent = new TextEncoder().encode(t).length;
 });
 
-// ============ 发送端 ============
 function splitBase64(b64, chunkSize) {
   const chunks = [];
-  for (let i = 0; i < b64.length; i += chunkSize) {
-    chunks.push(b64.slice(i, i + chunkSize));
-  }
+  for (let i = 0; i < b64.length; i += chunkSize) chunks.push(b64.slice(i, i + chunkSize));
   if (chunks.length === 0) chunks.push('');
   return chunks;
 }
@@ -326,7 +337,6 @@ function generateQRCodes() {
   if (!text) { notify('请先输入文本内容', 'warning'); return; }
   const cs = parseInt(document.getElementById('chunkSize').value);
   if (cs < 50) { notify('每块大小不能小于50', 'warning'); return; }
-
   try {
     const b64 = textToBase64(text);
     const b64Chunks = splitBase64(b64, cs);
@@ -335,9 +345,7 @@ function generateQRCodes() {
     showPreview(text, b64, qrChunksData);
     renderQRGrid(qrChunksData);
     notify(`成功生成 ${qrChunksData.length} 个二维码`, 'success');
-  } catch (e) {
-    notify('生成失败: ' + e.message, 'error');
-  }
+  } catch (e) { notify('生成失败: ' + e.message, 'error'); }
 }
 
 function showPreview(origText, b64, chunks) {
@@ -365,7 +373,7 @@ function renderQRGrid(chunks) {
       qr.addData(chunk, 'Byte');
       qr.make();
       const url = qr.createDataURL(8, 2);
-      card.innerHTML = `<span class="zoom-hint">🔍 点击放大</span><img src="${url}" alt="QR ${i + 1}"><div class="qr-label">第 ${i + 1} / ${chunks.length} 块</div><div class="qr-size">${chunk.length} 字符</div>`;
+      card.innerHTML = `<span class="zoom-hint"> 点击放大</span><img src="${url}" alt="QR ${i + 1}"><div class="qr-label">第 ${i + 1} / ${chunks.length} 块</div><div class="qr-size">${chunk.length} 字符</div>`;
     } catch (e) {
       card.innerHTML = `<div style="padding:20px;color:#f87171">生成失败</div><div class="qr-label">第 ${i + 1} / ${chunks.length} 块</div>`;
     }
@@ -374,7 +382,6 @@ function renderQRGrid(chunks) {
   c.appendChild(grid);
 }
 
-// ========= 放大模态框 =========
 function openModal(idx) { currentModalIdx = idx; renderModal(); document.getElementById('qrModal').classList.add('active'); }
 function closeModal() { document.getElementById('qrModal').classList.remove('active'); }
 function renderModal() {
@@ -403,7 +410,6 @@ document.addEventListener('keydown', function (e) {
   else if (e.key === 'Escape') { e.preventDefault(); closeModal(); }
 });
 
-// ========= 提示音 =========
 function playBeep(type) {
   if (!document.getElementById('soundEnabled').checked) return;
   try {
@@ -445,11 +451,9 @@ function showScanToast(text, isDup) {
   setTimeout(() => t.classList.remove('show'), 1200);
 }
 
-// ========= 变焦控制 =========
 async function detectZoomCapabilities() {
   if (!currentTrack) return;
   try {
-    // 标准 API: MediaTrackCapabilities
     if (currentTrack.getCapabilities) {
       const caps = currentTrack.getCapabilities();
       zoomCapabilities = {
@@ -461,7 +465,7 @@ async function detectZoomCapabilities() {
       if (zoomCapabilities.supported) {
         const slider = document.getElementById('zoomSlider');
         slider.min = zoomCapabilities.min;
-        slider.max = Math.min(zoomCapabilities.max, 10); // 限制最大10倍
+        slider.max = Math.min(zoomCapabilities.max, 10);
         slider.step = zoomCapabilities.step;
         slider.value = zoomCapabilities.min;
         document.getElementById('zoomVal').textContent = zoomCapabilities.min.toFixed(1) + 'x';
@@ -469,11 +473,9 @@ async function detectZoomCapabilities() {
         addLog(`变焦支持: ${zoomCapabilities.min}x ~ ${zoomCapabilities.max}x`, 'debug');
       } else {
         document.getElementById('zoomControl').style.display = 'none';
-        addLog('摄像头不支持硬件变焦', 'debug');
       }
     }
   } catch (e) {
-    addLog('检测变焦能力失败: ' + e.message, 'debug');
     document.getElementById('zoomControl').style.display = 'none';
   }
 }
@@ -483,37 +485,24 @@ function setZoom(val) {
   const v = parseFloat(val);
   document.getElementById('zoomVal').textContent = v.toFixed(1) + 'x';
   try {
-    // 标准 API: applyConstraints with zoom
     currentTrack.applyConstraints({ advanced: [{ zoom: v }] })
-      .then(() => {
-        addLog(`变焦设为 ${v.toFixed(1)}x`, 'debug');
-      })
-      .catch(e => {
-        addLog(`变焦失败: ${e.message}`, 'err');
-      });
-  } catch (e) {
-    addLog(`变焦不支持: ${e.message}`, 'debug');
-  }
+      .then(() => addLog(`变焦设为 ${v.toFixed(1)}x`, 'debug'))
+      .catch(e => addLog(`变焦失败: ${e.message}`, 'err'));
+  } catch (e) { }
 }
 
-// ========= 摄像头约束构建 =========
 function buildVideoConstraints() {
-  // 关键修复：限制分辨率避免手机选择超高分辨率导致数字变焦
-  // 同时明确指定 facingMode 避免选到长焦镜头
-  const constraints = {
+  return {
     video: {
       facingMode: { ideal: 'environment' },
       width: { ideal: 1280, max: 1920 },
       height: { ideal: 720, max: 1080 },
-      // 明确请求 1x 变焦，避免手机默认放大
       zoom: { ideal: 1.0 }
     },
     audio: false
   };
-  return constraints;
 }
 
-// ========= 扫描循环 =========
 function scanLoop() {
   if (!scanning) return;
   const v = document.getElementById('camVideo');
@@ -525,7 +514,6 @@ function scanLoop() {
         const canvas = document.getElementById('scanCanvas');
         const vw = v.videoWidth, vh = v.videoHeight;
         if (vw > 0 && vh > 0) {
-          // 限制处理尺寸，提升手机端性能
           let drawW = vw, drawH = vh;
           const maxDim = 960;
           if (Math.max(vw, vh) > maxDim) {
@@ -539,9 +527,7 @@ function scanLoop() {
           ctx.drawImage(v, 0, 0, drawW, drawH);
           const imgd = ctx.getImageData(0, 0, drawW, drawH);
           const code = jsQR(imgd.data, imgd.width, imgd.height, { inversionAttempts: 'attemptBoth' });
-          if (code && code.data) {
-            processQR(code.data);
-          }
+          if (code && code.data) processQR(code.data);
         }
       } catch (e) { }
     }
@@ -549,7 +535,19 @@ function scanLoop() {
   scanAnimId = requestAnimationFrame(scanLoop);
 }
 
-// ========= 摄像头 =========
+// 关键修复：视频加载后强制约束尺寸
+function enforceVideoSize() {
+  const v = document.getElementById('camVideo');
+  const box = document.getElementById('cameraBox');
+  if (!v || !box) return;
+  // 强制视频元素尺寸与容器一致
+  const boxRect = box.getBoundingClientRect();
+  v.style.width = boxRect.width + 'px';
+  v.style.height = boxRect.height + 'px';
+  v.style.maxWidth = boxRect.width + 'px';
+  v.style.maxHeight = boxRect.height + 'px';
+}
+
 async function startScan() {
   try {
     const constraints = buildVideoConstraints();
@@ -562,17 +560,18 @@ async function startScan() {
     const v = document.getElementById('camVideo');
     v.srcObject = stream;
 
-    // 等待视频元数据加载
     await new Promise((resolve) => {
-      if (v.readyState >= v.HAVE_METADATA) {
-        resolve();
-      } else {
-        v.onloadedmetadata = () => resolve();
-      }
+      if (v.readyState >= v.HAVE_METADATA) resolve();
+      else v.onloadedmetadata = () => resolve();
     });
     await v.play();
 
-    // 获取实际视频轨道设置信息
+    // 关键：视频开始播放后强制约束尺寸
+    enforceVideoSize();
+    // 再次延迟执行，确保渲染完成
+    setTimeout(enforceVideoSize, 100);
+    setTimeout(enforceVideoSize, 500);
+
     if (currentTrack && currentTrack.getSettings) {
       const settings = currentTrack.getSettings();
       const infoEl = document.getElementById('camInfo');
@@ -581,12 +580,10 @@ async function startScan() {
       if (settings.facingMode) tags.push(`镜头: ${settings.facingMode}`);
       if (settings.frameRate) tags.push(`${settings.frameRate.toFixed(1)}fps`);
       if (settings.zoom) tags.push(`变焦: ${settings.zoom}x`);
-      if (settings.deviceId) tags.push(`设备: ${settings.deviceId.substring(0, 8)}...`);
       infoEl.innerHTML = tags.map(t => `<span class="tag">${t}</span>`).join('');
-      addLog(`摄像头设置: ${tags.join(', ')}`, 'debug');
+      addLog(`摄像头: ${tags.join(', ')}`, 'debug');
     }
 
-    // 检测变焦能力
     await detectZoomCapabilities();
 
     scanning = true;
@@ -599,16 +596,15 @@ async function startScan() {
     document.getElementById('scanCorners').classList.add('active');
     document.getElementById('scanDot').classList.add('active');
     document.getElementById('scanStatusText').textContent = '扫描中...';
-    addLog(`扫描已启动 (${v.videoWidth}×${v.videoHeight})`, 'ok');
+    addLog(`扫描启动 (${v.videoWidth}×${v.videoHeight})`, 'ok');
     scanAnimId = requestAnimationFrame(scanLoop);
 
   } catch (e) {
     notify('无法访问摄像头: ' + e.message, 'error');
-    addLog('摄像头访问失败: ' + e.message, 'err');
+    addLog('摄像头失败: ' + e.message, 'err');
 
-    // 如果带 zoom 约束失败，尝试不带 zoom 回退
-    if (e.name === 'OverconstrainedError' || e.message.includes('zoom')) {
-      addLog('尝试不带变焦约束重新启动...', 'debug');
+    if (e.name === 'OverconstrainedError' || (e.message && e.message.includes('zoom'))) {
+      addLog('尝试不带变焦约束...', 'debug');
       try {
         const fallbackConstraints = {
           video: {
@@ -628,6 +624,9 @@ async function startScan() {
           else v.onloadedmetadata = () => resolve();
         });
         await v.play();
+        enforceVideoSize();
+        setTimeout(enforceVideoSize, 100);
+        setTimeout(enforceVideoSize, 500);
         scanning = true;
         lastScanT = 0;
         debugLogCount = 0;
@@ -642,8 +641,7 @@ async function startScan() {
         await detectZoomCapabilities();
         scanAnimId = requestAnimationFrame(scanLoop);
       } catch (e2) {
-        notify('摄像头启动彻底失败: ' + e2.message, 'error');
-        addLog('回退也失败: ' + e2.message, 'err');
+        notify('摄像头启动失败: ' + e2.message, 'error');
       }
     }
   }
@@ -655,6 +653,8 @@ function stopScan() {
   if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
   currentTrack = null;
   zoomCapabilities = null;
+  const v = document.getElementById('camVideo');
+  if (v) { v.srcObject = null; v.style.width = ''; v.style.height = ''; v.style.maxWidth = ''; v.style.maxHeight = ''; }
   document.getElementById('btnStart').style.display = 'inline-flex';
   document.getElementById('btnStop').style.display = 'none';
   document.getElementById('cameraBox').classList.remove('scanning');
@@ -667,7 +667,6 @@ function stopScan() {
   addLog('扫描已停止', 'info');
 }
 
-// ========= 处理扫码结果 =========
 function processQR(data) {
   const now = Date.now();
   if (data === lastData && now - lastTime < 2000) return;
@@ -681,7 +680,7 @@ function processQR(data) {
 
   const m = data.match(/^\[(\d+)\/(\d+)\](.+)$/);
   if (!m) {
-    if (debugLogCount <= 3) addLog('⚠ 非本系统二维码，忽略', 'err');
+    if (debugLogCount <= 3) addLog('⚠ 非本系统二维码', 'err');
     return;
   }
 
@@ -690,7 +689,7 @@ function processQR(data) {
   const b64data = m[3];
 
   if (expectedTotal > 0 && tot !== expectedTotal) {
-    addLog(`⚠ 第${idx}块总数不匹配(期望${expectedTotal},实际${tot})`, 'err');
+    addLog(` 第${idx}块总数不匹配`, 'err');
     notify('二维码来源不一致！', 'error');
     return;
   }
@@ -715,16 +714,13 @@ function processQR(data) {
   playBeep('ok');
   updateProgress();
 
-  if (Object.keys(scannedChunks).length === expectedTotal) {
-    reassemble();
-  }
+  if (Object.keys(scannedChunks).length === expectedTotal) reassemble();
 }
 
 function flashCamera(type) {
   const box = document.getElementById('cameraBox');
-  const cls = type === 'dup' ? 'flash-dup' : 'flash-ok';
-  box.classList.add(cls);
-  setTimeout(() => box.classList.remove(cls), 500);
+  box.classList.add(type === 'dup' ? 'flash-dup' : 'flash-ok');
+  setTimeout(() => box.classList.remove('flash-ok', 'flash-dup'), 500);
 }
 
 function updateProgress() {
@@ -742,8 +738,7 @@ function updateBadges() {
   if (!expectedTotal) { c.innerHTML = '<span style="color:#475569;font-size:.85em">等待首次扫描...</span>'; return; }
   let html = '';
   for (let i = 1; i <= expectedTotal; i++) {
-    if (scannedChunks[i]) html += `<span class="badge done">#${i} ✓</span>`;
-    else html += `<span class="badge wait">#${i}</span>`;
+    html += scannedChunks[i] ? `<span class="badge done">#${i} ✓</span>` : `<span class="badge wait">#${i}</span>`;
   }
   c.innerHTML = html;
 }
@@ -783,7 +778,7 @@ function fallbackCopy(t) {
   const ta = document.getElementById('resultText');
   ta.select(); ta.setSelectionRange(0, 999999);
   try { document.execCommand('copy'); notify('已复制到剪贴板 ✓', 'success'); }
-  catch (e) { notify('复制失败，请手动选择复制', 'error'); }
+  catch (e) { notify('复制失败', 'error'); }
 }
 
 function downloadResult() {
@@ -832,6 +827,22 @@ function notify(msg, type) {
   document.body.appendChild(d);
   if (notifTimer) clearTimeout(notifTimer);
   notifTimer = setTimeout(() => d.remove(), 2500);
+}
+
+// 窗口大小变化时重新约束视频尺寸
+window.addEventListener('resize', () => {
+  if (scanning) {
+    setTimeout(enforceVideoSize, 50);
+  }
+});
+
+// 监听视频尺寸变化
+const camVideo = document.getElementById('camVideo');
+if (camVideo && typeof ResizeObserver !== 'undefined') {
+  const ro = new ResizeObserver(() => {
+    if (scanning) enforceVideoSize();
+  });
+  ro.observe(document.getElementById('cameraBox'));
 }
 </script>
 </body>
