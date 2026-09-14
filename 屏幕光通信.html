@@ -31,7 +31,7 @@
         .panel h2 { margin-bottom: 12px; color: #66bb6a; font-size: 1.1em; }
         .input-group { margin-bottom: 10px; }
         label { display: block; margin-bottom: 4px; color: #b0b0b0; font-size: 13px; }
-        input[type="text"], textarea, select {
+        input[type="text"], input[type="number"], textarea, select {
             width: 100%; padding: 6px; background: #1a1a1a;
             border: 1px solid #444; border-radius: 4px; color: #e0e0e0; font-size: 13px;
         }
@@ -109,6 +109,35 @@
             font-size: 11px; color: #888; margin-top: 5px;
             padding: 5px; background: #1a1a1a; border-radius: 3px;
         }
+        .calibration-section {
+            background: #1a1a1a; padding: 10px; border-radius: 4px;
+            margin-bottom: 10px; border-left: 3px solid #ffa726;
+        }
+        .calibration-section h3 {
+            color: #ffa726; font-size: 0.95em; margin-bottom: 8px;
+        }
+        .slider-group {
+            display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+        }
+        .slider-group label {
+            min-width: 80px; margin: 0; font-size: 12px;
+        }
+        .slider-group input[type="range"] {
+            flex: 1; height: 6px; background: #333; border-radius: 3px;
+            outline: none; -webkit-appearance: none;
+        }
+        .slider-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 16px; height: 16px;
+            background: #4CAF50; border-radius: 50%; cursor: pointer;
+        }
+        .slider-group input[type="range"]::-moz-range-thumb {
+            width: 16px; height: 16px; background: #4CAF50;
+            border-radius: 50%; cursor: pointer; border: none;
+        }
+        .slider-group .value {
+            min-width: 50px; text-align: right; font-family: monospace;
+            font-size: 12px; color: #4CAF50;
+        }
     </style>
 </head>
 <body>
@@ -172,30 +201,53 @@
             <!-- 接收面板 -->
             <div class="panel" id="recvPanel">
                 <h2>📷 接收端</h2>
-                <div class="params-row">
-                    <div class="input-group">
-                        <label>采样区域偏移X：</label>
-                        <input type="text" id="offsetX" value="0" style="width:60px">
+                
+                <div class="calibration-section">
+                    <h3>🎯 采样区域校准</h3>
+                    <div class="hint">💡 调整以下参数，使绿色采样框精确对准发送端的4个闪烁区域。确保摄像头能看到完整的发送画面。</div>
+                    
+                    <div class="slider-group">
+                        <label>水平偏移 X:</label>
+                        <input type="range" id="offsetX" min="-0.5" max="0.5" step="0.01" value="0">
+                        <span class="value" id="offsetXVal">0.00</span>
                     </div>
-                    <div class="input-group">
-                        <label>采样区域偏移Y：</label>
-                        <input type="text" id="offsetY" value="0" style="width:60px">
+                    
+                    <div class="slider-group">
+                        <label>垂直偏移 Y:</label>
+                        <input type="range" id="offsetY" min="-0.5" max="0.5" step="0.01" value="0">
+                        <span class="value" id="offsetYVal">0.00</span>
                     </div>
-                    <div class="input-group">
-                        <label>采样区域缩放：</label>
-                        <input type="text" id="scaleFactor" value="1.0" style="width:60px">
+                    
+                    <div class="slider-group">
+                        <label>缩放比例:</label>
+                        <input type="range" id="scaleFactor" min="0.1" max="2.0" step="0.01" value="1.0">
+                        <span class="value" id="scaleFactorVal">1.00</span>
+                    </div>
+                    
+                    <div class="slider-group">
+                        <label>区域间距:</label>
+                        <input type="range" id="zoneGap" min="0" max="0.1" step="0.005" value="0.02">
+                        <span class="value" id="zoneGapVal">0.020</span>
+                    </div>
+                    
+                    <div class="slider-group">
+                        <label>整体旋转:</label>
+                        <input type="range" id="rotation" min="-30" max="30" step="1" value="0">
+                        <span class="value" id="rotationVal">0°</span>
                     </div>
                 </div>
+
                 <div class="button-group">
                     <button id="startRecvBtn" class="primary">📷 开始接收</button>
                     <button id="stopRecvBtn" class="secondary" disabled>⏹ 停止</button>
                     <button id="resetRecvBtn" class="secondary">↺ 重置解码</button>
                 </div>
-                <div class="hint">💡 提示：将摄像头对准发送端屏幕，确保4个定位标记（白色小方块）可见。调整偏移和缩放使采样框对齐发送区域。</div>
+                
                 <div class="video-wrap">
                     <video id="recvVideo" autoplay playsinline width="400" height="300"></video>
                     <canvas id="overlayCanvas" class="overlay-canvas" width="400" height="300"></canvas>
                 </div>
+                
                 <div class="input-group">
                     <label>解码进度：</label>
                     <div class="progress-bar">
@@ -220,23 +272,23 @@
     //  全局状态
     // ================================================================
     const State = {
-        // 发送端
         send: {
             running: false, paused: false,
             text: '', bytes: [], fragments: [],
             encoder: null, zones: [], animId: null, lastTick: 0
         },
-        // 接收端
         recv: {
             running: false, stream: null, animId: null,
             decoder: null, zones: [],
-            // 每个区域的采样状态
             samplers: []
         },
-        // 参数
         params: {
             zoneCount: 4, symbolDuration: 80, fragmentSize: 16,
             gridSize: 2
+        },
+        calibration: {
+            offsetX: 0, offsetY: 0, scale: 1.0,
+            gap: 0.02, rotation: 0
         }
     };
 
@@ -247,7 +299,6 @@
         return Array.from(new TextEncoder().encode(text));
     }
     function bytesToText(bytes) {
-        // 去除末尾0填充
         let end = bytes.length;
         while (end > 0 && bytes[end - 1] === 0) end--;
         return new TextDecoder().decode(new Uint8Array(bytes.slice(0, end)));
@@ -262,7 +313,7 @@
     }
 
     // ================================================================
-    //  LCG 伪随机数生成器 (保证收发端一致)
+    //  LCG 伪随机数生成器
     // ================================================================
     class LCG {
         constructor(seed) { this.state = seed >>> 0; }
@@ -275,7 +326,7 @@
     }
 
     // ================================================================
-    //  鲁棒孤子分布 (Robust Soliton Distribution)
+    //  鲁棒孤子分布
     // ================================================================
     class RobustSoliton {
         constructor(K, c = 0.03, delta = 0.5) {
@@ -299,7 +350,6 @@
                 Z += combined[d];
             }
             for (let d = 1; d <= K; d++) combined[d] /= Z;
-            // 累积分布
             const cum = new Float64Array(K + 1);
             cum[0] = 0;
             for (let d = 1; d <= K; d++) cum[d] = cum[d - 1] + combined[d];
@@ -326,7 +376,7 @@
         }
         generate() {
             const seed = this.seedCounter++;
-            const lcg = new LCG(seed + 12345); // 偏移避免seed=0的问题
+            const lcg = new LCG(seed + 12345);
             const degree = this.dist.sample(lcg);
             const indices = new Set();
             while (indices.size < degree) indices.add(lcg.nextInt(this.K));
@@ -341,7 +391,7 @@
     }
 
     // ================================================================
-    //  LT 解码器 (Belief Propagation / 置信传播)
+    //  LT 解码器
     // ================================================================
     class LTDecoder {
         constructor(K, fragmentSize) {
@@ -349,7 +399,7 @@
             this.fsize = fragmentSize;
             this.originals = new Array(K).fill(null);
             this.decoded = 0;
-            this.packets = []; // {seed, degree, indices, data}
+            this.packets = [];
             this.seen = new Set();
         }
         addPacket(seed, degree, indices, data) {
@@ -397,11 +447,10 @@
 
     // ================================================================
     //  数据包封装 & 解析
-    //  格式: 包头(1B) + 序号(2B) + 数据(K B) + 校验(1B)
     // ================================================================
     function encodePacket(encoded) {
         const pkt = [];
-        pkt.push(0xAA); // 包头 10101010
+        pkt.push(0xAA);
         pkt.push((encoded.seed >> 8) & 0xFF);
         pkt.push(encoded.seed & 0xFF);
         for (const b of encoded.data) pkt.push(b);
@@ -412,9 +461,7 @@
     }
 
     function decodePacket(bits) {
-        // bits: 比特数组, 长度 = (3 + K + 1) * 8
         if (bits.length < 32) return null;
-        // 解析字节
         const bytes = [];
         for (let i = 0; i + 7 < bits.length; i += 8) {
             let b = 0;
@@ -422,21 +469,17 @@
             bytes.push(b);
         }
         if (bytes.length < 4) return null;
-        // 校验包头
         if (bytes[0] !== 0xAA) return null;
-        // 校验XOR
         let cksum = 0;
         for (let i = 0; i < bytes.length - 1; i++) cksum ^= bytes[i];
         if (cksum !== bytes[bytes.length - 1]) return null;
-        // 解析序号
         const seed = (bytes[1] << 8) | bytes[2];
-        // 数据
         const data = bytes.slice(3, bytes.length - 1);
         return { seed, data };
     }
 
     // ================================================================
-    //  曼彻斯特编码: 0→[暗,亮] 1→[亮,暗]
+    //  曼彻斯特编码
     // ================================================================
     function manchesterEncode(bytes) {
         const out = [];
@@ -525,14 +568,12 @@
             sendCtx.strokeStyle = '#4CAF50';
             sendCtx.lineWidth = 2;
             sendCtx.strokeRect(z.x, z.y, z.size, z.size);
-            // 区域编号
             sendCtx.fillStyle = z.display ? '#000' : '#4CAF50';
             sendCtx.font = '14px monospace';
             sendCtx.textAlign = 'center';
             sendCtx.textBaseline = 'middle';
             sendCtx.fillText(`Z${z.id + 1}`, z.x + z.size / 2, z.y + z.size / 2);
         });
-        // 四角定位标记
         const m = 8;
         sendCtx.fillStyle = '#fff';
         sendCtx.fillRect(0, 0, m, m);
@@ -551,7 +592,6 @@
                 z.currentSeed = enc.seed;
                 z.loadPacket(pkt);
             }
-            // 更新UI
             const si = document.getElementById(`sz-seed-${z.id}`);
             const ci = document.getElementById(`sz-cnt-${z.id}`);
             const bi = document.getElementById(`sz-br-${z.id}`);
@@ -570,7 +610,6 @@
         State.send.text = text;
         State.send.bytes = textToBytes(text);
         log('sendLog', `文本: ${text.length}字符, ${State.send.bytes.length}字节`);
-        // 分片
         State.send.fragments = [];
         for (let i = 0; i < State.send.bytes.length; i += fsize) {
             const f = State.send.bytes.slice(i, i + fsize);
@@ -612,7 +651,7 @@
     }
 
     // ================================================================
-    //  接收端
+    //  接收端 - 改进的采样逻辑
     // ================================================================
     const recvVideo = document.getElementById('recvVideo');
     const overlayCanvas = document.getElementById('overlayCanvas');
@@ -623,21 +662,15 @@
     class RecvSampler {
         constructor(id) {
             this.id = id;
-            // 采样区域在video中的位置（相对坐标0-1）
             this.relX = 0; this.relY = 0; this.relW = 0; this.relH = 0;
-            // 亮度历史
             this.brightnessHistory = [];
             this.threshold = 128;
-            // 曼彻斯特解码状态
-            this.symbolBuffer = []; // 当前符号周期内的亮度采样
-            this.symbolTimer = 0; // 当前符号已积累的帧数
-            this.bitBuffer = []; // 已解码的比特
-            this.lastSymbol = -1; // 上一个符号值
-            // 数据包解析状态
+            this.symbolBuffer = [];
+            this.symbolTimer = 0;
+            this.bitBuffer = [];
+            this.lastSymbol = -1;
             this.packetBits = [];
-            this.packetExpectedLen = 0;
-            this.state = 'SEARCH'; // SEARCH | RECV
-            // 统计
+            this.state = 'SEARCH';
             this.collectedSeeds = new Set();
             this.currentBit = '-';
             this.frameCount = 0;
@@ -645,32 +678,61 @@
         }
     }
 
+    /**
+     * 计算采样区域在摄像头画面中的实际位置
+     * 考虑偏移、缩放、旋转
+     */
+    function calculateSampleRegion(sampler, videoWidth, videoHeight) {
+        const cal = State.calibration;
+        const gs = State.params.gridSize;
+        
+        // 发送端Canvas中区域的相对位置
+        const canvasSize = 400;
+        const pad = 15 / canvasSize;
+        const gap = cal.gap;
+        const zoneSize = (1 - 2 * pad - (gs - 1) * gap) / gs;
+        
+        const row = Math.floor(sampler.id / gs);
+        const col = sampler.id % gs;
+        
+        // 区域中心在发送Canvas中的相对坐标
+        const centerRelX = pad + col * (zoneSize + gap) + zoneSize / 2;
+        const centerRelY = pad + row * (zoneSize + gap) + zoneSize / 2;
+        
+        // 应用旋转
+        const rotRad = cal.rotation * Math.PI / 180;
+        const cosR = Math.cos(rotRad);
+        const sinR = Math.sin(rotRad);
+        
+        // 以中心为旋转原点
+        const dx = centerRelX - 0.5;
+        const dy = centerRelY - 0.5;
+        const rotX = 0.5 + dx * cosR - dy * sinR;
+        const rotY = 0.5 + dx * sinR + dy * cosR;
+        
+        // 应用缩放和偏移
+        const finalX = 0.5 + (rotX - 0.5) * cal.scale + cal.offsetX;
+        const finalY = 0.5 + (rotY - 0.5) * cal.scale + cal.offsetY;
+        
+        // 区域大小（考虑缩放）
+        const finalSize = zoneSize * cal.scale;
+        
+        // 转换为视频像素坐标
+        const px = (finalX - finalSize / 2) * videoWidth;
+        const py = (finalY - finalSize / 2) * videoHeight;
+        const pw = finalSize * videoWidth;
+        const ph = finalSize * videoHeight;
+        
+        return { x: px, y: py, w: pw, h: ph };
+    }
+
     function initRecvZones() {
         const N = State.params.zoneCount;
-        const gs = State.params.gridSize;
         State.recv.zones = [];
         State.recv.samplers = [];
-        // 计算每个区域在Canvas中的相对位置
-        const pad = 15, gap = 8;
-        const canvasSize = 400;
-        const sz = (canvasSize - 2 * pad - (gs - 1) * gap) / canvasSize;
-        const padR = pad / canvasSize;
-        const gapR = gap / canvasSize;
-        let id = 0;
-        for (let r = 0; r < gs; r++) {
-            for (let c = 0; c < gs; c++) {
-                const rx = padR + c * (sz + gapR);
-                const ry = padR + r * (sz + gapR);
-                const sampler = new RecvSampler(id);
-                sampler.relX = rx;
-                sampler.relY = ry;
-                sampler.relW = sz;
-                sampler.relH = sz;
-                State.recv.samplers.push(sampler);
-                id++;
-            }
+        for (let i = 0; i < N; i++) {
+            State.recv.samplers.push(new RecvSampler(i));
         }
-        // 初始化LT解码器
         const fsize = State.params.fragmentSize;
         const text = document.getElementById('textInput').value;
         const bytes = textToBytes(text || 'dummy');
@@ -697,40 +759,35 @@
     }
 
     /**
-     * 计算图像区域的平均亮度
+     * 计算区域平均亮度 - 改进版
      */
-    function getRegionBrightness(video, relX, relY, relW, relH, offsetX, offsetY, scale) {
+    function getRegionBrightness(video, region) {
         const vw = video.videoWidth || video.width;
         const vh = video.videoHeight || video.height;
-        // 应用偏移和缩放
-        const cx = 0.5 + (relX + relW / 2 - 0.5) * scale + offsetX;
-        const cy = 0.5 + (relY + relH / 2 - 0.5) * scale + offsetY;
-        const w = relW * scale;
-        const h = relH * scale;
+        
         // 取中心50%面积
-        const innerW = w * 0.5;
-        const innerH = h * 0.5;
-        const sx = Math.max(0, (cx - innerW / 2) * vw);
-        const sy = Math.max(0, (cy - innerH / 2) * vh);
-        const sw = Math.min(vw - sx, innerW * vw);
-        const sh = Math.min(vh - sy, innerH * vh);
-        if (sw <= 0 || sh <= 0) return -1;
+        const innerW = region.w * 0.5;
+        const innerH = region.h * 0.5;
+        const sx = Math.max(0, region.x + (region.w - innerW) / 2);
+        const sy = Math.max(0, region.y + (region.h - innerH) / 2);
+        const sw = Math.min(vw - sx, innerW);
+        const sh = Math.min(vh - sy, innerH);
+        
+        if (sw <= 0 || sh <= 0 || sx < 0 || sy < 0) return -1;
+        
         analysisCanvas.width = Math.max(1, Math.floor(sw));
         analysisCanvas.height = Math.max(1, Math.floor(sh));
         analysisCtx.drawImage(video, sx, sy, sw, sh, 0, 0, analysisCanvas.width, analysisCanvas.height);
+        
         const imgData = analysisCtx.getImageData(0, 0, analysisCanvas.width, analysisCanvas.height);
         let sum = 0, count = 0;
         for (let i = 0; i < imgData.data.length; i += 4) {
-            // 亮度 = 0.299R + 0.587G + 0.114B
             sum += 0.299 * imgData.data[i] + 0.587 * imgData.data[i + 1] + 0.114 * imgData.data[i + 2];
             count++;
         }
         return count > 0 ? sum / count : -1;
     }
 
-    /**
-     * 自适应阈值
-     */
     function adaptiveThreshold(sampler, brightness) {
         sampler.brightnessHistory.push(brightness);
         if (sampler.brightnessHistory.length > 20) sampler.brightnessHistory.shift();
@@ -741,48 +798,77 @@
             if (v > max) max = v;
         }
         const range = max - min;
-        if (range < 20) return -1; // 无信号
+        if (range < 20) return -1;
         return (max + min) / 2;
     }
 
     /**
-     * 绘制叠加层（采样框）
+     * 绘制叠加层 - 改进版，显示更清晰的采样框
      */
     function drawOverlay() {
         const vw = recvVideo.videoWidth || recvVideo.width;
         const vh = recvVideo.videoHeight || recvVideo.height;
         const dispW = recvVideo.clientWidth;
         const dispH = recvVideo.clientHeight;
+        
         overlayCanvas.width = dispW;
         overlayCanvas.height = dispH;
         overlayCtx.clearRect(0, 0, dispW, dispH);
+        
         const scaleX = dispW / vw;
         const scaleY = dispH / vh;
-        const offsetX = parseFloat(document.getElementById('offsetX').value) || 0;
-        const offsetY = parseFloat(document.getElementById('offsetY').value) || 0;
-        const scale = parseFloat(document.getElementById('scaleFactor').value) || 1;
+        
         State.recv.samplers.forEach((s, i) => {
-            const cx = 0.5 + (s.relX + s.relW / 2 - 0.5) * scale + offsetX;
-            const cy = 0.5 + (s.relY + s.relH / 2 - 0.5) * scale + offsetY;
-            const w = s.relW * scale;
-            const h = s.relH * scale;
-            const dx = (cx - w / 2) * dispW;
-            const dy = (cy - h / 2) * dispH;
-            const dw = w * dispW;
-            const dh = h * dispH;
+            const region = calculateSampleRegion(s, vw, vh);
+            
+            const dx = region.x * scaleX;
+            const dy = region.y * scaleY;
+            const dw = region.w * scaleX;
+            const dh = region.h * scaleY;
+            
+            // 外框
             overlayCtx.strokeStyle = '#4CAF50';
-            overlayCtx.lineWidth = 2;
+            overlayCtx.lineWidth = 3;
             overlayCtx.strokeRect(dx, dy, dw, dh);
+            
+            // 内框（实际采样区域）
+            overlayCtx.strokeStyle = '#FFA726';
+            overlayCtx.lineWidth = 1;
+            overlayCtx.setLineDash([5, 5]);
+            overlayCtx.strokeRect(
+                dx + dw * 0.25,
+                dy + dh * 0.25,
+                dw * 0.5,
+                dh * 0.5
+            );
+            overlayCtx.setLineDash([]);
+            
+            // 标签
             overlayCtx.fillStyle = '#4CAF50';
-            overlayCtx.font = '12px monospace';
-            overlayCtx.fillText(`Z${i + 1}`, dx + 3, dy + 14);
+            overlayCtx.font = 'bold 14px monospace';
+            overlayCtx.fillText(`Z${i + 1}`, dx + 5, dy + 18);
+            
+            // 亮度显示
+            if (s.lastBrightness >= 0) {
+                overlayCtx.fillStyle = s.lastBrightness > s.threshold ? '#fff' : '#666';
+                overlayCtx.fillRect(dx + dw - 30, dy + 5, 25, 20);
+                overlayCtx.fillStyle = '#000';
+                overlayCtx.font = '12px monospace';
+                overlayCtx.fillText(Math.round(s.lastBrightness), dx + dw - 28, dy + 19);
+            }
         });
+        
+        // 绘制十字准线
+        overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        overlayCtx.lineWidth = 1;
+        overlayCtx.beginPath();
+        overlayCtx.moveTo(dispW / 2, 0);
+        overlayCtx.lineTo(dispW / 2, dispH);
+        overlayCtx.moveTo(0, dispH / 2);
+        overlayCtx.lineTo(dispW, dispH / 2);
+        overlayCtx.stroke();
     }
 
-    /**
-     * 曼彻斯特解码 + 数据包解析
-     * 每T ms产生一个符号，每2个符号产生1个比特
-     */
     function processSymbol(sampler, symbolValue) {
         sampler.symbolBuffer.push(symbolValue);
         if (sampler.symbolBuffer.length === 2) {
@@ -792,7 +878,6 @@
             let bit = -1;
             if (s0 === 0 && s1 === 1) bit = 0;
             else if (s0 === 1 && s1 === 0) bit = 1;
-            // else: 无效，跳过
             if (bit >= 0) {
                 sampler.bitBuffer.push(bit);
                 processBits(sampler);
@@ -802,30 +887,26 @@
 
     function processBits(sampler) {
         const fsize = State.params.fragmentSize;
-        const pktBytes = 3 + fsize + 1; // 包头+序号+数据+校验
+        const pktBytes = 3 + fsize + 1;
         const pktBits = pktBytes * 8;
 
         if (sampler.state === 'SEARCH') {
-            // 搜索包头 10101010 = 0xAA
             const headerBits = [1, 0, 1, 0, 1, 0, 1, 0];
             const buf = sampler.bitBuffer;
-            // 在缓冲区中搜索
             while (buf.length >= 8) {
                 let found = true;
                 for (let i = 0; i < 8; i++) {
                     if (buf[i] !== headerBits[i]) { found = false; break; }
                 }
                 if (found) {
-                    // 找到包头，开始接收数据包
                     sampler.state = 'RECV';
-                    sampler.packetBits = buf.slice(8); // 包头之后的比特
+                    sampler.packetBits = buf.slice(8);
                     buf.splice(0, 8);
                     break;
                 } else {
                     buf.shift();
                 }
             }
-            // 限制缓冲区大小
             if (sampler.bitBuffer.length > pktBits * 3) {
                 sampler.bitBuffer = sampler.bitBuffer.slice(-pktBits);
             }
@@ -835,11 +916,9 @@
             if (sampler.packetBits.length >= pktBits) {
                 const bits = sampler.packetBits.slice(0, pktBits);
                 sampler.packetBits = sampler.packetBits.slice(pktBits);
-                // 解析数据包（包含包头）
                 const fullBits = [1, 0, 1, 0, 1, 0, 1, 0, ...bits];
                 const pkt = decodePacket(fullBits);
                 if (pkt) {
-                    // 重新用种子生成indices
                     const lcg = new LCG(pkt.seed + 12345);
                     const dist = new RobustSoliton(State.recv.decoder.K);
                     const degree = dist.sample(lcg);
@@ -852,7 +931,6 @@
                         checkDecodeComplete();
                     }
                 }
-                // 继续搜索下一个包头
                 sampler.state = 'SEARCH';
             }
         }
@@ -870,7 +948,6 @@
             const result = dec.getResult();
             document.getElementById('resultBox').textContent = result || '(解码失败)';
             log('recvLog', `✅ 解码成功! 文本: ${result}`, 'info');
-            // 播放提示音
             try {
                 const actx = new (window.AudioContext || window.webkitAudioContext)();
                 const osc = actx.createOscillator();
@@ -882,34 +959,29 @@
         }
     }
 
-    /**
-     * 接收端主循环
-     */
     let lastRecvTime = 0;
     function recvLoop(timestamp) {
         if (!State.recv.running) return;
         const T = State.params.symbolDuration;
-        const offsetX = parseFloat(document.getElementById('offsetX').value) || 0;
-        const offsetY = parseFloat(document.getElementById('offsetY').value) || 0;
-        const scale = parseFloat(document.getElementById('scaleFactor').value) || 1;
+        const vw = recvVideo.videoWidth || recvVideo.width;
+        const vh = recvVideo.videoHeight || recvVideo.height;
 
         State.recv.samplers.forEach((s, i) => {
-            const br = getRegionBrightness(recvVideo, s.relX, s.relY, s.relW, s.relH, offsetX, offsetY, scale);
+            const region = calculateSampleRegion(s, vw, vh);
+            const br = getRegionBrightness(recvVideo, region);
             if (br < 0) return;
             s.lastBrightness = br;
             s.frameCount++;
             const th = adaptiveThreshold(s, br);
-            if (th < 0) return; // 无信号
+            if (th < 0) return;
             s.threshold = th;
             const bit = br > th ? 1 : 0;
             s.currentBit = bit;
-            // 符号计时：每T ms产生一个符号
-            s.symbolTimer += 33; // 约30fps
+            s.symbolTimer += 33;
             if (s.symbolTimer >= T) {
                 s.symbolTimer -= T;
                 processSymbol(s, bit);
             }
-            // 更新UI
             const brEl = document.getElementById(`rz-br-${i}`);
             const thEl = document.getElementById(`rz-th-${i}`);
             const colEl = document.getElementById(`rz-col-${i}`);
@@ -937,6 +1009,7 @@
             document.getElementById('startRecvBtn').disabled = true;
             document.getElementById('stopRecvBtn').disabled = false;
             log('recvLog', '摄像头已启动', 'info');
+            log('recvLog', '请调整校准参数，使绿色采样框对准发送区域', 'info');
             State.recv.animId = requestAnimationFrame(recvLoop);
         } catch (e) {
             log('recvLog', '摄像头权限被拒绝: ' + e.message, 'error');
@@ -980,6 +1053,27 @@
     }
 
     // ================================================================
+    //  校准滑块事件绑定
+    // ================================================================
+    function updateCalibration() {
+        State.calibration.offsetX = parseFloat(document.getElementById('offsetX').value);
+        State.calibration.offsetY = parseFloat(document.getElementById('offsetY').value);
+        State.calibration.scale = parseFloat(document.getElementById('scaleFactor').value);
+        State.calibration.gap = parseFloat(document.getElementById('zoneGap').value);
+        State.calibration.rotation = parseFloat(document.getElementById('rotation').value);
+        
+        document.getElementById('offsetXVal').textContent = State.calibration.offsetX.toFixed(2);
+        document.getElementById('offsetYVal').textContent = State.calibration.offsetY.toFixed(2);
+        document.getElementById('scaleFactorVal').textContent = State.calibration.scale.toFixed(2);
+        document.getElementById('zoneGapVal').textContent = State.calibration.gap.toFixed(3);
+        document.getElementById('rotationVal').textContent = State.calibration.rotation + '°';
+    }
+
+    ['offsetX', 'offsetY', 'scaleFactor', 'zoneGap', 'rotation'].forEach(id => {
+        document.getElementById(id).addEventListener('input', updateCalibration);
+    });
+
+    // ================================================================
     //  模式切换
     // ================================================================
     function setMode(mode) {
@@ -999,9 +1093,6 @@
         }
     }
 
-    // ================================================================
-    //  参数同步
-    // ================================================================
     function syncParams() {
         State.params.zoneCount = parseInt(document.getElementById('zoneCount').value);
         State.params.symbolDuration = parseInt(document.getElementById('symbolDuration').value);
@@ -1034,7 +1125,9 @@
     sendCtx.fillText('等待开始...', 200, 200);
     log('sendLog', '系统就绪。输入文本后点击"开始发送"。');
     log('recvLog', '系统就绪。点击"开始接收"启动摄像头。');
+    log('recvLog', '启动后请调整校准参数，使绿色框对准发送区域。', 'info');
     setMode('both');
+    updateCalibration();
     </script>
 </body>
 </html>
