@@ -40,17 +40,21 @@ textarea.input-area::placeholder{color:#64748b}
 .btn-danger{background:linear-gradient(135deg,#dc2626,#f87171);color:#fff}
 .btn-ghost{background:rgba(255,255,255,.08);color:#94a3b8;border:1px solid rgba(255,255,255,.1)}
 .btn-ghost:hover{background:rgba(255,255,255,.14)}
-.qr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px;margin-top:18px}
-.qr-card{background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.08);border-radius:14px;padding:14px;text-align:center;transition:all .3s}
-.qr-card:hover{border-color:#7c3aed;transform:translateY(-3px);box-shadow:0 8px 30px rgba(124,58,237,.2)}
-.qr-card img{width:100%;max-width:140px;border-radius:6px;background:#fff;padding:4px}
-.qr-card .qr-label{margin-top:8px;font-weight:700;color:#a78bfa;font-size:.85em}
+.qr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:18px;margin-top:18px}
+.qr-card{background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.08);border-radius:14px;padding:16px;text-align:center;transition:all .3s;cursor:pointer;position:relative}
+.qr-card:hover{border-color:#7c3aed;transform:translateY(-3px);box-shadow:0 8px 30px rgba(124,58,237,.25)}
+.qr-card .zoom-hint{position:absolute;top:8px;right:8px;background:rgba(124,58,237,.8);color:#fff;font-size:.7em;padding:3px 8px;border-radius:10px;opacity:0;transition:opacity .3s;pointer-events:none}
+.qr-card:hover .zoom-hint{opacity:1}
+.qr-card img{width:100%;max-width:200px;border-radius:6px;background:#fff;padding:6px;image-rendering:pixelated}
+.qr-card .qr-label{margin-top:10px;font-weight:700;color:#a78bfa;font-size:.9em}
+.qr-card .qr-size{margin-top:3px;font-size:.75em;color:#64748b}
 .receiver-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
 @media(max-width:800px){.receiver-grid{grid-template-columns:1fr}}
 .camera-box{position:relative;width:100%;aspect-ratio:4/3;background:#0a0a1a;border-radius:14px;overflow:hidden;border:2px solid rgba(255,255,255,.1)}
 .camera-box video{width:100%;height:100%;object-fit:cover}
 .camera-box.scanning{border-color:#7c3aed;box-shadow:0 0 20px rgba(124,58,237,.3)}
-.camera-box.flash{border-color:#34d399!important;box-shadow:0 0 30px rgba(52,211,153,.5)!important}
+.camera-box.flash-ok{border-color:#34d399!important;box-shadow:0 0 30px rgba(52,211,153,.6)!important}
+.camera-box.flash-dup{border-color:#fbbf24!important;box-shadow:0 0 30px rgba(251,191,36,.6)!important}
 .scan-overlay{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;display:none}
 .scan-overlay.active{display:block}
 .scan-overlay::before{content:'';position:absolute;left:10%;right:10%;height:2px;background:linear-gradient(90deg,transparent,#7c3aed,transparent);animation:scanMove 2s ease-in-out infinite;top:0}
@@ -68,19 +72,9 @@ textarea.input-area::placeholder{color:#64748b}
 .badge{padding:3px 10px;border-radius:16px;font-size:.78em;font-weight:600;transition:all .3s}
 .badge.done{background:rgba(52,211,153,.15);color:#34d399;border:1px solid rgba(52,211,153,.3)}
 .badge.wait{background:rgba(255,255,255,.05);color:#475569;border:1px solid rgba(255,255,255,.06)}
-.badge.dup{background:rgba(251,191,36,.12);color:#fbbf24;border:1px solid rgba(251,191,36,.25)}
 .result-box{margin-top:16px}
 .result-box textarea{width:100%;height:180px;background:rgba(0,0,0,.3);border:1.5px solid rgba(52,211,153,.3);border-radius:12px;padding:14px;font-size:.95em;color:#e2e8f0;resize:vertical;font-family:inherit;line-height:1.6}
 .result-actions{margin-top:10px;display:flex;gap:10px;flex-wrap:wrap}
-.empty-state{text-align:center;padding:36px 20px;color:#475569}
-.empty-state .icon{font-size:2.5em;margin-bottom:8px}
-.empty-state p{font-size:.9em}
-.notification{position:fixed;top:16px;right:16px;padding:12px 22px;border-radius:12px;color:#fff;font-weight:600;font-size:.9em;z-index:9999;animation:notifIn .3s ease;box-shadow:0 8px 30px rgba(0,0,0,.3);backdrop-filter:blur(10px);max-width:340px}
-.notification.success{background:linear-gradient(135deg,rgba(5,150,105,.9),rgba(52,211,153,.9))}
-.notification.warning{background:linear-gradient(135deg,rgba(217,119,6,.9),rgba(251,191,36,.9))}
-.notification.error{background:linear-gradient(135deg,rgba(220,38,38,.9),rgba(248,113,113,.9))}
-.notification.info{background:linear-gradient(135deg,rgba(124,58,237,.9),rgba(59,130,246,.9))}
-@keyframes notifIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
 .preview-info{display:flex;gap:16px;margin:14px 0;flex-wrap:wrap}
 .preview-chip{background:rgba(124,58,237,.12);border:1px solid rgba(124,58,237,.25);border-radius:10px;padding:8px 16px;font-size:.85em;color:#a78bfa}
 .preview-chip strong{color:#c4b5fd}
@@ -88,12 +82,40 @@ textarea.input-area::placeholder{color:#64748b}
 .log-area .log-item{padding:2px 0;border-bottom:1px solid rgba(255,255,255,.03)}
 .log-area .log-ok{color:#34d399}
 .log-area .log-dup{color:#fbbf24}
-::-webkit-scrollbar{width:5px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px}
 .complete-banner{background:linear-gradient(135deg,rgba(5,150,105,.15),rgba(52,211,153,.1));border:1px solid rgba(52,211,153,.3);border-radius:14px;padding:18px;text-align:center;margin:14px 0;animation:fadeUp .5s ease}
 .complete-banner .big{font-size:1.3em;font-weight:700;color:#34d399;margin-bottom:4px}
 .complete-banner .sub{font-size:.85em;color:#6ee7b7}
+
+/* 放大模态框 */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);z-index:1000;display:none;align-items:center;justify-content:center;animation:fadeIn .25s ease}
+.modal-overlay.active{display:flex}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal-box{background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:24px;max-width:90vw;max-height:90vh;overflow:auto;text-align:center;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.modal-close{position:absolute;top:12px;right:12px;background:rgba(255,255,255,.1);border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:1.2em;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center}
+.modal-close:hover{background:rgba(239,68,68,.6);transform:rotate(90deg)}
+.modal-title{font-size:1.1em;font-weight:700;color:#a78bfa;margin-bottom:16px}
+.modal-qr{background:#fff;padding:16px;border-radius:12px;display:inline-block;image-rendering:pixelated}
+.modal-qr img{display:block;max-width:none}
+.modal-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:18px}
+.modal-nav button{width:44px;height:44px;border-radius:50%;border:none;background:rgba(124,58,237,.3);color:#fff;font-size:1.3em;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center}
+.modal-nav button:hover:not(:disabled){background:rgba(124,58,237,.6);transform:scale(1.1)}
+.modal-nav button:disabled{opacity:.3;cursor:not-allowed}
+.modal-nav .nav-info{color:#94a3b8;font-weight:600;min-width:100px}
+.modal-hint{color:#475569;font-size:.78em;margin-top:12px}
+
+/* 扫码成功提示覆盖层 */
+.scan-toast{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(0);background:rgba(52,211,153,.95);color:#fff;padding:16px 28px;border-radius:16px;font-weight:700;font-size:1.1em;z-index:10;pointer-events:none;transition:transform .2s ease;box-shadow:0 8px 30px rgba(52,211,153,.5)}
+.scan-toast.show{transform:translate(-50%,-50%) scale(1)}
+.scan-toast.dup{background:rgba(251,191,36,.95);box-shadow:0 8px 30px rgba(251,191,36,.5)}
+
+/* 声音开关 */
+.sound-toggle{display:flex;align-items:center;gap:8px;margin-top:10px;justify-content:center}
+.sound-toggle label{color:#94a3b8;font-size:.85em;cursor:pointer;display:flex;align-items:center;gap:6px}
+.sound-toggle input{accent-color:#7c3aed;width:16px;height:16px}
+
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px}
 </style>
 </head>
 <body>
@@ -131,11 +153,15 @@ textarea.input-area::placeholder{color:#64748b}
 <video id="camVideo" autoplay playsinline muted></video>
 <div class="scan-overlay" id="scanOverlay"></div>
 <div class="scan-corners" id="scanCorners"></div>
+<div class="scan-toast" id="scanToast"></div>
 </div>
 <div class="scan-controls">
 <button class="btn btn-primary" id="btnStart" onclick="startScan()">▶ 开始扫描</button>
 <button class="btn btn-danger" id="btnStop" onclick="stopScan()" style="display:none">⏹ 停止</button>
 <button class="btn btn-ghost" onclick="resetScan()">🔄 重置</button>
+</div>
+<div class="sound-toggle">
+<label><input type="checkbox" id="soundEnabled" checked> 🔊 扫码成功提示音</label>
 </div>
 <div class="section-title" style="margin-top:18px">📋 扫描日志</div>
 <div class="log-area" id="logArea"><div class="log-item" style="color:#475569">等待扫描...</div></div>
@@ -163,10 +189,28 @@ textarea.input-area::placeholder{color:#64748b}
 </div>
 </div>
 
+<!-- 放大模态框 -->
+<div class="modal-overlay" id="qrModal">
+<div class="modal-box">
+<button class="modal-close" onclick="closeModal()">✕</button>
+<div class="modal-title" id="modalTitle">第 1 / 1 块</div>
+<div class="modal-qr" id="modalQr"></div>
+<div class="modal-nav">
+<button id="btnPrev" onclick="navModal(-1)">‹</button>
+<span class="nav-info" id="modalNavInfo">1 / 1</span>
+<button id="btnNext" onclick="navModal(1)">›</button>
+</div>
+<div class="modal-hint">💡 使用键盘 ← → 切换 · ESC 关闭</div>
+</div>
+</div>
+
 <script>
 let scanning=false,videoStream=null,scanAnimId=null;
 let scannedChunks={},expectedTotal=0,dupCount=0;
 let lastData='',lastTime=0,lastScanT=0;
+let qrChunksData=[]; // 存储生成的二维码数据
+let currentModalIdx=0;
+let audioCtx=null;
 
 function switchMode(m){
 document.querySelectorAll('.mode-btn').forEach((b,i)=>{b.classList.toggle('active',(m==='send'&&i===0)||(m==='receive'&&i===1))});
@@ -196,10 +240,8 @@ chunks.push(dec.decode(bytes.slice(s,e)));
 s=e;
 }
 const total=chunks.length;
-// verify prefix fits
 const maxPrefixLen=enc.encode(`[${total}/${total}]`).length;
 if(maxPrefixLen>reserve){
-// need to re-split with larger reserve
 const newContentMax=maxB-maxPrefixLen;
 if(newContentMax<=0)throw new Error('分块大小太小');
 chunks.length=0;
@@ -222,6 +264,7 @@ const cs=parseInt(document.getElementById('chunkSize').value);
 if(cs<30){notify('分块大小不能小于30字节','warning');return;}
 try{
 const encoded=splitText(text,cs);
+qrChunksData=encoded;
 showPreview(encoded,text);
 renderQRGrid(encoded);
 notify(`成功生成 ${encoded.length} 个二维码`,'success');
@@ -240,18 +283,21 @@ pa.innerHTML=`<div class="preview-info">
 
 function renderQRGrid(chunks){
 const c=document.getElementById('qrResult');
-c.innerHTML=`<div class="section-title">📱 二维码 (共 ${chunks.length} 个)</div>`;
+c.innerHTML=`<div class="section-title">📱 二维码 (共 ${chunks.length} 个) · 点击可放大查看</div>`;
 const grid=document.createElement('div');
 grid.className='qr-grid';
 chunks.forEach((chunk,i)=>{
 const card=document.createElement('div');
 card.className='qr-card';
+card.onclick=()=>openModal(i);
 try{
 const qr=qrcode(0,'M');
 qr.addData(chunk,'Byte');
 qr.make();
-const url=qr.createDataURL(5,2);
-card.innerHTML=`<img src="${url}" alt="QR ${i+1}"><div class="qr-label">第 ${i+1} / ${chunks.length} 块</div>`;
+// 增大默认显示尺寸：cell size 8
+const url=qr.createDataURL(8,2);
+const byteLen=new TextEncoder().encode(chunk).length;
+card.innerHTML=`<span class="zoom-hint">🔍 点击放大</span><img src="${url}" alt="QR ${i+1}"><div class="qr-label">第 ${i+1} / ${chunks.length} 块</div><div class="qr-size">${byteLen} 字节</div>`;
 }catch(e){
 card.innerHTML=`<div style="padding:20px;color:#f87171">生成失败</div><div class="qr-label">第 ${i+1} / ${chunks.length} 块</div>`;
 }
@@ -260,6 +306,94 @@ grid.appendChild(card);
 c.appendChild(grid);
 }
 
+// ========= 放大模态框 =========
+function openModal(idx){
+currentModalIdx=idx;
+renderModal();
+document.getElementById('qrModal').classList.add('active');
+}
+function closeModal(){
+document.getElementById('qrModal').classList.remove('active');
+}
+function renderModal(){
+const total=qrChunksData.length;
+const chunk=qrChunksData[currentModalIdx];
+document.getElementById('modalTitle').textContent=`第 ${currentModalIdx+1} / ${total} 块`;
+document.getElementById('modalNavInfo').textContent=`${currentModalIdx+1} / ${total}`;
+document.getElementById('btnPrev').disabled=currentModalIdx===0;
+document.getElementById('btnNext').disabled=currentModalIdx===total-1;
+const qr=qrcode(0,'M');
+qr.addData(chunk,'Byte');
+qr.make();
+// 放大显示：cell size 14，更大更清晰
+const url=qr.createDataURL(14,2);
+const byteLen=new TextEncoder().encode(chunk).length;
+document.getElementById('modalQr').innerHTML=`<img src="${url}" alt="QR ${currentModalIdx+1}" style="width:100%;max-width:520px;height:auto"><div style="margin-top:10px;color:#64748b;font-size:.85em">${byteLen} 字节 · 点击左右箭头或按 ← → 切换</div>`;
+}
+function navModal(dir){
+const newIdx=currentModalIdx+dir;
+if(newIdx<0||newIdx>=qrChunksData.length)return;
+currentModalIdx=newIdx;
+renderModal();
+}
+
+document.addEventListener('keydown',function(e){
+if(!document.getElementById('qrModal').classList.contains('active'))return;
+if(e.key==='ArrowLeft'){e.preventDefault();navModal(-1);}
+else if(e.key==='ArrowRight'){e.preventDefault();navModal(1);}
+else if(e.key==='Escape'){e.preventDefault();closeModal();}
+});
+
+// ========= 扫码提示音 =========
+function playBeep(type){
+if(!document.getElementById('soundEnabled').checked)return;
+try{
+if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+const osc=audioCtx.createOscillator();
+const gain=audioCtx.createGain();
+osc.connect(gain);
+gain.connect(audioCtx.destination);
+if(type==='ok'){
+// 成功：清脆双音
+osc.type='sine';
+osc.frequency.setValueAtTime(880,audioCtx.currentTime);
+osc.frequency.setValueAtTime(1320,audioCtx.currentTime+0.08);
+gain.gain.setValueAtTime(0.25,audioCtx.currentTime);
+gain.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.2);
+osc.start(audioCtx.currentTime);
+osc.stop(audioCtx.currentTime+0.2);
+}else if(type==='dup'){
+// 重复：低沉提示
+osc.type='square';
+osc.frequency.setValueAtTime(300,audioCtx.currentTime);
+gain.gain.setValueAtTime(0.15,audioCtx.currentTime);
+gain.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.15);
+osc.start(audioCtx.currentTime);
+osc.stop(audioCtx.currentTime+0.15);
+}else if(type==='complete'){
+// 完成：欢快三连音
+osc.type='sine';
+osc.frequency.setValueAtTime(660,audioCtx.currentTime);
+osc.frequency.setValueAtTime(880,audioCtx.currentTime+0.12);
+osc.frequency.setValueAtTime(1320,audioCtx.currentTime+0.24);
+gain.gain.setValueAtTime(0.3,audioCtx.currentTime);
+gain.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.4);
+osc.start(audioCtx.currentTime);
+osc.stop(audioCtx.currentTime+0.4);
+}
+}catch(e){}
+}
+
+// ========= 扫码覆盖提示 =========
+function showScanToast(text,isDup){
+const t=document.getElementById('scanToast');
+t.textContent=text;
+t.classList.toggle('dup',!!isDup);
+t.classList.add('show');
+setTimeout(()=>t.classList.remove('show'),1200);
+}
+
+// ========= 摄像头扫描 =========
 async function startScan(){
 try{
 const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}}});
@@ -329,6 +463,8 @@ dupCount++;
 addLog(`⚠ 第 ${idx}/${tot} 块 — 重复扫描，已忽略`,'dup');
 notify(`第 ${idx} 块已扫过（重复）`,'warning');
 flashCamera('dup');
+showScanToast(`#${idx} 已扫过`,true);
+playBeep('dup');
 updateBadges();
 return;
 }
@@ -337,6 +473,8 @@ expectedTotal=tot;
 addLog(`✓ 第 ${idx}/${tot} 块 — 扫描成功`,'ok');
 notify(`✓ 第 ${idx}/${tot} 块`,'success');
 flashCamera('ok');
+showScanToast(`✓ 第 ${idx}/${tot} 块`,false);
+playBeep('ok');
 updateProgress();
 if(Object.keys(scannedChunks).length===expectedTotal){
 reassemble();
@@ -345,9 +483,9 @@ reassemble();
 
 function flashCamera(type){
 const box=document.getElementById('cameraBox');
-box.classList.add('flash');
-if(type==='dup')box.style.borderColor='#fbbf24';
-setTimeout(()=>{box.classList.remove('flash');box.style.borderColor='';},400);
+const cls=type==='dup'?'flash-dup':'flash-ok';
+box.classList.add(cls);
+setTimeout(()=>box.classList.remove(cls),500);
 }
 
 function updateProgress(){
@@ -385,6 +523,7 @@ document.getElementById('completeBanner').innerHTML=`<div class="complete-banner
 </div>`;
 addLog(`🎉 全部 ${expectedTotal} 块扫描完成，文本已重组 (${full.length} 字符)`,'ok');
 notify('🎉 所有二维码已扫描完成！','success');
+playBeep('complete');
 if(scanning)stopScan();
 }
 
