@@ -138,6 +138,13 @@
             min-width: 50px; text-align: right; font-family: monospace;
             font-size: 12px; color: #4CAF50;
         }
+        .decode-info {
+            background: #1a1a1a; padding: 10px; border-radius: 4px;
+            margin-bottom: 10px; border-left: 3px solid #2196F3;
+        }
+        .decode-info h3 {
+            color: #2196F3; font-size: 0.95em; margin-bottom: 8px;
+        }
     </style>
 </head>
 <body>
@@ -156,7 +163,7 @@
                 <h2>📡 发送端</h2>
                 <div class="input-group">
                     <label>要发送的文本：</label>
-                    <textarea id="textInput" placeholder="输入要传输的文本...">Hello, 光通信测试！这是一段用于验证LT喷泉码的文本。</textarea>
+                    <textarea id="textInput" placeholder="输入要传输的文本...">Hello, 光通信测试！</textarea>
                 </div>
                 <div class="params-row">
                     <div class="input-group">
@@ -237,6 +244,22 @@
                     </div>
                 </div>
 
+                <div class="decode-info">
+                    <h3>📊 解码状态</h3>
+                    <div class="status-item">
+                        <span>原始分片数 K:</span>
+                        <span id="kValue">未检测</span>
+                    </div>
+                    <div class="status-item">
+                        <span>已收集分片:</span>
+                        <span id="collectedCount">0</span>
+                    </div>
+                    <div class="status-item">
+                        <span>需要约:</span>
+                        <span id="neededCount">-</span>
+                    </div>
+                </div>
+
                 <div class="button-group">
                     <button id="startRecvBtn" class="primary">📷 开始接收</button>
                     <button id="stopRecvBtn" class="secondary" disabled>⏹ 停止</button>
@@ -275,12 +298,15 @@
         send: {
             running: false, paused: false,
             text: '', bytes: [], fragments: [],
-            encoder: null, zones: [], animId: null, lastTick: 0
+            encoder: null, zones: [], animId: null, lastTick: 0,
+            K: 0 // 原始分片数
         },
         recv: {
             running: false, stream: null, animId: null,
             decoder: null, zones: [],
-            samplers: []
+            samplers: [],
+            K: 0, // 从数据包中检测到的K值
+            lastFrameTime: 0
         },
         params: {
             zoneCount: 4, symbolDuration: 80, fragmentSize: 16,
@@ -368,10 +394,10 @@
     //  LT 编码器
     // ================================================================
     class LTEncoder {
-        constructor(fragments) {
+        constructor(fragments, K) {
             this.fragments = fragments;
-            this.K = fragments.length;
-            this.dist = new RobustSoliton(this.K);
+            this.K = K;
+            this.dist = new RobustSoliton(K);
             this.seedCounter = 0;
         }
         generate() {
@@ -446,11 +472,13 @@
     }
 
     // ================================================================
-    //  数据包封装 & 解析
+    //  数据包封装 & 解析 (改进版：包含K值)
+    //  格式: 包头(1B) + K值(1B) + 序号(2B) + 数据(fsize B) + 校验(1B)
     // ================================================================
-    function encodePacket(encoded) {
+    function encodePacket(encoded, K) {
         const pkt = [];
-        pkt.push(0xAA);
+        pkt.push(0xAA); // 包头 10101010
+        pkt.push(K); // K值
         pkt.push((encoded.seed >> 8) & 0xFF);
         pkt.push(encoded.seed & 0xFF);
         for (const b of encoded.data) pkt.push(b);
@@ -461,21 +489,22 @@
     }
 
     function decodePacket(bits) {
-        if (bits.length < 32) return null;
+        if (bits.length < 40) return null; // 至少需要5字节
         const bytes = [];
         for (let i = 0; i + 7 < bits.length; i += 8) {
             let b = 0;
             for (let j = 0; j < 8; j++) b = (b << 1) | (bits[i + j] & 1);
             bytes.push(b);
         }
-        if (bytes.length < 4) return null;
+        if (bytes.length < 5) return null;
         if (bytes[0] !== 0xAA) return null;
         let cksum = 0;
         for (let i = 0; i < bytes.length - 1; i++) cksum ^= bytes[i];
         if (cksum !== bytes[bytes.length - 1]) return null;
-        const seed = (bytes[1] << 8) | bytes[2];
-        const data = bytes.slice(3, bytes.length - 1);
-        return { seed, data };
+        const K = bytes[1];
+        const seed = (bytes[2] << 8) | bytes[3];
+        const data = bytes.slice(4, bytes.length - 1);
+        return { K, seed, data };
     }
 
     // ================================================================
@@ -588,7 +617,7 @@
             const needNew = z.tick();
             if (needNew || z.brightnessSeq.length === 0) {
                 const enc = State.send.encoder.generate();
-                const pkt = encodePacket(enc);
+                const pkt = encodePacket(enc, State.send.K);
                 z.currentSeed = enc.seed;
                 z.loadPacket(pkt);
             }
@@ -617,8 +646,9 @@
             State.send.fragments.push(f);
         }
         if (State.send.fragments.length === 0) State.send.fragments.push(new Array(fsize).fill(0));
-        log('sendLog', `分片: ${State.send.fragments.length}片 × ${fsize}字节`);
-        State.send.encoder = new LTEncoder(State.send.fragments);
+        State.send.K = State.send.fragments.length;
+        log('sendLog', `分片: ${State.send.K}片 × ${fsize}字节`);
+        State.send.encoder = new LTEncoder(State.send.fragments, State.send.K);
         initSendZones();
         State.send.running = true;
         State.send.paused = false;
@@ -651,7 +681,7 @@
     }
 
     // ================================================================
-    //  接收端 - 改进的采样逻辑
+    //  接收端
     // ================================================================
     const recvVideo = document.getElementById('recvVideo');
     const overlayCanvas = document.getElementById('overlayCanvas');
@@ -666,63 +696,43 @@
             this.brightnessHistory = [];
             this.threshold = 128;
             this.symbolBuffer = [];
-            this.symbolTimer = 0;
             this.bitBuffer = [];
-            this.lastSymbol = -1;
             this.packetBits = [];
             this.state = 'SEARCH';
             this.collectedSeeds = new Set();
             this.currentBit = '-';
             this.frameCount = 0;
             this.lastBrightness = 0;
+            this.lastSymbolTime = 0;
+            this.phase = 0; // 曼彻斯特相位
         }
     }
 
-    /**
-     * 计算采样区域在摄像头画面中的实际位置
-     * 考虑偏移、缩放、旋转
-     */
     function calculateSampleRegion(sampler, videoWidth, videoHeight) {
         const cal = State.calibration;
         const gs = State.params.gridSize;
-        
-        // 发送端Canvas中区域的相对位置
         const canvasSize = 400;
         const pad = 15 / canvasSize;
         const gap = cal.gap;
         const zoneSize = (1 - 2 * pad - (gs - 1) * gap) / gs;
-        
         const row = Math.floor(sampler.id / gs);
         const col = sampler.id % gs;
-        
-        // 区域中心在发送Canvas中的相对坐标
         const centerRelX = pad + col * (zoneSize + gap) + zoneSize / 2;
         const centerRelY = pad + row * (zoneSize + gap) + zoneSize / 2;
-        
-        // 应用旋转
         const rotRad = cal.rotation * Math.PI / 180;
         const cosR = Math.cos(rotRad);
         const sinR = Math.sin(rotRad);
-        
-        // 以中心为旋转原点
         const dx = centerRelX - 0.5;
         const dy = centerRelY - 0.5;
         const rotX = 0.5 + dx * cosR - dy * sinR;
         const rotY = 0.5 + dx * sinR + dy * cosR;
-        
-        // 应用缩放和偏移
         const finalX = 0.5 + (rotX - 0.5) * cal.scale + cal.offsetX;
         const finalY = 0.5 + (rotY - 0.5) * cal.scale + cal.offsetY;
-        
-        // 区域大小（考虑缩放）
         const finalSize = zoneSize * cal.scale;
-        
-        // 转换为视频像素坐标
         const px = (finalX - finalSize / 2) * videoWidth;
         const py = (finalY - finalSize / 2) * videoHeight;
         const pw = finalSize * videoWidth;
         const ph = finalSize * videoHeight;
-        
         return { x: px, y: py, w: pw, h: ph };
     }
 
@@ -733,12 +743,10 @@
         for (let i = 0; i < N; i++) {
             State.recv.samplers.push(new RecvSampler(i));
         }
-        const fsize = State.params.fragmentSize;
-        const text = document.getElementById('textInput').value;
-        const bytes = textToBytes(text || 'dummy');
-        const numFragments = Math.max(1, Math.ceil(bytes.length / fsize));
-        State.recv.decoder = new LTDecoder(numFragments, fsize);
+        State.recv.K = 0;
+        State.recv.decoder = null;
         updateRecvStatus();
+        updateDecodeInfo();
     }
 
     function updateRecvStatus() {
@@ -758,27 +766,25 @@
         });
     }
 
-    /**
-     * 计算区域平均亮度 - 改进版
-     */
+    function updateDecodeInfo() {
+        document.getElementById('kValue').textContent = State.recv.K > 0 ? State.recv.K : '未检测';
+        document.getElementById('collectedCount').textContent = State.recv.decoder ? State.recv.decoder.seen.size : 0;
+        document.getElementById('neededCount').textContent = State.recv.K > 0 ? Math.ceil(State.recv.K * 1.2) : '-';
+    }
+
     function getRegionBrightness(video, region) {
         const vw = video.videoWidth || video.width;
         const vh = video.videoHeight || video.height;
-        
-        // 取中心50%面积
         const innerW = region.w * 0.5;
         const innerH = region.h * 0.5;
         const sx = Math.max(0, region.x + (region.w - innerW) / 2);
         const sy = Math.max(0, region.y + (region.h - innerH) / 2);
         const sw = Math.min(vw - sx, innerW);
         const sh = Math.min(vh - sy, innerH);
-        
         if (sw <= 0 || sh <= 0 || sx < 0 || sy < 0) return -1;
-        
         analysisCanvas.width = Math.max(1, Math.floor(sw));
         analysisCanvas.height = Math.max(1, Math.floor(sh));
         analysisCtx.drawImage(video, sx, sy, sw, sh, 0, 0, analysisCanvas.width, analysisCanvas.height);
-        
         const imgData = analysisCtx.getImageData(0, 0, analysisCanvas.width, analysisCanvas.height);
         let sum = 0, count = 0;
         for (let i = 0; i < imgData.data.length; i += 4) {
@@ -802,36 +808,25 @@
         return (max + min) / 2;
     }
 
-    /**
-     * 绘制叠加层 - 改进版，显示更清晰的采样框
-     */
     function drawOverlay() {
         const vw = recvVideo.videoWidth || recvVideo.width;
         const vh = recvVideo.videoHeight || recvVideo.height;
         const dispW = recvVideo.clientWidth;
         const dispH = recvVideo.clientHeight;
-        
         overlayCanvas.width = dispW;
         overlayCanvas.height = dispH;
         overlayCtx.clearRect(0, 0, dispW, dispH);
-        
         const scaleX = dispW / vw;
         const scaleY = dispH / vh;
-        
         State.recv.samplers.forEach((s, i) => {
             const region = calculateSampleRegion(s, vw, vh);
-            
             const dx = region.x * scaleX;
             const dy = region.y * scaleY;
             const dw = region.w * scaleX;
             const dh = region.h * scaleY;
-            
-            // 外框
             overlayCtx.strokeStyle = '#4CAF50';
             overlayCtx.lineWidth = 3;
             overlayCtx.strokeRect(dx, dy, dw, dh);
-            
-            // 内框（实际采样区域）
             overlayCtx.strokeStyle = '#FFA726';
             overlayCtx.lineWidth = 1;
             overlayCtx.setLineDash([5, 5]);
@@ -842,13 +837,9 @@
                 dh * 0.5
             );
             overlayCtx.setLineDash([]);
-            
-            // 标签
             overlayCtx.fillStyle = '#4CAF50';
             overlayCtx.font = 'bold 14px monospace';
             overlayCtx.fillText(`Z${i + 1}`, dx + 5, dy + 18);
-            
-            // 亮度显示
             if (s.lastBrightness >= 0) {
                 overlayCtx.fillStyle = s.lastBrightness > s.threshold ? '#fff' : '#666';
                 overlayCtx.fillRect(dx + dw - 30, dy + 5, 25, 20);
@@ -857,8 +848,6 @@
                 overlayCtx.fillText(Math.round(s.lastBrightness), dx + dw - 28, dy + 19);
             }
         });
-        
-        // 绘制十字准线
         overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
         overlayCtx.lineWidth = 1;
         overlayCtx.beginPath();
@@ -869,25 +858,59 @@
         overlayCtx.stroke();
     }
 
-    function processSymbol(sampler, symbolValue) {
-        sampler.symbolBuffer.push(symbolValue);
-        if (sampler.symbolBuffer.length === 2) {
-            const s0 = sampler.symbolBuffer[0];
-            const s1 = sampler.symbolBuffer[1];
-            sampler.symbolBuffer = [];
-            let bit = -1;
-            if (s0 === 0 && s1 === 1) bit = 0;
-            else if (s0 === 1 && s1 === 0) bit = 1;
-            if (bit >= 0) {
-                sampler.bitBuffer.push(bit);
-                processBits(sampler);
+    /**
+     * 改进的曼彻斯特解码：使用跳变沿检测
+     */
+    function processBrightnessChange(sampler, brightness, timestamp) {
+        const bit = brightness > sampler.threshold ? 1 : 0;
+        sampler.currentBit = bit;
+        
+        const T = State.params.symbolDuration;
+        
+        // 检测跳变沿
+        if (sampler.symbolBuffer.length > 0) {
+            const lastBit = sampler.symbolBuffer[sampler.symbolBuffer.length - 1];
+            const timeSinceLastSymbol = timestamp - sampler.lastSymbolTime;
+            
+            // 如果检测到跳变，且时间接近T，说明是一个完整的符号
+            if (bit !== lastBit && timeSinceLastSymbol >= T * 0.7) {
+                // 完成一个符号
+                sampler.lastSymbolTime = timestamp;
+                
+                // 曼彻斯特解码：每2个符号产生1个bit
+                if (sampler.phase === 0) {
+                    sampler.phase = 1;
+                } else {
+                    sampler.phase = 0;
+                    // 两个符号组合解码
+                    const s0 = sampler.symbolBuffer[0];
+                    const s1 = sampler.symbolBuffer[1];
+                    let decodedBit = -1;
+                    if (s0 === 0 && s1 === 1) decodedBit = 0;
+                    else if (s0 === 1 && s1 === 0) decodedBit = 1;
+                    
+                    if (decodedBit >= 0) {
+                        sampler.bitBuffer.push(decodedBit);
+                        processBits(sampler);
+                    }
+                    sampler.symbolBuffer = [];
+                }
+            } else if (timeSinceLastSymbol >= T * 1.5) {
+                // 超时，重置
+                sampler.symbolBuffer = [];
+                sampler.phase = 0;
+                sampler.lastSymbolTime = timestamp;
             }
+        } else {
+            // 第一个符号
+            sampler.symbolBuffer.push(bit);
+            sampler.lastSymbolTime = timestamp;
         }
     }
 
     function processBits(sampler) {
         const fsize = State.params.fragmentSize;
-        const pktBytes = 3 + fsize + 1;
+        const pktBytes = 4 + fsize + 1; // 包头+K+序号+数据+校验
         const pktBits = pktBytes * 8;
 
         if (sampler.state === 'SEARCH') {
@@ -902,6 +925,7 @@
                     sampler.state = 'RECV';
                     sampler.packetBits = buf.slice(8);
                     buf.splice(0, 8);
+                    log('recvLog', `Z${sampler.id + 1}: 检测到包头`, 'info');
                     break;
                 } else {
                     buf.shift();
@@ -919,16 +943,28 @@
                 const fullBits = [1, 0, 1, 0, 1, 0, 1, 0, ...bits];
                 const pkt = decodePacket(fullBits);
                 if (pkt) {
-                    const lcg = new LCG(pkt.seed + 12345);
-                    const dist = new RobustSoliton(State.recv.decoder.K);
-                    const degree = dist.sample(lcg);
-                    const indices = new Set();
-                    while (indices.size < degree) indices.add(lcg.nextInt(State.recv.decoder.K));
-                    const added = State.recv.decoder.addPacket(pkt.seed, degree, Array.from(indices), pkt.data);
-                    if (added) {
-                        sampler.collectedSeeds.add(pkt.seed);
-                        log('recvLog', `Z${sampler.id + 1}: 收到分片 seed=${pkt.seed}, degree=${degree}`);
-                        checkDecodeComplete();
+                    // 首次检测到K值
+                    if (State.recv.K === 0) {
+                        State.recv.K = pkt.K;
+                        const fsize = State.params.fragmentSize;
+                        State.recv.decoder = new LTDecoder(pkt.K, fsize);
+                        log('recvLog', `检测到 K=${pkt.K}`, 'info');
+                        updateDecodeInfo();
+                    }
+                    
+                    if (State.recv.decoder && pkt.K === State.recv.K) {
+                        const lcg = new LCG(pkt.seed + 12345);
+                        const dist = new RobustSoliton(pkt.K);
+                        const degree = dist.sample(lcg);
+                        const indices = new Set();
+                        while (indices.size < degree) indices.add(lcg.nextInt(pkt.K));
+                        const added = State.recv.decoder.addPacket(pkt.seed, degree, Array.from(indices), pkt.data);
+                        if (added) {
+                            sampler.collectedSeeds.add(pkt.seed);
+                            log('recvLog', `Z${sampler.id + 1}: 收到分片 seed=${pkt.seed}, degree=${degree}`);
+                            updateDecodeInfo();
+                            checkDecodeComplete();
+                        }
                     }
                 }
                 sampler.state = 'SEARCH';
@@ -937,6 +973,7 @@
     }
 
     function checkDecodeComplete() {
+        if (!State.recv.decoder) return;
         const dec = State.recv.decoder;
         const total = dec.K;
         const done = dec.decoded;
@@ -944,6 +981,9 @@
         const fill = document.getElementById('progressFill');
         fill.style.width = pct + '%';
         fill.textContent = `${done}/${total} (${pct}%)`;
+        
+        document.getElementById('collectedCount').textContent = dec.seen.size;
+        
         if (dec.isComplete()) {
             const result = dec.getResult();
             document.getElementById('resultBox').textContent = result || '(解码失败)';
@@ -959,10 +999,9 @@
         }
     }
 
-    let lastRecvTime = 0;
     function recvLoop(timestamp) {
         if (!State.recv.running) return;
-        const T = State.params.symbolDuration;
+        
         const vw = recvVideo.videoWidth || recvVideo.width;
         const vh = recvVideo.videoHeight || recvVideo.height;
 
@@ -975,13 +1014,10 @@
             const th = adaptiveThreshold(s, br);
             if (th < 0) return;
             s.threshold = th;
-            const bit = br > th ? 1 : 0;
-            s.currentBit = bit;
-            s.symbolTimer += 33;
-            if (s.symbolTimer >= T) {
-                s.symbolTimer -= T;
-                processSymbol(s, bit);
-            }
+            
+            // 使用跳变沿检测
+            processBrightnessChange(s, br, timestamp);
+            
             const brEl = document.getElementById(`rz-br-${i}`);
             const thEl = document.getElementById(`rz-th-${i}`);
             const colEl = document.getElementById(`rz-col-${i}`);
@@ -1010,6 +1046,7 @@
             document.getElementById('stopRecvBtn').disabled = false;
             log('recvLog', '摄像头已启动', 'info');
             log('recvLog', '请调整校准参数，使绿色采样框对准发送区域', 'info');
+            log('recvLog', '等待检测K值...', 'info');
             State.recv.animId = requestAnimationFrame(recvLoop);
         } catch (e) {
             log('recvLog', '摄像头权限被拒绝: ' + e.message, 'error');
@@ -1032,23 +1069,21 @@
     }
 
     function resetRecv() {
-        const fsize = State.params.fragmentSize;
-        const text = document.getElementById('textInput').value;
-        const bytes = textToBytes(text || 'dummy');
-        const numFragments = Math.max(1, Math.ceil(bytes.length / fsize));
-        State.recv.decoder = new LTDecoder(numFragments, fsize);
+        State.recv.K = 0;
+        State.recv.decoder = null;
         State.recv.samplers.forEach(s => {
             s.bitBuffer = [];
             s.symbolBuffer = [];
             s.packetBits = [];
             s.state = 'SEARCH';
             s.collectedSeeds.clear();
-            s.symbolTimer = 0;
+            s.phase = 0;
         });
         document.getElementById('progressFill').style.width = '0%';
         document.getElementById('progressFill').textContent = '0%';
         document.getElementById('resultBox').textContent = '等待接收...';
         updateRecvStatus();
+        updateDecodeInfo();
         log('recvLog', '解码器已重置');
     }
 
