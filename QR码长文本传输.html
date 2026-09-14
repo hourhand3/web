@@ -2,15 +2,15 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
 <title>QR码长文本传输工具</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/@fontsource/inter@5.1.0/index.css" rel="stylesheet">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-html,body{overflow-x:hidden!important;width:100%!important;max-width:100vw!important}
-body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Noto Sans SC','Microsoft YaHei',sans-serif;background:linear-gradient(135deg,#0f0c29,#302b63,#24243e);min-height:100vh;color:#e0e0e0}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{overflow-x:hidden!important;width:100%!important;max-width:100vw!important;touch-action:manipulation}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Noto Sans SC','Microsoft YaHei',sans-serif;background:linear-gradient(135deg,#0f0c29,#302b63,#24243e);min-height:100vh;color:#e0e0e0;overflow-x:hidden}
 .container{max-width:1200px;margin:0 auto;padding:16px;width:100%;overflow:hidden}
 header{text-align:center;padding:24px 0 12px;position:relative}
 header h1{font-size:1.8em;background:linear-gradient(90deg,#a78bfa,#60a5fa,#34d399);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px}
@@ -18,16 +18,16 @@ header p{color:#94a3b8;font-size:.95em}
 .version-tag{position:absolute;top:24px;right:0;background:linear-gradient(135deg,rgba(124,58,237,.25),rgba(59,130,246,.25));border:1px solid rgba(124,58,237,.4);color:#c4b5fd;padding:4px 12px;border-radius:20px;font-size:.78em;font-weight:600}
 .version-tag .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#34d399;margin-right:6px;animation:pulse 1.5s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-.mode-switch{display:flex;justify-content:center;gap:0;margin:18px 0 22px}
-.mode-btn{padding:11px 36px;border:none;font-size:1em;cursor:pointer;transition:all .3s;font-weight:600;color:#cbd5e1;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1)}
+.mode-switch{display:flex;justify-content:center;gap:0;margin:18px 0 22px;touch-action:manipulation}
+.mode-btn{padding:11px 36px;border:none;font-size:1em;cursor:pointer;transition:all .3s;font-weight:600;color:#cbd5e1;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);touch-action:manipulation}
 .mode-btn:first-child{border-radius:50px 0 0 50px}
 .mode-btn:last-child{border-radius:0 50px 50px 0}
 .mode-btn.active{background:linear-gradient(135deg,#7c3aed,#3b82f6);color:#fff;border-color:transparent;box-shadow:0 4px 20px rgba(124,58,237,.4)}
-.panel{background:rgba(255,255,255,.05);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:28px;display:none;animation:fadeUp .4s ease;overflow:hidden}
+.panel{background:rgba(255,255,255,.05);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:28px;display:none;animation:fadeUp .4s ease;overflow:hidden;width:100%;max-width:100%}
 .panel.active{display:block}
 @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 .section-title{font-size:1.1em;font-weight:700;margin-bottom:14px;color:#e2e8f0;display:flex;align-items:center;gap:8px}
-textarea.input-area{width:100%;height:180px;background:rgba(0,0,0,.3);border:1.5px solid rgba(255,255,255,.12);border-radius:12px;padding:14px;font-size:.95em;color:#e2e8f0;resize:vertical;transition:border-color .3s;font-family:inherit;line-height:1.6}
+textarea.input-area{width:100%;height:180px;background:rgba(0,0,0,.3);border:1.5px solid rgba(255,255,255,.12);border-radius:12px;padding:14px;font-size:.95em;color:#e2e8f0;resize:vertical;transition:border-color .3s;font-family:inherit;line-height:1.6;max-width:100%}
 textarea.input-area:focus{outline:none;border-color:#7c3aed}
 textarea.input-area::placeholder{color:#64748b}
 .char-info{text-align:right;color:#64748b;font-size:.82em;margin-top:6px}
@@ -35,7 +35,7 @@ textarea.input-area::placeholder{color:#64748b}
 .settings-row label{font-weight:600;color:#94a3b8;font-size:.9em}
 .settings-row input[type=number]{width:90px;padding:8px 10px;background:rgba(0,0,0,.3);border:1.5px solid rgba(255,255,255,.12);border-radius:8px;color:#e2e8f0;font-size:.95em;text-align:center}
 .hint{color:#64748b;font-size:.82em}
-.btn{padding:10px 26px;border:none;border-radius:50px;font-size:.95em;font-weight:600;cursor:pointer;transition:all .3s;display:inline-flex;align-items:center;gap:6px}
+.btn{padding:10px 26px;border:none;border-radius:50px;font-size:.95em;font-weight:600;cursor:pointer;transition:all .3s;display:inline-flex;align-items:center;gap:6px;touch-action:manipulation;white-space:nowrap}
 .btn-primary{background:linear-gradient(135deg,#7c3aed,#3b82f6);color:#fff;box-shadow:0 4px 15px rgba(124,58,237,.35)}
 .btn-primary:hover{transform:translateY(-2px);box-shadow:0 6px 25px rgba(124,58,237,.5)}
 .btn-success{background:linear-gradient(135deg,#059669,#34d399);color:#fff;box-shadow:0 4px 15px rgba(5,150,105,.35)}
@@ -43,7 +43,7 @@ textarea.input-area::placeholder{color:#64748b}
 .btn-ghost{background:rgba(255,255,255,.08);color:#94a3b8;border:1px solid rgba(255,255,255,.1)}
 .btn-ghost:hover{background:rgba(255,255,255,.14)}
 .qr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:18px;margin-top:18px}
-.qr-card{background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.08);border-radius:14px;padding:16px;text-align:center;transition:all .3s;cursor:pointer;position:relative}
+.qr-card{background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.08);border-radius:14px;padding:16px;text-align:center;transition:all .3s;cursor:pointer;position:relative;touch-action:manipulation}
 .qr-card:hover{border-color:#7c3aed;transform:translateY(-3px);box-shadow:0 8px 30px rgba(124,58,237,.25)}
 .qr-card .zoom-hint{position:absolute;top:8px;right:8px;background:rgba(124,58,237,.8);color:#fff;font-size:.7em;padding:3px 8px;border-radius:10px;opacity:0;transition:opacity .3s}
 .qr-card:hover .zoom-hint{opacity:1}
@@ -53,17 +53,8 @@ textarea.input-area::placeholder{color:#64748b}
 .receiver-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
 @media(max-width:800px){.receiver-grid{grid-template-columns:1fr}}
 
-/* ===== 摄像头显示 - 严格约束防止溢出 ===== */
-.camera-wrapper{
-  position:relative;
-  width:100%;
-  max-width:100%;
-  overflow:hidden;
-  border-radius:14px;
-  background:#000;
-  contain:layout style;
-  isolation:isolate;
-}
+/* ===== 摄像头 - 严格约束 ===== */
+.camera-wrapper{position:relative;width:100%;max-width:100%;overflow:hidden;border-radius:14px;background:#000}
 .camera-box{
   position:relative;
   width:100%;
@@ -72,7 +63,6 @@ textarea.input-area::placeholder{color:#64748b}
   border:2px solid rgba(255,255,255,.1);
   border-radius:14px;
   background:#000;
-  /* 使用 aspect-ratio 保持固定比例，防止视频撑开 */
   aspect-ratio:4/3;
   contain:strict;
   transform:translateZ(0);
@@ -80,8 +70,7 @@ textarea.input-area::placeholder{color:#64748b}
 }
 .camera-box video{
   position:absolute;
-  top:0;
-  left:0;
+  top:0;left:0;
   width:100%!important;
   height:100%!important;
   max-width:100%!important;
@@ -91,7 +80,7 @@ textarea.input-area::placeholder{color:#64748b}
   display:block;
   transform:translateZ(0);
   -webkit-transform:translateZ(0);
-  will-change:transform;
+  pointer-events:none;
 }
 .camera-box.scanning{border-color:#7c3aed;box-shadow:0 0 20px rgba(124,58,237,.3)}
 .camera-box.flash-ok{border-color:#34d399!important;box-shadow:0 0 30px rgba(52,211,153,.6)!important}
@@ -115,13 +104,13 @@ textarea.input-area::placeholder{color:#64748b}
 .badge.done{background:rgba(52,211,153,.15);color:#34d399;border:1px solid rgba(52,211,153,.3)}
 .badge.wait{background:rgba(255,255,255,.05);color:#475569;border:1px solid rgba(255,255,255,.06)}
 .result-box{margin-top:16px}
-.result-box textarea{width:100%;height:180px;background:rgba(0,0,0,.3);border:1.5px solid rgba(52,211,153,.3);border-radius:12px;padding:14px;font-size:.95em;color:#e2e8f0;resize:vertical;font-family:inherit;line-height:1.6}
+.result-box textarea{width:100%;height:180px;background:rgba(0,0,0,.3);border:1.5px solid rgba(52,211,153,.3);border-radius:12px;padding:14px;font-size:.95em;color:#e2e8f0;resize:vertical;font-family:inherit;line-height:1.6;max-width:100%}
 .result-actions{margin-top:10px;display:flex;gap:10px;flex-wrap:wrap}
 .preview-info{display:flex;gap:16px;margin:14px 0;flex-wrap:wrap}
 .preview-chip{background:rgba(124,58,237,.12);border:1px solid rgba(124,58,237,.25);border-radius:10px;padding:8px 16px;font-size:.85em;color:#a78bfa}
 .preview-chip strong{color:#c4b5fd}
-.log-area{max-height:160px;overflow-y:auto;background:rgba(0,0,0,.2);border-radius:10px;padding:10px;margin-top:10px;font-size:.8em;line-height:1.8;color:#64748b;border:1px solid rgba(255,255,255,.05)}
-.log-area .log-item{padding:2px 0;border-bottom:1px solid rgba(255,255,255,.03)}
+.log-area{max-height:160px;overflow-y:auto;background:rgba(0,0,0,.2);border-radius:10px;padding:10px;margin-top:10px;font-size:.8em;line-height:1.8;color:#64748b;border:1px solid rgba(255,255,255,.05);max-width:100%;overflow-x:hidden}
+.log-area .log-item{padding:2px 0;border-bottom:1px solid rgba(255,255,255,.03);word-break:break-all}
 .log-area .log-ok{color:#34d399}
 .log-area .log-dup{color:#fbbf24}
 .log-area .log-err{color:#f87171}
@@ -146,7 +135,7 @@ textarea.input-area::placeholder{color:#64748b}
 .scan-toast{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(0);background:rgba(52,211,153,.95);color:#fff;padding:16px 28px;border-radius:16px;font-weight:700;font-size:1.1em;z-index:10;pointer-events:none;transition:transform .2s ease}
 .scan-toast.show{transform:translate(-50%,-50%) scale(1)}
 .scan-toast.dup{background:rgba(251,191,36,.95)}
-.sound-toggle{display:flex;align-items:center;gap:8px;margin-top:10px;justify-content:center}
+.sound-toggle{display:flex;align-items:center;gap:8px;margin-top:10px;justify-content:center;touch-action:manipulation}
 .sound-toggle label{color:#94a3b8;font-size:.85em;cursor:pointer;display:flex;align-items:center;gap:6px}
 .sound-toggle input{accent-color:#7c3aed;width:16px;height:16px}
 .scan-status{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;font-size:.85em;color:#64748b}
@@ -159,6 +148,31 @@ textarea.input-area::placeholder{color:#64748b}
 .zoom-control .zoom-val{color:#a78bfa;font-size:.82em;font-weight:600;min-width:36px;text-align:center}
 .cam-info{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:8px}
 .cam-info .tag{display:inline-block;padding:2px 8px;border-radius:8px;background:rgba(124,58,237,.12);color:#a78bfa;font-size:.72em}
+
+/* 恢复视图浮动按钮 */
+.restore-btn{
+  position:fixed;
+  bottom:20px;
+  right:20px;
+  z-index:9998;
+  background:linear-gradient(135deg,#dc2626,#f87171);
+  color:#fff;
+  border:none;
+  border-radius:50px;
+  padding:12px 20px;
+  font-size:.9em;
+  font-weight:600;
+  cursor:pointer;
+  box-shadow:0 4px 20px rgba(220,38,38,.5);
+  display:none;
+  align-items:center;
+  gap:6px;
+  touch-action:manipulation;
+  animation:restorePulse 1.5s infinite;
+}
+.restore-btn.show{display:flex}
+@keyframes restorePulse{0%,100%{box-shadow:0 4px 20px rgba(220,38,38,.5)}50%{box-shadow:0 4px 30px rgba(220,38,38,.8)}}
+
 .notification{position:fixed;top:16px;right:16px;padding:12px 22px;border-radius:12px;color:#fff;font-weight:600;font-size:.9em;z-index:9999;animation:notifIn .3s ease;box-shadow:0 8px 30px rgba(0,0,0,.3);max-width:340px}
 .notification.success{background:linear-gradient(135deg,rgba(5,150,105,.9),rgba(52,211,153,.9))}
 .notification.warning{background:linear-gradient(135deg,rgba(217,119,6,.9),rgba(251,191,36,.9))}
@@ -169,7 +183,7 @@ textarea.input-area::placeholder{color:#64748b}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px}
 
-/* 防止移动端视频全屏/缩放 */
+/* 防止视频触发浏览器全屏/缩放 */
 video::-webkit-media-controls{display:none!important}
 video::-webkit-media-controls-enclosure{display:none!important}
 </style>
@@ -179,7 +193,7 @@ video::-webkit-media-controls-enclosure{display:none!important}
 <header>
 <h1>📱 QR码长文本传输工具</h1>
 <p>将长文本智能分割为多个二维码 · 扫码自动识别重组 · 纯离线本地处理</p>
-<div class="version-tag"><span class="dot"></span><span id="versionDisplay">v3.2</span></div>
+<div class="version-tag"><span class="dot"></span><span id="versionDisplay">v3.3</span></div>
 </header>
 <div class="mode-switch">
 <button class="mode-btn active" onclick="switchMode('send')">📤 发送端</button>
@@ -187,7 +201,7 @@ video::-webkit-media-controls-enclosure{display:none!important}
 </div>
 
 <div id="sendPanel" class="panel active">
-<div class="section-title">📝 输入要传输的文本</div>
+<div class="section-title"> 输入要传输的文本</div>
 <textarea class="input-area" id="inputText" placeholder="在此粘贴或输入需要传输的长文本内容...&#10;&#10;支持任意长度文本（小说章节、文章、代码等），系统将自动分割成多个二维码。接收端逐个扫码后即可完整还原。"></textarea>
 <div class="char-info">字符数: <span id="charCount">0</span> &nbsp;|&nbsp; 字节数: <span id="byteCount">0</span></div>
 <div class="settings-row">
@@ -217,16 +231,16 @@ video::-webkit-media-controls-enclosure{display:none!important}
 </div>
 <div class="scan-controls">
 <button class="btn btn-primary" id="btnStart" onclick="startScan()">▶ 开始扫描</button>
-<button class="btn btn-danger" id="btnStop" onclick="stopScan()" style="display:none"> 停止</button>
+<button class="btn btn-danger" id="btnStop" onclick="stopScan()" style="display:none">⏹ 停止</button>
 <button class="btn btn-ghost" onclick="resetScan()">🔄 重置</button>
 </div>
 <div class="zoom-control" id="zoomControl" style="display:none">
-<label>🔍 变焦:</label>
+<label> 变焦:</label>
 <input type="range" id="zoomSlider" min="1" max="10" step="0.1" value="1" oninput="setZoom(this.value)">
 <span class="zoom-val" id="zoomVal">1.0x</span>
 </div>
 <div class="sound-toggle">
-<label><input type="checkbox" id="soundEnabled" checked>  扫码成功提示音</label>
+<label><input type="checkbox" id="soundEnabled" checked> 🔊 扫码成功提示音</label>
 </div>
 <div class="scan-status">
 <span class="scan-dot" id="scanDot"></span>
@@ -269,15 +283,18 @@ video::-webkit-media-controls-enclosure{display:none!important}
 <span class="nav-info" id="modalNavInfo">1 / 1</span>
 <button id="btnNext" onclick="navModal(1)">›</button>
 </div>
-<div class="modal-hint">💡 使用键盘 ← → 切换 · ESC 关闭</div>
+<div class="modal-hint"> 使用键盘 ← → 切换 · ESC 关闭</div>
 </div>
 </div>
+
+<!-- 恢复视图按钮 -->
+<button class="restore-btn" id="restoreBtn" onclick="restoreView()">🔧 恢复视图</button>
 
 <canvas id="scanCanvas" style="display:none"></canvas>
 
 <script>
-const APP_VERSION = 'v3.2';
-const APP_BUILD = '20250118';
+const APP_VERSION = 'v3.3';
+const APP_BUILD = '20250119';
 console.log(`%c📱 QR码长文本传输工具 ${APP_VERSION} (build ${APP_BUILD})`, 'color:#a78bfa;font-size:14px;font-weight:bold');
 console.log(`%c✓ 页面加载成功 | jsQR: ${typeof jsQR} | qrcode: ${typeof qrcode}`, 'color:#34d399');
 document.getElementById('versionDisplay').textContent = APP_VERSION;
@@ -292,6 +309,74 @@ let debugLogCount = 0;
 let currentTrack = null;
 let zoomCapabilities = null;
 
+// ============ 视图恢复机制 ============
+function checkAndRestoreView() {
+  const vp = window.visualViewport;
+  if (!vp) return;
+  const scale = vp.scale;
+  const restoreBtn = document.getElementById('restoreBtn');
+  if (scale > 1.05) {
+    restoreBtn.classList.add('show');
+    console.log(`检测到页面缩放: ${scale.toFixed(2)}x，已显示恢复按钮`);
+  } else {
+    restoreBtn.classList.remove('show');
+  }
+}
+
+function restoreView() {
+  // 方案1: 使用 visualViewport 的 scrollTo 和缩放重置
+  const vp = window.visualViewport;
+  if (vp) {
+    try {
+      window.scrollTo(0, 0);
+      // 通过临时修改 meta viewport 强制重置
+      const meta = document.querySelector('meta[name=viewport]');
+      const original = meta.content;
+      meta.content = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no';
+      setTimeout(() => {
+        meta.content = original;
+      }, 100);
+    } catch(e) {}
+  }
+  // 方案2: 强制滚动到顶部并重置
+  window.scrollTo(0, 0);
+  document.documentElement.style.transform = 'scale(1)';
+  document.documentElement.style.transformOrigin = 'top left';
+  document.getElementById('restoreBtn').classList.remove('show');
+  notify('视图已恢复', 'info');
+  addLog('视图已手动恢复', 'debug');
+}
+
+// 监听缩放变化
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', checkAndRestoreView);
+  window.visualViewport.addEventListener('scroll', checkAndRestoreView);
+}
+// 兼容旧浏览器
+window.addEventListener('resize', checkAndRestoreView);
+
+// 防止双击缩放
+let lastTouchEnd = 0;
+document.addEventListener('touchend', function(e) {
+  const now = Date.now();
+  if (now - lastTouchEnd <= 300) {
+    e.preventDefault();
+  }
+  lastTouchEnd = now;
+}, { passive: false });
+
+// 防止手势缩放（双指）
+document.addEventListener('gesturestart', function(e) {
+  e.preventDefault();
+}, { passive: false });
+document.addEventListener('gesturechange', function(e) {
+  e.preventDefault();
+}, { passive: false });
+document.addEventListener('gestureend', function(e) {
+  e.preventDefault();
+}, { passive: false });
+
+// ============ Base64 ============
 function textToBase64(text) {
   const bytes = new TextEncoder().encode(text);
   let binary = '';
@@ -302,7 +387,6 @@ function textToBase64(text) {
   }
   return btoa(binary);
 }
-
 function base64ToText(b64) {
   const binary = atob(b64);
   const bytes = new Uint8Array(binary.length);
@@ -317,6 +401,8 @@ function switchMode(m) {
   document.getElementById('sendPanel').classList.toggle('active', m === 'send');
   document.getElementById('receivePanel').classList.toggle('active', m === 'receive');
   if (m === 'send' && scanning) stopScan();
+  // 切换后检查视图
+  setTimeout(checkAndRestoreView, 300);
 }
 
 document.getElementById('inputText').addEventListener('input', function () {
@@ -373,7 +459,7 @@ function renderQRGrid(chunks) {
       qr.addData(chunk, 'Byte');
       qr.make();
       const url = qr.createDataURL(8, 2);
-      card.innerHTML = `<span class="zoom-hint"> 点击放大</span><img src="${url}" alt="QR ${i + 1}"><div class="qr-label">第 ${i + 1} / ${chunks.length} 块</div><div class="qr-size">${chunk.length} 字符</div>`;
+      card.innerHTML = `<span class="zoom-hint">🔍 点击放大</span><img src="${url}" alt="QR ${i + 1}"><div class="qr-label">第 ${i + 1} / ${chunks.length} 块</div><div class="qr-size">${chunk.length} 字符</div>`;
     } catch (e) {
       card.innerHTML = `<div style="padding:20px;color:#f87171">生成失败</div><div class="qr-label">第 ${i + 1} / ${chunks.length} 块</div>`;
     }
@@ -535,12 +621,10 @@ function scanLoop() {
   scanAnimId = requestAnimationFrame(scanLoop);
 }
 
-// 关键修复：视频加载后强制约束尺寸
 function enforceVideoSize() {
   const v = document.getElementById('camVideo');
   const box = document.getElementById('cameraBox');
   if (!v || !box) return;
-  // 强制视频元素尺寸与容器一致
   const boxRect = box.getBoundingClientRect();
   v.style.width = boxRect.width + 'px';
   v.style.height = boxRect.height + 'px';
@@ -552,26 +636,19 @@ async function startScan() {
   try {
     const constraints = buildVideoConstraints();
     addLog('请求摄像头权限...', 'debug');
-
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     videoStream = stream;
     currentTrack = stream.getVideoTracks()[0];
-
     const v = document.getElementById('camVideo');
     v.srcObject = stream;
-
     await new Promise((resolve) => {
       if (v.readyState >= v.HAVE_METADATA) resolve();
       else v.onloadedmetadata = () => resolve();
     });
     await v.play();
-
-    // 关键：视频开始播放后强制约束尺寸
     enforceVideoSize();
-    // 再次延迟执行，确保渲染完成
     setTimeout(enforceVideoSize, 100);
     setTimeout(enforceVideoSize, 500);
-
     if (currentTrack && currentTrack.getSettings) {
       const settings = currentTrack.getSettings();
       const infoEl = document.getElementById('camInfo');
@@ -583,9 +660,7 @@ async function startScan() {
       infoEl.innerHTML = tags.map(t => `<span class="tag">${t}</span>`).join('');
       addLog(`摄像头: ${tags.join(', ')}`, 'debug');
     }
-
     await detectZoomCapabilities();
-
     scanning = true;
     lastScanT = 0;
     debugLogCount = 0;
@@ -598,20 +673,14 @@ async function startScan() {
     document.getElementById('scanStatusText').textContent = '扫描中...';
     addLog(`扫描启动 (${v.videoWidth}×${v.videoHeight})`, 'ok');
     scanAnimId = requestAnimationFrame(scanLoop);
-
   } catch (e) {
     notify('无法访问摄像头: ' + e.message, 'error');
     addLog('摄像头失败: ' + e.message, 'err');
-
     if (e.name === 'OverconstrainedError' || (e.message && e.message.includes('zoom'))) {
       addLog('尝试不带变焦约束...', 'debug');
       try {
         const fallbackConstraints = {
-          video: {
-            facingMode: { ideal: 'environment' },
-            width: { ideal: 1280, max: 1920 },
-            height: { ideal: 720, max: 1080 }
-          },
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280, max: 1920 }, height: { ideal: 720, max: 1080 } },
           audio: false
         };
         const stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
@@ -671,29 +740,24 @@ function processQR(data) {
   const now = Date.now();
   if (data === lastData && now - lastTime < 2000) return;
   lastData = data; lastTime = now;
-
   debugLogCount++;
   if (debugLogCount <= 3) {
     const preview = data.length > 60 ? data.substring(0, 60) + '...' : data;
     addLog(`解码: "${preview}" (${data.length}字符)`, 'debug');
   }
-
   const m = data.match(/^\[(\d+)\/(\d+)\](.+)$/);
   if (!m) {
     if (debugLogCount <= 3) addLog('⚠ 非本系统二维码', 'err');
     return;
   }
-
   const idx = parseInt(m[1]);
   const tot = parseInt(m[2]);
   const b64data = m[3];
-
   if (expectedTotal > 0 && tot !== expectedTotal) {
-    addLog(` 第${idx}块总数不匹配`, 'err');
+    addLog(`⚠ 第${idx}块总数不匹配`, 'err');
     notify('二维码来源不一致！', 'error');
     return;
   }
-
   if (scannedChunks[idx]) {
     dupCount++;
     addLog(`⚠ 第 ${idx}/${tot} 块 — 重复`, 'dup');
@@ -704,7 +768,6 @@ function processQR(data) {
     updateBadges();
     return;
   }
-
   scannedChunks[idx] = b64data;
   expectedTotal = tot;
   addLog(`✓ 第 ${idx}/${tot} 块 — 成功`, 'ok');
@@ -713,7 +776,6 @@ function processQR(data) {
   showScanToast(`✓ 第 ${idx}/${tot} 块`, false);
   playBeep('ok');
   updateProgress();
-
   if (Object.keys(scannedChunks).length === expectedTotal) reassemble();
 }
 
@@ -761,7 +823,7 @@ function reassemble() {
     <div class="big">🎉 全部扫描完成！</div>
     <div class="sub">已成功接收 ${expectedTotal} 个分块，共 ${fullText.length} 字符</div>
   </div>`;
-  addLog(`🎉 全部完成 (${fullText.length} 字符)`, 'ok');
+  addLog(` 全部完成 (${fullText.length} 字符)`, 'ok');
   notify('🎉 所有二维码已扫描完成！', 'success');
   playBeep('complete');
   if (scanning) stopScan();
@@ -805,6 +867,8 @@ function resetScan() {
   document.getElementById('logArea').innerHTML = '<div class="log-item" style="color:#475569">等待扫描...</div>';
   document.getElementById('scanStatusText').textContent = '未启动';
   notify('扫描状态已重置', 'info');
+  // 重置时也恢复视图
+  restoreView();
 }
 
 function addLog(msg, type) {
@@ -829,21 +893,8 @@ function notify(msg, type) {
   notifTimer = setTimeout(() => d.remove(), 2500);
 }
 
-// 窗口大小变化时重新约束视频尺寸
-window.addEventListener('resize', () => {
-  if (scanning) {
-    setTimeout(enforceVideoSize, 50);
-  }
-});
-
-// 监听视频尺寸变化
-const camVideo = document.getElementById('camVideo');
-if (camVideo && typeof ResizeObserver !== 'undefined') {
-  const ro = new ResizeObserver(() => {
-    if (scanning) enforceVideoSize();
-  });
-  ro.observe(document.getElementById('cameraBox'));
-}
+// 初始检查
+setTimeout(checkAndRestoreView, 500);
 </script>
 </body>
 </html>
