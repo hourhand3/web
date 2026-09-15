@@ -3,1382 +3,1293 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>彩色二维码工具箱 v2.1.0</title>
-
-    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-
+    <title>高密度彩色二维码 v3.0.0</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        :root {
-            --primary: #4f46e5;
-            --primary-hover: #4338ca;
-            --primary-light: #eef2ff;
-            --danger: #ef4444;
-            --danger-light: #fef2f2;
-            --success: #10b981;
-            --success-light: #ecfdf5;
-            --warning: #f59e0b;
-            --warning-light: #fffbeb;
-            --gray-50: #f9fafb;
-            --gray-100: #f3f4f6;
-            --gray-200: #e5e7eb;
-            --gray-300: #d1d5db;
-            --gray-400: #9ca3af;
-            --gray-500: #6b7280;
-            --gray-600: #4b5563;
-            --gray-700: #374151;
-            --gray-800: #1f2937;
-            --gray-900: #111827;
-            --radius: 12px;
-            --shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
-            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
+        *{margin:0;padding:0;box-sizing:border-box}
+        :root{
+            --pri:#4f46e5;--pri-h:#4338ca;--pri-l:#eef2ff;
+            --dan:#ef4444;--dan-l:#fef2f2;
+            --suc:#10b981;--suc-l:#ecfdf5;
+            --wrn:#f59e0b;--wrn-l:#fffbeb;
+            --g50:#f9fafb;--g100:#f3f4f6;--g200:#e5e7eb;--g300:#d1d5db;
+            --g400:#9ca3af;--g500:#6b7280;--g600:#4b5563;--g700:#374151;--g800:#1f2937;
+            --r:12px;
+            --sh:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -2px rgba(0,0,0,.1);
+            --sh-lg:0 10px 15px -3px rgba(0,0,0,.1),0 4px 6px -4px rgba(0,0,0,.1);
         }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            color: var(--gray-800);
-            line-height: 1.6;
+        body{
+            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+            background:linear-gradient(135deg,#667eea,#764ba2);
+            min-height:100vh;color:var(--g800);line-height:1.6;
         }
-
-        .app-container { max-width: 640px; margin: 0 auto; padding: 20px 16px 40px; }
-
-        .app-header { text-align: center; padding: 24px 0 20px; color: white; }
-        .app-header h1 { font-size: 26px; font-weight: 700; margin-bottom: 4px; text-shadow: 0 2px 4px rgba(0,0,0,0.15); }
-        .app-header p { font-size: 14px; opacity: 0.85; }
-
-        .version-badge {
-            display: inline-block;
-            background: rgba(255,255,255,0.25);
-            color: white;
-            font-size: 11px;
-            font-weight: 700;
-            padding: 2px 8px;
-            border-radius: 20px;
-            margin-left: 6px;
-            vertical-align: middle;
-            letter-spacing: 0.5px;
-            backdrop-filter: blur(4px);
+        .app{max-width:660px;margin:0 auto;padding:20px 16px 40px}
+        .hdr{text-align:center;padding:20px 0 16px;color:#fff}
+        .hdr h1{font-size:24px;font-weight:700;text-shadow:0 2px 4px rgba(0,0,0,.15)}
+        .hdr p{font-size:13px;opacity:.85;margin-top:2px}
+        .vbadge{
+            display:inline-block;background:rgba(255,255,255,.25);color:#fff;
+            font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;
+            margin-left:4px;vertical-align:middle;letter-spacing:.5px;
         }
-
-        .tab-bar {
-            display: flex; background: rgba(255,255,255,0.2);
-            border-radius: var(--radius); padding: 4px; margin-bottom: 20px;
-            backdrop-filter: blur(10px);
+        .tabs{
+            display:flex;background:rgba(255,255,255,.2);border-radius:var(--r);
+            padding:4px;margin-bottom:16px;backdrop-filter:blur(10px);
         }
-        .tab-btn {
-            flex: 1; padding: 12px 16px; border: none; background: transparent;
-            color: rgba(255,255,255,0.8); font-size: 15px; font-weight: 600;
-            cursor: pointer; border-radius: 8px; transition: all 0.3s ease;
-            display: flex; align-items: center; justify-content: center; gap: 8px;
+        .tbtn{
+            flex:1;padding:10px;border:none;background:0 0;color:rgba(255,255,255,.8);
+            font-size:14px;font-weight:600;cursor:pointer;border-radius:8px;
+            transition:.3s;display:flex;align-items:center;justify-content:center;gap:6px;
         }
-        .tab-btn:hover { color: white; background: rgba(255,255,255,0.1); }
-        .tab-btn.active { background: white; color: var(--primary); box-shadow: var(--shadow); }
-        .tab-btn .tab-icon { font-size: 18px; }
-
-        .card {
-            background: white; border-radius: var(--radius); padding: 24px;
-            box-shadow: var(--shadow-lg); margin-bottom: 16px;
+        .tbtn:hover{color:#fff;background:rgba(255,255,255,.1)}
+        .tbtn.on{background:#fff;color:var(--pri);box-shadow:var(--sh)}
+        .card{background:#fff;border-radius:var(--r);padding:20px;box-shadow:var(--sh-lg);margin-bottom:14px}
+        .ctitle{font-size:15px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+        .finput{
+            width:100%;padding:10px 12px;border:2px solid var(--g200);border-radius:8px;
+            font-size:14px;color:var(--g800);outline:0;background:var(--g50);transition:.2s;
         }
-        .card-title {
-            font-size: 16px; font-weight: 600; color: var(--gray-800);
-            margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+        .finput:focus{border-color:var(--pri);background:#fff;box-shadow:0 0 0 3px rgba(79,70,229,.1)}
+        textarea.finput{resize:vertical;min-height:70px;font-family:inherit}
+        .cwarn{
+            margin-top:8px;padding:8px 12px;border-radius:8px;font-size:12px;
+            display:none;align-items:flex-start;gap:6px;line-height:1.5;
         }
-        .card-title .icon { font-size: 20px; }
-
-        .form-group { margin-bottom: 16px; }
-        .form-label {
-            display: block; font-size: 13px; font-weight: 600;
-            color: var(--gray-600); margin-bottom: 6px;
-            text-transform: uppercase; letter-spacing: 0.5px;
+        .cwarn.show{display:flex}
+        .cwarn.danger{background:var(--dan-l);color:var(--dan);border:1px solid rgba(239,68,68,.2)}
+        .cwarn.ok{background:var(--suc-l);color:var(--suc);border:1px solid rgba(16,185,129,.2)}
+        .ebanner{
+            background:linear-gradient(135deg,#fef3c7,#fde68a);border:1px solid #f59e0b;
+            border-radius:8px;padding:10px 12px;margin-bottom:14px;display:flex;
+            align-items:flex-start;gap:8px;font-size:12px;color:#92400e;line-height:1.5;
         }
-        .form-input {
-            width: 100%; padding: 12px 14px; border: 2px solid var(--gray-200);
-            border-radius: 8px; font-size: 15px; color: var(--gray-800);
-            transition: all 0.2s ease; outline: none; background: var(--gray-50);
+        .btn{
+            display:inline-flex;align-items:center;justify-content:center;gap:6px;
+            padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:600;
+            cursor:pointer;transition:.2s;outline:0;white-space:nowrap;
         }
-        .form-input:focus {
-            border-color: var(--primary); background: white;
-            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        .btn:active{transform:scale(.97)}
+        .btn-p{background:var(--pri);color:#fff;box-shadow:0 2px 4px rgba(79,70,229,.3)}
+        .btn-p:hover{background:var(--pri-h)}
+        .btn-p:disabled{background:var(--g300);color:var(--g500);box-shadow:none;cursor:not-allowed}
+        .btn-s{background:var(--g100);color:var(--g700);border:2px solid var(--g200)}
+        .btn-s:hover{background:var(--g200)}
+        .btn-d{background:var(--dan);color:#fff}
+        .btn-d:hover{background:#dc2626}
+        .btn-ok{background:var(--suc);color:#fff}
+        .btn-ok:hover{background:#059669}
+        .btn-sm{padding:7px 12px;font-size:12px}
+        .btn-blk{width:100%}
+        .bgrp{display:flex;gap:8px;flex-wrap:wrap}
+        .fup{
+            border:2px dashed var(--g300);border-radius:8px;padding:16px;text-align:center;
+            cursor:pointer;transition:.2s;background:var(--g50);
         }
-        .form-input::placeholder { color: var(--gray-400); }
-        textarea.form-input { resize: vertical; min-height: 80px; font-family: inherit; }
-
-        .color-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .color-picker-wrap {
-            display: flex; align-items: center; gap: 10px; padding: 10px 12px;
-            border: 2px solid var(--gray-200); border-radius: 8px;
-            background: var(--gray-50); transition: all 0.2s ease;
+        .fup:hover{border-color:var(--pri);background:var(--pri-l)}
+        .fup.has{border-color:var(--suc);background:var(--suc-l)}
+        .fup input[type=file]{display:none}
+        .prev{
+            display:flex;flex-direction:column;align-items:center;padding:16px;
+            background:var(--g50);border-radius:8px;min-height:180px;justify-content:center;
         }
-        .color-picker-wrap:focus-within { border-color: var(--primary); background: white; }
-        .color-picker-wrap input[type="color"] {
-            width: 36px; height: 36px; border: none; border-radius: 6px;
-            cursor: pointer; padding: 0; background: none; flex-shrink: 0;
+        .prev canvas{border-radius:8px;box-shadow:var(--sh);max-width:100%;height:auto}
+        .placeholder{text-align:center;color:var(--g400)}
+        .placeholder .pi{font-size:40px;margin-bottom:6px}
+        .vwrap{
+            position:relative;width:100%;border-radius:8px;overflow:hidden;
+            background:var(--g800);aspect-ratio:1/1;
         }
-        .color-picker-wrap input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
-        .color-picker-wrap input[type="color"]::-webkit-color-swatch { border: 2px solid var(--gray-200); border-radius: 4px; }
-        .color-info { display: flex; flex-direction: column; }
-        .color-info .color-name { font-size: 12px; font-weight: 600; color: var(--gray-600); }
-        .color-info .color-hex { font-size: 12px; color: var(--gray-400); font-family: monospace; }
-
-        .contrast-warning {
-            margin-top: 10px; padding: 10px 14px; border-radius: 8px;
-            font-size: 13px; display: none; align-items: flex-start; gap: 8px; line-height: 1.5;
+        .vwrap video{width:100%;height:100%;object-fit:cover;display:block}
+        .sline{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+        .sline.on::after{
+            content:'';position:absolute;left:10%;right:10%;height:3px;
+            background:linear-gradient(90deg,transparent,var(--pri),transparent);
+            box-shadow:0 0 12px var(--pri);animation:sl 2s ease-in-out infinite;
         }
-        .contrast-warning.show { display: flex; }
-        .contrast-warning.danger { background: var(--danger-light); color: var(--danger); border: 1px solid rgba(239,68,68,0.2); }
-        .contrast-warning.success { background: var(--success-light); color: var(--success); border: 1px solid rgba(16,185,129,0.2); }
-        .contrast-warning .warn-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
-
-        .experiment-banner {
-            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-            border: 1px solid #f59e0b; border-radius: 8px; padding: 12px 14px;
-            margin-bottom: 16px; display: flex; align-items: flex-start; gap: 10px;
-            font-size: 13px; color: #92400e; line-height: 1.5;
+        @keyframes sl{0%{top:10%}50%{top:85%}100%{top:10%}}
+        .scorners{position:absolute;top:15%;left:15%;right:15%;bottom:15%;pointer-events:none}
+        .scorners::before,.scorners::after,.scorners span::before,.scorners span::after{
+            content:'';position:absolute;width:20px;height:20px;border-color:var(--pri);border-style:solid;
         }
-        .experiment-banner .banner-icon { font-size: 18px; flex-shrink: 0; }
-        .experiment-banner strong { color: #78350f; }
-
-        .btn {
-            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-            padding: 12px 24px; border: none; border-radius: 8px; font-size: 15px;
-            font-weight: 600; cursor: pointer; transition: all 0.2s ease;
-            outline: none; text-decoration: none; white-space: nowrap;
+        .scorners::before{top:0;left:0;border-width:3px 0 0 3px}
+        .scorners::after{top:0;right:0;border-width:3px 3px 0 0}
+        .scorners span::before{bottom:0;left:0;border-width:0 0 3px 3px;position:absolute}
+        .scorners span::after{bottom:0;right:0;border-width:0 3px 3px 0;position:absolute}
+        .sstatus{text-align:center;padding:16px;color:var(--g400);font-size:13px}
+        .sstatus .si{font-size:36px;margin-bottom:8px}
+        .dpanel{background:var(--g800);border-radius:8px;padding:10px;margin-top:10px;display:none}
+        .dpanel.show{display:block}
+        .dpanel canvas{width:100%;border-radius:4px;image-rendering:pixelated}
+        .dstats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px}
+        .dstat{background:rgba(255,255,255,.05);border-radius:6px;padding:6px;text-align:center}
+        .dstat .sv{color:var(--suc);font-size:14px;font-weight:700;font-family:monospace}
+        .dstat .sl{color:var(--g500);font-size:9px;text-transform:uppercase;letter-spacing:.5px}
+        .camSel{
+            margin-bottom:10px;padding:8px 12px;border:2px solid var(--g200);border-radius:8px;
+            font-size:13px;background:var(--g50);width:100%;outline:0;cursor:pointer;
         }
-        .btn:active { transform: scale(0.97); }
-        .btn-primary { background: var(--primary); color: white; box-shadow: 0 2px 4px rgba(79,70,229,0.3); }
-        .btn-primary:hover { background: var(--primary-hover); box-shadow: 0 4px 8px rgba(79,70,229,0.4); }
-        .btn-primary:disabled { background: var(--gray-300); color: var(--gray-500); box-shadow: none; cursor: not-allowed; }
-        .btn-secondary { background: var(--gray-100); color: var(--gray-700); border: 2px solid var(--gray-200); }
-        .btn-secondary:hover { background: var(--gray-200); }
-        .btn-danger { background: var(--danger); color: white; }
-        .btn-danger:hover { background: #dc2626; }
-        .btn-success { background: var(--success); color: white; }
-        .btn-success:hover { background: #059669; }
-        .btn-sm { padding: 8px 14px; font-size: 13px; }
-        .btn-block { width: 100%; }
-        .btn-group { display: flex; gap: 10px; flex-wrap: wrap; }
-
-        .file-upload-area {
-            border: 2px dashed var(--gray-300); border-radius: 8px; padding: 20px;
-            text-align: center; cursor: pointer; transition: all 0.2s ease; background: var(--gray-50);
+        .envw{
+            background:var(--dan-l);border:1px solid rgba(239,68,68,.2);border-radius:8px;
+            padding:12px;margin-bottom:14px;display:flex;align-items:flex-start;gap:8px;
+            font-size:12px;color:var(--dan);line-height:1.6;
         }
-        .file-upload-area:hover { border-color: var(--primary); background: var(--primary-light); }
-        .file-upload-area.has-file { border-color: var(--success); background: var(--success-light); }
-        .file-upload-area .upload-icon { font-size: 32px; margin-bottom: 8px; }
-        .file-upload-area .upload-text { font-size: 14px; color: var(--gray-500); }
-        .file-upload-area .file-name { font-size: 13px; color: var(--success); font-weight: 600; margin-top: 4px; }
-        .file-upload-area input[type="file"] { display: none; }
-
-        .qr-preview-area {
-            display: flex; flex-direction: column; align-items: center; padding: 20px;
-            background: var(--gray-50); border-radius: 8px; min-height: 200px; justify-content: center;
+        .sresult{
+            background:var(--suc-l);border:2px solid rgba(16,185,129,.2);border-radius:8px;
+            padding:14px;margin-top:14px;display:none;
         }
-        .qr-preview-area canvas { border-radius: 8px; box-shadow: var(--shadow); max-width: 100%; height: auto; }
-        .qr-placeholder { text-align: center; color: var(--gray-400); }
-        .qr-placeholder .placeholder-icon { font-size: 48px; margin-bottom: 8px; }
-        .qr-placeholder p { font-size: 14px; }
-
-        .scanner-video-wrap {
-            position: relative;
-            width: 100%;
-            border-radius: 8px;
-            overflow: hidden;
-            background: var(--gray-900);
-            aspect-ratio: 1 / 1;
+        .sresult.show{display:block;animation:si .3s ease}
+        .sresult .rt{font-size:14px;color:var(--g800);word-break:break-all;font-family:monospace;
+            background:#fff;padding:8px 10px;border-radius:6px;margin-bottom:10px;
+            border:1px solid rgba(16,185,129,.15);
         }
-        .scanner-video-wrap video {
-            width: 100%; height: 100%;
-            object-fit: cover;
-            display: block;
+        .sresult .ra{display:flex;gap:6px;flex-wrap:wrap}
+        .toast-c{
+            position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:10000;
+            display:flex;flex-direction:column;gap:6px;pointer-events:none;
         }
-
-        .scan-line-overlay {
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            pointer-events: none;
-            overflow: hidden;
+        .toast{
+            padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;
+            box-shadow:var(--sh-lg);animation:ti .3s ease,to .3s ease 2.7s forwards;
+            display:flex;align-items:center;gap:6px;pointer-events:auto;max-width:90vw;
         }
-        .scan-line-overlay.active::after {
-            content: '';
-            position: absolute;
-            left: 10%; right: 10%;
-            height: 3px;
-            background: linear-gradient(90deg, transparent, var(--primary), transparent);
-            box-shadow: 0 0 15px var(--primary);
-            animation: scanLine 2s ease-in-out infinite;
+        .toast.success{background:var(--suc);color:#fff}
+        .toast.error{background:var(--dan);color:#fff}
+        .toast.warning{background:var(--wrn);color:#fff}
+        .toast.info{background:var(--pri);color:#fff}
+        @keyframes ti{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes to{from{opacity:1}to{opacity:0;transform:translateY(-16px)}}
+        @keyframes si{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .spinner{
+            display:inline-block;width:18px;height:18px;border:3px solid rgba(255,255,255,.3);
+            border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite;
         }
-        @keyframes scanLine {
-            0% { top: 10%; }
-            50% { top: 85%; }
-            100% { top: 10%; }
+        .spinner.dk{border-color:rgba(79,70,229,.2);border-top-color:var(--pri)}
+        @keyframes sp{to{transform:rotate(360deg)}}
+        .tc{display:none}.tc.on{display:block;animation:fi .3s ease}
+        @keyframes fi{from{opacity:0}to{opacity:1}}
+        .pbar{display:flex;gap:2px;margin-top:8px;padding:6px;background:var(--g50);border-radius:6px}
+        .psw{flex:1;height:20px;border-radius:3px;border:1px solid rgba(0,0,0,.08);position:relative}
+        .psw::after{
+            content:attr(data-l);position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);
+            font-size:8px;color:var(--g400);font-family:monospace;
         }
-
-        .scan-corners {
-            position: absolute;
-            top: 15%; left: 15%; right: 15%; bottom: 15%;
-            pointer-events: none;
+        .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+        .info-item{background:var(--g50);border-radius:6px;padding:8px 10px}
+        .info-item .il{font-size:10px;color:var(--g500);text-transform:uppercase;letter-spacing:.5px}
+        .info-item .iv{font-size:14px;font-weight:700;color:var(--g800);font-family:monospace}
+        @media(max-width:480px){
+            .app{padding:10px 8px 30px}
+            .card{padding:14px}
+            .hdr h1{font-size:20px}
+            .bgrp{flex-direction:column}
+            .bgrp .btn{width:100%}
+            .dstats{grid-template-columns:1fr 1fr}
+            .info-grid{grid-template-columns:1fr}
         }
-        .scan-corners::before, .scan-corners::after,
-        .scan-corners span::before, .scan-corners span::after {
-            content: '';
-            position: absolute;
-            width: 24px; height: 24px;
-            border-color: var(--primary);
-            border-style: solid;
-        }
-        .scan-corners::before { top: 0; left: 0; border-width: 3px 0 0 3px; }
-        .scan-corners::after { top: 0; right: 0; border-width: 3px 3px 0 0; }
-        .scan-corners span::before { bottom: 0; left: 0; border-width: 0 0 3px 3px; position: absolute; }
-        .scan-corners span::after { bottom: 0; right: 0; border-width: 0 3px 3px 0; position: absolute; }
-
-        .scan-status {
-            text-align: center; padding: 20px 16px; color: var(--gray-400); font-size: 14px;
-        }
-        .scan-status .status-icon { font-size: 40px; margin-bottom: 10px; }
-
-        .debug-panel {
-            background: var(--gray-900);
-            border-radius: 8px;
-            padding: 12px;
-            margin-top: 12px;
-            display: none;
-        }
-        .debug-panel.show { display: block; }
-        .debug-panel .debug-title {
-            color: var(--gray-400);
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        .debug-panel canvas {
-            width: 100%;
-            border-radius: 4px;
-            image-rendering: pixelated;
-        }
-        .debug-stats {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 8px;
-            margin-top: 8px;
-        }
-        .debug-stat {
-            background: rgba(255,255,255,0.05);
-            border-radius: 6px;
-            padding: 8px;
-            text-align: center;
-        }
-        .debug-stat .stat-value {
-            color: var(--success);
-            font-size: 16px;
-            font-weight: 700;
-            font-family: monospace;
-        }
-        .debug-stat .stat-label {
-            color: var(--gray-500);
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .slider-group {
-            margin-top: 12px;
-            padding: 12px;
-            background: var(--gray-50);
-            border-radius: 8px;
-        }
-        .slider-group label {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--gray-600);
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 6px;
-        }
-        .slider-group input[type="range"] {
-            width: 100%;
-            accent-color: var(--primary);
-        }
-
-        .mode-switch {
-            display: flex;
-            background: var(--gray-100);
-            border-radius: 8px;
-            padding: 3px;
-            margin-bottom: 16px;
-        }
-        .mode-btn {
-            flex: 1;
-            padding: 8px 12px;
-            border: none;
-            background: transparent;
-            color: var(--gray-500);
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            border-radius: 6px;
-            transition: all 0.2s ease;
-        }
-        .mode-btn.active {
-            background: white;
-            color: var(--primary);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-
-        .camera-selector {
-            margin-bottom: 12px; padding: 10px 14px;
-            border: 2px solid var(--gray-200); border-radius: 8px;
-            font-size: 14px; color: var(--gray-700); background: var(--gray-50);
-            width: 100%; outline: none; cursor: pointer;
-        }
-        .camera-selector:focus { border-color: var(--primary); }
-
-        .env-warning {
-            background: var(--danger-light); border: 1px solid rgba(239,68,68,0.2);
-            border-radius: 8px; padding: 14px; margin-bottom: 16px;
-            display: flex; align-items: flex-start; gap: 10px;
-            font-size: 13px; color: var(--danger); line-height: 1.6;
-        }
-        .env-warning .env-icon { font-size: 20px; flex-shrink: 0; }
-
-        .scan-result {
-            background: var(--success-light); border: 2px solid rgba(16,185,129,0.2);
-            border-radius: 8px; padding: 16px; margin-top: 16px; display: none;
-        }
-        .scan-result.show { display: block; animation: slideIn 0.3s ease; }
-        .scan-result .result-label {
-            font-size: 12px; font-weight: 600; color: var(--success);
-            text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;
-        }
-        .scan-result .result-text {
-            font-size: 14px; color: var(--gray-800); word-break: break-all;
-            font-family: monospace; background: white; padding: 10px 12px;
-            border-radius: 6px; margin-bottom: 12px;
-            border: 1px solid rgba(16,185,129,0.15);
-        }
-        .scan-result .result-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-
-        .toast-container {
-            position: fixed; top: 20px; left: 50%;
-            transform: translateX(-50%); z-index: 10000;
-            display: flex; flex-direction: column; gap: 8px; pointer-events: none;
-        }
-        .toast {
-            padding: 12px 20px; border-radius: 8px; font-size: 14px; font-weight: 500;
-            box-shadow: var(--shadow-lg);
-            animation: toastIn 0.3s ease, toastOut 0.3s ease 2.7s forwards;
-            display: flex; align-items: center; gap: 8px;
-            pointer-events: auto; max-width: 90vw;
-        }
-        .toast.success { background: var(--success); color: white; }
-        .toast.error { background: var(--danger); color: white; }
-        .toast.warning { background: var(--warning); color: white; }
-        .toast.info { background: var(--primary); color: white; }
-        @keyframes toastIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes toastOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-20px); } }
-        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        .loading-spinner {
-            display: inline-block; width: 20px; height: 20px;
-            border: 3px solid rgba(255,255,255,0.3);
-            border-top-color: white; border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-        .loading-spinner.dark { border-color: rgba(79,70,229,0.2); border-top-color: var(--primary); }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        .tab-content { display: none; }
-        .tab-content.active { display: block; animation: fadeIn 0.3s ease; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-        .palette-bar {
-            display: flex; gap: 3px; margin-top: 10px;
-            padding: 8px; background: var(--gray-50); border-radius: 6px;
-        }
-        .palette-swatch {
-            flex: 1; height: 24px; border-radius: 4px;
-            border: 1px solid rgba(0,0,0,0.08);
-            position: relative;
-        }
-        .palette-swatch::after {
-            content: attr(data-idx);
-            position: absolute; bottom: -16px; left: 50%;
-            transform: translateX(-50%);
-            font-size: 9px; color: var(--gray-400);
-            font-family: monospace;
-        }
-
-        @media (max-width: 480px) {
-            .app-container { padding: 12px 10px 30px; }
-            .card { padding: 18px; }
-            .app-header h1 { font-size: 20px; }
-            .color-row { grid-template-columns: 1fr; }
-            .btn-group { flex-direction: column; }
-            .btn-group .btn { width: 100%; }
-            .debug-stats { grid-template-columns: 1fr 1fr; }
-        }
-
-        .hidden { display: none !important; }
+        .hidden{display:none!important}
     </style>
 </head>
 <body>
-    <div class="toast-container" id="toastContainer"></div>
+<div class="toast-c" id="toastC"></div>
+<div class="app">
+    <div class="hdr">
+        <h1>🌈 高密度彩色二维码 <span class="vbadge" id="vBadge">v3.0.0</span></h1>
+        <p>3-bit/模块 · 真·高密度编码 · 专用解码器</p>
+    </div>
+    <div class="tabs">
+        <button class="tbtn on" data-tab="gen" onclick="switchTab('gen')"><span>🎨</span>生成器</button>
+        <button class="tbtn" data-tab="scan" onclick="switchTab('scan')"><span>📷</span>扫码器</button>
+    </div>
 
-    <div class="app-container">
-        <div class="app-header">
-            <h1>🌈 彩色二维码工具箱 <span class="version-badge" id="versionBadge">v2.1.0</span></h1>
-            <p>矩阵级彩色编码 · 专用彩色解码器</p>
+    <!-- ========== 生成器 ========== -->
+    <div class="tc on" id="tab-gen">
+        <div class="card">
+            <div class="ctitle">✏️ 编码内容</div>
+            <textarea class="finput" id="qrText" rows="3" placeholder="输入文本、网址或中文...">你好世界 Hello!</textarea>
         </div>
-
-        <div class="tab-bar">
-            <button class="tab-btn active" data-tab="generator" onclick="switchTab('generator')">
-                <span class="tab-icon">🎨</span><span>生成器</span>
-            </button>
-            <button class="tab-btn" data-tab="scanner" onclick="switchTab('scanner')">
-                <span class="tab-icon">📷</span><span>扫码器</span>
-            </button>
+        <div class="card">
+            <div class="ctitle">🎨 定位点颜色</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:2px solid var(--g200);border-radius:8px;background:var(--g50)">
+                    <input type="color" id="fgC" value="#000000" style="width:32px;height:32px;border:none;border-radius:4px;cursor:pointer;padding:0;background:none">
+                    <div><div style="font-size:11px;font-weight:600;color:var(--g600)">前景(定位点)</div><div style="font-size:11px;color:var(--g400);font-family:monospace" id="fgH">#000000</div></div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:2px solid var(--g200);border-radius:8px;background:var(--g50)">
+                    <input type="color" id="bgC" value="#ffffff" style="width:32px;height:32px;border:none;border-radius:4px;cursor:pointer;padding:0;background:none">
+                    <div><div style="font-size:11px;font-weight:600;color:var(--g600)">背景色</div><div style="font-size:11px;color:var(--g400);font-family:monospace" id="bgH">#ffffff</div></div>
+                </div>
+            </div>
+            <div class="cwarn" id="cWarn"><span id="cWarnI"></span><span id="cWarnT"></span></div>
         </div>
-
-        <!-- ==================== 生成器 ==================== -->
-        <div class="tab-content active" id="tab-generator">
-            <div class="card">
-                <div class="card-title"><span class="icon">✏️</span> 编码内容</div>
-                <div class="form-group">
-                    <textarea class="form-input" id="qrText" placeholder="请输入要编码的文本或网址..." rows="3">你好世界 Hello World</textarea>
-                </div>
-            </div>
-            <div class="card">
-                <div class="card-title"><span class="icon">🎨</span> 基础颜色设置</div>
-                <div class="color-row">
-                    <div class="color-picker-wrap">
-                        <input type="color" id="fgColor" value="#000000">
-                        <div class="color-info">
-                            <span class="color-name">前景色（定位点）</span>
-                            <span class="color-hex" id="fgHex">#000000</span>
-                        </div>
-                    </div>
-                    <div class="color-picker-wrap">
-                        <input type="color" id="bgColor" value="#ffffff">
-                        <div class="color-info">
-                            <span class="color-name">背景色</span>
-                            <span class="color-hex" id="bgHex">#ffffff</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="contrast-warning" id="contrastWarning">
-                    <span class="warn-icon"></span>
-                    <span class="warn-text"></span>
-                </div>
-            </div>
-            <div class="card">
-                <div class="card-title"><span class="icon">🖼️</span> Logo 嵌入（可选）</div>
-                <div class="file-upload-area" id="logoUploadArea" onclick="document.getElementById('logoInput').click()">
-                    <div class="upload-icon">📁</div>
-                    <div class="upload-text">点击上传 Logo 图片</div>
-                    <div class="file-name hidden" id="logoFileName"></div>
-                    <input type="file" id="logoInput" accept="image/*">
-                </div>
-            </div>
-            <div class="card">
-                <button class="btn btn-primary btn-block" onclick="generateQR()">
-                    <span>✨</span> 生成彩色二维码
-                </button>
-            </div>
-            <div class="card">
-                <div class="card-title"><span class="icon">📱</span> 预览与下载</div>
-                <div class="qr-preview-area" id="qrPreviewArea">
-                    <div class="qr-placeholder" id="qrPlaceholder">
-                        <div class="placeholder-icon">📲</div>
-                        <p>输入内容后点击生成</p>
-                    </div>
-                    <canvas id="qrCanvas" class="hidden"></canvas>
-                </div>
-                <div style="margin-top:16px;" id="downloadSection" class="hidden">
-                    <button class="btn btn-success btn-block" onclick="downloadQR()">
-                        <span>💾</span> 下载二维码 (PNG)
-                    </button>
-                </div>
+        <div class="card">
+            <div class="ctitle">🖼️ Logo（可选）</div>
+            <div class="fup" id="logoArea" onclick="document.getElementById('logoIn').click()">
+                <div style="font-size:28px;margin-bottom:4px">📁</div>
+                <div style="font-size:13px;color:var(--g500)" id="logoTxt">点击上传 Logo</div>
+                <input type="file" id="logoIn" accept="image/*">
             </div>
         </div>
-
-        <!-- ==================== 扫码器 ==================== -->
-        <div class="tab-content" id="tab-scanner">
-            <div class="experiment-banner">
-                <span class="banner-icon">🧪</span>
-                <div>
-                    <strong>专用解码器已就绪：</strong>支持中英文、数字及特殊字符。自动识别本工具生成的所有彩色二维码。
-                </div>
+        <div class="card">
+            <button class="btn btn-p btn-blk" onclick="doGenerate()"><span>✨</span> 生成高密度彩色码</button>
+        </div>
+        <div class="card">
+            <div class="ctitle">📱 预览</div>
+            <div class="prev" id="prevArea">
+                <div class="placeholder" id="pholder"><div class="pi">📲</div><p>输入内容后点击生成</p></div>
+                <canvas id="qrCvs" class="hidden"></canvas>
             </div>
-
-            <div class="env-warning hidden" id="envWarning">
-                <span class="env-icon">🔒</span>
-                <div><strong>安全环境检测未通过：</strong>摄像头需要 HTTPS 或 localhost 环境。请使用"上传图片"方式替代。</div>
+            <div class="info-grid hidden" id="infoGrid">
+                <div class="info-item"><div class="il">矩阵尺寸</div><div class="iv" id="infoSize">-</div></div>
+                <div class="info-item"><div class="il">数据容量</div><div class="iv" id="infoCap">-</div></div>
+                <div class="info-item"><div class="il">编码模式</div><div class="iv">3-bit/模块</div></div>
+                <div class="info-item"><div class="il">数据格子</div><div class="iv" id="infoCells">-</div></div>
             </div>
-
-            <div class="card">
-                <div class="card-title"><span class="icon">⚙️</span> 解码模式</div>
-                <div class="mode-switch">
-                    <button class="mode-btn active" onclick="setDecoderMode('color')" id="modeColorBtn">🌈 彩色码专用</button>
-                    <button class="mode-btn" onclick="setDecoderMode('standard')" id="modeStdBtn">⬛ 标准黑白码</button>
-                </div>
-
-                <div id="paletteReference">
-                    <p style="font-size:12px; color:var(--gray-500); margin-bottom:6px;">解码器将识别以下 8 种颜色为"数据模块"：</p>
-                    <div class="palette-bar" id="paletteBar"></div>
-                </div>
-
-                <div class="slider-group">
-                    <label>
-                        <span>🎯 颜色识别灵敏度</span>
-                        <span id="thresholdValue">130</span>
-                    </label>
-                    <input type="range" id="thresholdSlider" min="50" max="250" value="130" oninput="updateThreshold(this.value)">
-                    <p style="font-size:11px; color:var(--gray-400); margin-top:4px;">
-                        值越小越严格（减少误识别），值越大越宽松（适应更多光线条件）
-                    </p>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-title"><span class="icon">📷</span> 摄像头扫码</div>
-
-                <select class="camera-selector hidden" id="cameraSelect">
-                    <option value="">-- 请选择摄像头 --</option>
-                </select>
-
-                <div class="scanner-video-wrap" id="videoWrap">
-                    <video id="scanVideo" playsinline muted></video>
-                    <div class="scan-line-overlay" id="scanLineOverlay"></div>
-                    <div class="scan-corners"><span></span></div>
-                    <div class="scan-status" id="scanStatus">
-                        <div class="status-icon">📷</div>
-                        <p>点击下方按钮启动摄像头</p>
-                    </div>
-                </div>
-
-                <div style="margin-top:12px;" class="btn-group">
-                    <button class="btn btn-primary" id="startScanBtn" onclick="startScan()" style="flex:1;">
-                        <span>▶️</span> 开始扫描
-                    </button>
-                    <button class="btn btn-danger hidden" id="stopScanBtn" onclick="stopScan()" style="flex:1;">
-                        <span>⏹️</span> 停止扫描
-                    </button>
-                    <button class="btn btn-secondary btn-sm" onclick="toggleDebug()" id="debugToggleBtn">
-                        🔍 调试
-                    </button>
-                </div>
-
-                <div class="debug-panel" id="debugPanel">
-                    <div class="debug-title">
-                        <span>🔬 预处理实时视图</span>
-                        <span id="debugFps" style="color:var(--success);">0 FPS</span>
-                    </div>
-                    <canvas id="debugCanvas" width="256" height="256"></canvas>
-                    <div class="debug-stats">
-                        <div class="debug-stat">
-                            <div class="stat-value" id="statFrames">0</div>
-                            <div class="stat-label">已处理帧</div>
-                        </div>
-                        <div class="debug-stat">
-                            <div class="stat-value" id="statDarkPx">0%</div>
-                            <div class="stat-label">暗像素占比</div>
-                        </div>
-                        <div class="debug-stat">
-                            <div class="stat-value" id="statMode">彩色</div>
-                            <div class="stat-label">解码模式</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-title"><span class="icon">🖼️</span> 上传图片解码</div>
-                <div class="file-upload-area" id="scanFileArea" onclick="document.getElementById('scanFileInput').click()">
-                    <div class="upload-icon">🖼️</div>
-                    <div class="upload-text">点击选择包含二维码的图片</div>
-                    <div class="file-name hidden" id="scanFileName"></div>
-                    <input type="file" id="scanFileInput" accept="image/*">
-                </div>
-            </div>
-
-            <div class="scan-result" id="scanResult">
-                <div class="result-label">✅ 解码成功</div>
-                <div class="result-text" id="resultText"></div>
-                <div class="result-actions" id="resultActions"></div>
+            <div style="margin-top:12px" id="dlSec" class="hidden">
+                <button class="btn btn-ok btn-blk" onclick="doDownload()"><span>💾</span> 下载 PNG</button>
             </div>
         </div>
     </div>
 
-    <canvas id="processCanvas" class="hidden"></canvas>
-
-    <script>
-    // ================================================================
-    // 版本号
-    // ================================================================
-    const APP_VERSION = '2.1.0';
-    document.getElementById('versionBadge').textContent = `v${APP_VERSION}`;
-
-    // ================================================================
-    // 全局变量
-    // ================================================================
-    let isScanning = false;
-    let logoImage = null;
-    let cameraDevices = [];
-    let videoStream = null;
-    let scanRAF = null;
-    let lastFrameTime = 0;
-    let frameCount = 0;
-    let fpsCounter = 0;
-    let fpsTime = 0;
-    let currentFps = 0;
-    let decoderMode = 'color';
-    let colorThreshold = 130;
-    let debugVisible = false;
-
-    const scanVideo = document.getElementById('scanVideo');
-    const processCanvas = document.getElementById('processCanvas');
-    const processCtx = processCanvas.getContext('2d', { willReadFrequently: true });
-    const debugCanvas = document.getElementById('debugCanvas');
-    const debugCtx = debugCanvas.getContext('2d');
-
-    const PROC_SIZE = 384;
-
-    // 8 色调色板
-    const PALETTE_8_HEX = [
-        '#E53935', '#43A047', '#1E88E5', '#FDD835',
-        '#00ACC1', '#8E24AA', '#212121', '#FB8C00'
-    ];
-
-    const PALETTE_RGB = PALETTE_8_HEX.map(hex => [
-        parseInt(hex.slice(1, 3), 16),
-        parseInt(hex.slice(3, 5), 16),
-        parseInt(hex.slice(5, 7), 16)
-    ]);
-
-    (function initPaletteBar() {
-        const bar = document.getElementById('paletteBar');
-        const names = ['红','绿','蓝','黄','青','紫','黑','橙'];
-        PALETTE_8_HEX.forEach((color, i) => {
-            const swatch = document.createElement('div');
-            swatch.className = 'palette-swatch';
-            swatch.style.background = color;
-            swatch.dataset.idx = names[i];
-            bar.appendChild(swatch);
-        });
-    })();
-
-    // ================================================================
-    // Tab 切换
-    // ================================================================
-    function switchTab(tabName) {
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.tab === tabName);
-        });
-        document.querySelectorAll('.tab-content').forEach(c => {
-            c.classList.toggle('active', c.id === `tab-${tabName}`);
-        });
-        if (tabName !== 'scanner' && isScanning) stopScan();
-        if (tabName === 'scanner') checkEnvironment();
-    }
-
-    function showToast(message, type = 'info') {
-        const container = document.getElementById('toastContainer');
-        const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-        const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
-        toast.innerHTML = `<span>${icons[type]||''}</span><span>${message}</span>`;
-        container.appendChild(toast);
-        setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 3000);
-    }
-
-    function setDecoderMode(mode) {
-        decoderMode = mode;
-        document.getElementById('modeColorBtn').classList.toggle('active', mode === 'color');
-        document.getElementById('modeStdBtn').classList.toggle('active', mode === 'standard');
-        document.getElementById('paletteReference').style.display = mode === 'color' ? 'block' : 'none';
-        document.getElementById('statMode').textContent = mode === 'color' ? '彩色' : '标准';
-    }
-
-    function updateThreshold(val) {
-        colorThreshold = parseInt(val);
-        document.getElementById('thresholdValue').textContent = val;
-    }
-
-    function toggleDebug() {
-        debugVisible = !debugVisible;
-        document.getElementById('debugPanel').classList.toggle('show', debugVisible);
-        document.getElementById('debugToggleBtn').textContent = debugVisible ? '🔍 隐藏调试' : '🔍 调试';
-    }
-
-    function checkEnvironment() {
-        const envWarning = document.getElementById('envWarning');
-        const startBtn = document.getElementById('startScanBtn');
-        const isSecure = window.isSecureContext;
-        const hasMedia = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-
-        if (!isSecure || !hasMedia) {
-            envWarning.classList.remove('hidden');
-            startBtn.disabled = true;
-            startBtn.innerHTML = '<span>🚫</span> 环境不支持';
-        } else {
-            envWarning.classList.add('hidden');
-            startBtn.disabled = false;
-            startBtn.innerHTML = '<span>▶️</span> 开始扫描';
-        }
-    }
-
-    async function enumerateCameras() {
-        try {
-            const tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-            tempStream.getTracks().forEach(t => t.stop());
-
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            cameraDevices = devices.filter(d => d.kind === 'videoinput');
-            if (cameraDevices.length === 0) throw new Error('No camera found');
-
-            const select = document.getElementById('cameraSelect');
-            select.innerHTML = '';
-
-            const backKW = ['back','rear','environment','后置','背面','后摄','主摄'];
-            const frontKW = ['front','face','user','前置','前摄','自拍'];
-
-            const sorted = cameraDevices.map(d => {
-                const label = (d.label || '').toLowerCase();
-                let score = 0;
-                if (backKW.some(k => label.includes(k))) score += 100;
-                if (frontKW.some(k => label.includes(k))) score -= 50;
-                if (!d.label) score += 10;
-                return { device: d, score };
-            }).sort((a, b) => b.score - a.score).map(s => s.device);
-
-            sorted.forEach((d, i) => {
-                const opt = document.createElement('option');
-                opt.value = d.deviceId;
-                opt.textContent = d.label || `摄像头 ${i + 1}`;
-                select.appendChild(opt);
-            });
-
-            select.classList.remove('hidden');
-        } catch (err) {
-            throw err;
-        }
-    }
-
-    async function startScan() {
-        if (isScanning) return;
-
-        const startBtn = document.getElementById('startScanBtn');
-        const statusEl = document.getElementById('scanStatus');
-
-        startBtn.disabled = true;
-        startBtn.innerHTML = '<span class="loading-spinner"></span> 初始化中...';
-        statusEl.innerHTML = '<div class="loading-spinner dark" style="margin:0 auto 10px;"></div><p>正在检测摄像头...</p>';
-
-        try {
-            if (cameraDevices.length === 0) await enumerateCameras();
-
-            const select = document.getElementById('cameraSelect');
-            const deviceId = select.value || (cameraDevices[0] ? cameraDevices[0].deviceId : null);
-            if (!deviceId) throw { name: 'NotFoundError' };
-
-            videoStream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    deviceId: { exact: deviceId },
-                    width: { ideal: 720 },
-                    height: { ideal: 720 },
-                    facingMode: { ideal: 'environment' }
-                },
-                audio: false
-            });
-
-            scanVideo.srcObject = videoStream;
-            await scanVideo.play();
-
-            processCanvas.width = PROC_SIZE;
-            processCanvas.height = PROC_SIZE;
-
-            isScanning = true;
-            frameCount = 0;
-            fpsCounter = 0;
-            fpsTime = performance.now();
-            lastFrameTime = 0;
-
-            statusEl.classList.add('hidden');
-            document.getElementById('scanLineOverlay').classList.add('active');
-            startBtn.classList.add('hidden');
-            document.getElementById('stopScanBtn').classList.remove('hidden');
-
-            showToast('摄像头已启动，使用专用解码器识别中...', 'info');
-
-            scanRAF = requestAnimationFrame(processFrameLoop);
-
-        } catch (err) {
-            startBtn.disabled = false;
-            startBtn.innerHTML = '<span>▶️</span> 开始扫描';
-            handleCameraError(err);
-        }
-    }
-
-    function processFrameLoop(timestamp) {
-        if (!isScanning) return;
-
-        if (timestamp - lastFrameTime < 150) {
-            scanRAF = requestAnimationFrame(processFrameLoop);
-            return;
-        }
-        lastFrameTime = timestamp;
-
-        fpsCounter++;
-        if (timestamp - fpsTime >= 1000) {
-            currentFps = fpsCounter;
-            fpsCounter = 0;
-            fpsTime = timestamp;
-            if (debugVisible) {
-                document.getElementById('debugFps').textContent = currentFps + ' FPS';
-            }
-        }
-
-        const vw = scanVideo.videoWidth;
-        const vh = scanVideo.videoHeight;
-        if (vw === 0 || vh === 0) {
-            scanRAF = requestAnimationFrame(processFrameLoop);
-            return;
-        }
-
-        const size = Math.min(vw, vh);
-        const sx = (vw - size) / 2;
-        const sy = (vh - size) / 2;
-        processCtx.drawImage(scanVideo, sx, sy, size, size, 0, 0, PROC_SIZE, PROC_SIZE);
-
-        const imageData = processCtx.getImageData(0, 0, PROC_SIZE, PROC_SIZE);
-
-        let darkPixelRatio = 0;
-        if (decoderMode === 'color') {
-            darkPixelRatio = preprocessColorQR(imageData);
-        } else {
-            darkPixelRatio = preprocessStandard(imageData);
-        }
-
-        frameCount++;
-        if (debugVisible) {
-            debugCtx.putImageData(imageData, 0, 0);
-            document.getElementById('statFrames').textContent = frameCount;
-            document.getElementById('statDarkPx').textContent = (darkPixelRatio * 100).toFixed(1) + '%';
-        }
-
-        processCtx.putImageData(imageData, 0, 0);
-
-        const code = jsQR(imageData.data, PROC_SIZE, PROC_SIZE, {
-            inversionAttempts: 'dontInvert'
-        });
-
-        if (code && code.data) {
-            onScanSuccess(code.data);
-            return;
-        }
-
-        if (decoderMode === 'color') {
-            const data = imageData.data;
-            for (let i = 0; i < data.length; i += 4) {
-                const v = data[i] === 0 ? 255 : 0;
-                data[i] = v; data[i+1] = v; data[i+2] = v;
-            }
-            const codeInverted = jsQR(imageData.data, PROC_SIZE, PROC_SIZE, {
-                inversionAttempts: 'dontInvert'
-            });
-            if (codeInverted && codeInverted.data) {
-                onScanSuccess(codeInverted.data);
-                return;
-            }
-        }
-
-        scanRAF = requestAnimationFrame(processFrameLoop);
-    }
-
-    function preprocessColorQR(imageData) {
-        const data = imageData.data;
-        const len = data.length;
-        const thresholdSq = colorThreshold * colorThreshold;
-        let darkCount = 0;
-        const totalPixels = len / 4;
-
-        const p0r = PALETTE_RGB[0][0], p0g = PALETTE_RGB[0][1], p0b = PALETTE_RGB[0][2];
-        const p1r = PALETTE_RGB[1][0], p1g = PALETTE_RGB[1][1], p1b = PALETTE_RGB[1][2];
-        const p2r = PALETTE_RGB[2][0], p2g = PALETTE_RGB[2][1], p2b = PALETTE_RGB[2][2];
-        const p3r = PALETTE_RGB[3][0], p3g = PALETTE_RGB[3][1], p3b = PALETTE_RGB[3][2];
-        const p4r = PALETTE_RGB[4][0], p4g = PALETTE_RGB[4][1], p4b = PALETTE_RGB[4][2];
-        const p5r = PALETTE_RGB[5][0], p5g = PALETTE_RGB[5][1], p5b = PALETTE_RGB[5][2];
-        const p6r = PALETTE_RGB[6][0], p6g = PALETTE_RGB[6][1], p6b = PALETTE_RGB[6][2];
-        const p7r = PALETTE_RGB[7][0], p7g = PALETTE_RGB[7][1], p7b = PALETTE_RGB[7][2];
-
-        for (let i = 0; i < len; i += 4) {
-            const r = data[i];
-            const g = data[i + 1];
-            const b = data[i + 2];
-
-            let minDistSq = Infinity;
-
-            let d0 = (r-p0r)*(r-p0r) + (g-p0g)*(g-p0g) + (b-p0b)*(b-p0b);
-            if (d0 < minDistSq) minDistSq = d0;
-
-            let d1 = (r-p1r)*(r-p1r) + (g-p1g)*(g-p1g) + (b-p1b)*(b-p1b);
-            if (d1 < minDistSq) minDistSq = d1;
-
-            let d2 = (r-p2r)*(r-p2r) + (g-p2g)*(g-p2g) + (b-p2b)*(b-p2b);
-            if (d2 < minDistSq) minDistSq = d2;
-
-            let d3 = (r-p3r)*(r-p3r) + (g-p3g)*(g-p3g) + (b-p3b)*(b-p3b);
-            if (d3 < minDistSq) minDistSq = d3;
-
-            let d4 = (r-p4r)*(r-p4r) + (g-p4g)*(g-p4g) + (b-p4b)*(b-p4b);
-            if (d4 < minDistSq) minDistSq = d4;
-
-            let d5 = (r-p5r)*(r-p5r) + (g-p5g)*(g-p5g) + (b-p5b)*(b-p5b);
-            if (d5 < minDistSq) minDistSq = d5;
-
-            let d6 = (r-p6r)*(r-p6r) + (g-p6g)*(g-p6g) + (b-p6b)*(b-p6b);
-            if (d6 < minDistSq) minDistSq = d6;
-
-            let d7 = (r-p7r)*(r-p7r) + (g-p7g)*(g-p7g) + (b-p7b)*(b-p7b);
-            if (d7 < minDistSq) minDistSq = d7;
-
-            if (minDistSq < thresholdSq) {
-                data[i] = 0; data[i+1] = 0; data[i+2] = 0;
-                darkCount++;
-            } else {
-                data[i] = 255; data[i+1] = 255; data[i+2] = 255;
-            }
-            data[i+3] = 255;
-        }
-
-        return darkCount / totalPixels;
-    }
-
-    function preprocessStandard(imageData) {
-        const data = imageData.data;
-        const len = data.length;
-        const totalPixels = len / 4;
-
-        const histogram = new Array(256).fill(0);
-        const grayValues = new Uint8Array(totalPixels);
-
-        for (let i = 0; i < len; i += 4) {
-            const gray = Math.round(data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114);
-            grayValues[i / 4] = gray;
-            histogram[gray]++;
-        }
-
-        let sum = 0;
-        for (let i = 0; i < 256; i++) sum += i * histogram[i];
-
-        let sumB = 0, wB = 0, wF = 0;
-        let maxVariance = 0;
-        let threshold = 128;
-
-        for (let t = 0; t < 256; t++) {
-            wB += histogram[t];
-            if (wB === 0) continue;
-            wF = totalPixels - wB;
-            if (wF === 0) break;
-
-            sumB += t * histogram[t];
-            const mB = sumB / wB;
-            const mF = (sum - sumB) / wF;
-            const variance = wB * wF * (mB - mF) * (mB - mF);
-
-            if (variance > maxVariance) {
-                maxVariance = variance;
-                threshold = t;
-            }
-        }
-
-        let darkCount = 0;
-        for (let i = 0; i < len; i += 4) {
-            const gray = grayValues[i / 4];
-            if (gray < threshold) {
-                data[i] = 0; data[i+1] = 0; data[i+2] = 0;
-                darkCount++;
-            } else {
-                data[i] = 255; data[i+1] = 255; data[i+2] = 255;
-            }
-            data[i+3] = 255;
-        }
-
-        return darkCount / totalPixels;
-    }
-
-    function onScanSuccess(decodedText) {
-        stopScan();
-        showScanResult(decodedText);
-        showToast('🎉 解码成功！', 'success');
-        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-    }
-
-    function stopScan() {
-        isScanning = false;
-
-        if (scanRAF) {
-            cancelAnimationFrame(scanRAF);
-            scanRAF = null;
-        }
-
-        if (videoStream) {
-            videoStream.getTracks().forEach(t => t.stop());
-            videoStream = null;
-        }
-
-        scanVideo.srcObject = null;
-
-        const statusEl = document.getElementById('scanStatus');
-        statusEl.innerHTML = '<div class="status-icon">📷</div><p>点击下方按钮启动摄像头</p>';
-        statusEl.classList.remove('hidden');
-        document.getElementById('scanLineOverlay').classList.remove('active');
-
-        const startBtn = document.getElementById('startScanBtn');
-        startBtn.classList.remove('hidden');
-        startBtn.disabled = false;
-        startBtn.innerHTML = '<span>▶️</span> 开始扫描';
-        document.getElementById('stopScanBtn').classList.add('hidden');
-    }
-
-    function handleCameraError(err) {
-        const statusEl = document.getElementById('scanStatus');
-        const errName = err?.name || '';
-        let message = '', icon = '❌', detail = '';
-
-        if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
-            icon = '🔒'; message = '摄像头权限被拒绝';
-            detail = '请在浏览器/系统设置中允许摄像头权限后刷新页面。';
-        } else if (errName === 'NotFoundError') {
-            icon = '📷'; message = '未检测到摄像头';
-            detail = '请确认设备有摄像头，或使用"上传图片"功能。';
-        } else if (errName === 'NotReadableError') {
-            icon = '⚠️'; message = '摄像头被占用';
-            detail = '请关闭其他使用摄像头的应用后重试。';
-        } else if (errName === 'OverconstrainedError') {
-            icon = '⚙️'; message = '参数不匹配';
-            detail = '正在重新检测设备，请重试。';
-            cameraDevices = [];
-        } else if (errName === 'SecurityError') {
-            icon = '🔒'; message = '安全限制';
-            detail = '需要 HTTPS 环境。';
-        } else {
-            icon = '❓'; message = '启动失败';
-            detail = `错误：${err?.message || '未知'}。请刷新页面重试。`;
-        }
-
-        statusEl.innerHTML = `
-            <div class="status-icon">${icon}</div>
-            <p style="font-weight:600;color:var(--gray-700);margin-bottom:4px;">${message}</p>
-            <p style="font-size:13px;color:var(--gray-500);">${detail}</p>
-        `;
-        statusEl.classList.remove('hidden');
-        showToast(message, 'error');
-        console.error('[Scanner Error]', err);
-    }
-
-    function showScanResult(text) {
-        const resultDiv = document.getElementById('scanResult');
-        const resultText = document.getElementById('resultText');
-        const resultActions = document.getElementById('resultActions');
-        resultText.textContent = text;
-        resultActions.innerHTML = '';
-
-        const isUrl = /^https?:\/\//i.test(text) || /^www\./i.test(text);
-        if (isUrl) {
-            const url = text.startsWith('www.') ? 'https://' + text : text;
-            const btn = document.createElement('button');
-            btn.className = 'btn btn-primary';
-            btn.innerHTML = '<span>🔗</span> 新窗口打开';
-            btn.onclick = () => window.open(url, '_blank');
-            resultActions.appendChild(btn);
-        }
-
-        const copyBtn = document.createElement('button');
-        copyBtn.className = 'btn btn-secondary';
-        copyBtn.innerHTML = '<span>📋</span> 复制';
-        copyBtn.onclick = () => {
-            navigator.clipboard.writeText(text)
-                .then(() => showToast('已复制', 'success'))
-                .catch(() => {
-                    const ta = document.createElement('textarea');
-                    ta.value = text; document.body.appendChild(ta);
-                    ta.select(); document.execCommand('copy');
-                    document.body.removeChild(ta);
-                    showToast('已复制', 'success');
-                });
-        };
-        resultActions.appendChild(copyBtn);
-
-        const rescanBtn = document.createElement('button');
-        rescanBtn.className = 'btn btn-secondary';
-        rescanBtn.innerHTML = '<span>🔄</span> 重新扫描';
-        rescanBtn.onclick = () => { resultDiv.classList.remove('show'); startScan(); };
-        resultActions.appendChild(rescanBtn);
-
-        resultDiv.classList.add('show');
-    }
-
-    document.getElementById('scanFileInput').addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        document.getElementById('scanFileArea').classList.add('has-file');
-        document.getElementById('scanFileName').textContent = `✅ ${file.name}`;
-        document.getElementById('scanFileName').classList.remove('hidden');
-
-        showToast('正在使用专用解码器解析...', 'info');
-
-        const img = new Image();
-        img.onload = function() {
-            const size = Math.min(img.width, img.height);
-            const sx = (img.width - size) / 2;
-            const sy = (img.height - size) / 2;
-
-            processCanvas.width = PROC_SIZE;
-            processCanvas.height = PROC_SIZE;
-            processCtx.drawImage(img, sx, sy, size, size, 0, 0, PROC_SIZE, PROC_SIZE);
-
-            const imageData = processCtx.getImageData(0, 0, PROC_SIZE, PROC_SIZE);
-
-            if (decoderMode === 'color') {
-                preprocessColorQR(imageData);
-            } else {
-                preprocessStandard(imageData);
-            }
-
-            if (debugVisible) {
-                debugCtx.putImageData(imageData, 0, 0);
-            }
-
-            let code = jsQR(imageData.data, PROC_SIZE, PROC_SIZE, {
-                inversionAttempts: 'dontInvert'
-            });
-
-            if (!code) {
-                const d = imageData.data;
-                for (let i = 0; i < d.length; i += 4) {
-                    const v = d[i] === 0 ? 255 : 0;
-                    d[i] = v; d[i+1] = v; d[i+2] = v;
-                }
-                code = jsQR(imageData.data, PROC_SIZE, PROC_SIZE, {
-                    inversionAttempts: 'dontInvert'
-                });
-            }
-
-            if (!code && decoderMode === 'color') {
-                processCtx.drawImage(img, sx, sy, size, size, 0, 0, PROC_SIZE, PROC_SIZE);
-                const imageData2 = processCtx.getImageData(0, 0, PROC_SIZE, PROC_SIZE);
-                preprocessStandard(imageData2);
-                code = jsQR(imageData2.data, PROC_SIZE, PROC_SIZE, {
-                    inversionAttempts: 'dontInvert'
-                });
-                if (!code) {
-                    const d2 = imageData2.data;
-                    for (let i = 0; i < d2.length; i += 4) {
-                        const v = d2[i] === 0 ? 255 : 0;
-                        d2[i] = v; d2[i+1] = v; d2[i+2] = v;
-                    }
-                    code = jsQR(imageData2.data, PROC_SIZE, PROC_SIZE, {
-                        inversionAttempts: 'dontInvert'
-                    });
-                }
-            }
-
-            if (code && code.data) {
-                showScanResult(code.data);
-                showToast('🎉 图片解码成功！', 'success');
-            } else {
-                showToast('识别失败。请确保扫描的是本工具生成的彩色二维码，并检查图片清晰度。', 'error');
-            }
-        };
-        img.src = URL.createObjectURL(file);
-        e.target.value = '';
+    <!-- ========== 扫码器 ========== -->
+    <div class="tc" id="tab-scan">
+        <div class="ebanner">
+            <span style="font-size:16px;flex-shrink:0">🧪</span>
+            <div><strong>专用解码器：</strong>识别本工具生成的 3-bit 高密度彩色二维码。8色调色板自动匹配，支持中英文及特殊字符。</div>
+        </div>
+        <div class="envw hidden" id="envW">
+            <span style="font-size:18px;flex-shrink:0">🔒</span>
+            <div><strong>环境不支持：</strong>摄像头需要 HTTPS。请使用"上传图片"方式。</div>
+        </div>
+        <div class="card">
+            <div class="ctitle">🎨 调色板参考</div>
+            <p style="font-size:11px;color:var(--g500);margin-bottom:4px">解码器识别以下 8 色（每色 = 3 bits）：</p>
+            <div class="pbar" id="pBar"></div>
+        </div>
+        <div class="card">
+            <div class="ctitle">📷 摄像头扫码</div>
+            <select class="camSel hidden" id="camSel"><option value="">-- 选择摄像头 --</option></select>
+            <div class="vwrap" id="vWrap">
+                <video id="sVid" playsinline muted></video>
+                <div class="sline" id="sLine"></div>
+                <div class="scorners"><span></span></div>
+                <div class="sstatus" id="sStatus"><div class="si">📷</div><p>点击下方按钮启动</p></div>
+            </div>
+            <div style="margin-top:10px" class="bgrp">
+                <button class="btn btn-p" id="startBtn" onclick="doStart()" style="flex:1"><span>▶️</span> 开始扫描</button>
+                <button class="btn btn-d hidden" id="stopBtn" onclick="doStop()" style="flex:1"><span>⏹️</span> 停止</button>
+                <button class="btn btn-s btn-sm" onclick="toggleDbg()" id="dbgBtn">🔍调试</button>
+            </div>
+            <div class="dpanel" id="dPanel">
+                <div style="color:var(--g400);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:flex;justify-content:space-between">
+                    <span>🔬 二值化实时视图</span><span id="dbgFps" style="color:var(--suc)">0 FPS</span>
+                </div>
+                <canvas id="dbgCvs" width="256" height="256"></canvas>
+                <div class="dstats">
+                    <div class="dstat"><div class="sv" id="stFr">0</div><div class="sl">帧数</div></div>
+                    <div class="dstat"><div class="sv" id="stPat">0</div><div class="sl">定位点</div></div>
+                    <div class="dstat"><div class="sv" id="stDec">等待</div><div class="sl">状态</div></div>
+                </div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="ctitle">🖼️ 上传图片解码</div>
+            <div class="fup" id="scanFArea" onclick="document.getElementById('scanFIn').click()">
+                <div style="font-size:28px;margin-bottom:4px">🖼️</div>
+                <div style="font-size:13px;color:var(--g500)">选择包含彩色二维码的图片</div>
+                <input type="file" id="scanFIn" accept="image/*">
+            </div>
+        </div>
+        <div class="sresult" id="sResult">
+            <div style="font-size:11px;font-weight:600;color:var(--suc);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">✅ 解码成功</div>
+            <div class="rt" id="resTxt"></div>
+            <div class="ra" id="resAct"></div>
+        </div>
+    </div>
+</div>
+<canvas id="procCvs" class="hidden"></canvas>
+
+<script>
+// ================================================================
+// v3.0.0 — 真·高密度彩色二维码
+// 核心变更：每个模块存储 3 bits（8色），容量提升 3 倍
+// ================================================================
+const VER = '3.0.0';
+document.getElementById('vBadge').textContent = 'v' + VER;
+
+// ================================================================
+// 【核心】8 色调色板 — 生成器与解码器必须完全一致
+// 每色编码 3 bits: 索引 0-7
+// ================================================================
+const PALETTE = [
+    [  0,   0,   0],  // 0: 黑   000
+    [237,  28,  36],  // 1: 红   001
+    [ 34, 177,  76],  // 2: 绿   010
+    [  0, 112, 255],  // 3: 蓝   011
+    [255, 213,   0],  // 4: 黄   100
+    [  0, 195, 204],  // 5: 青   101
+    [200,  18, 193],  // 6: 品红 110
+    [136, 136, 136],  // 7: 灰   111
+];
+const PAL_NAMES = ['黑','红','绿','蓝','黄','青','品红','灰'];
+
+// 初始化调色板预览
+(function(){
+    const bar = document.getElementById('pBar');
+    PALETTE.forEach((c,i)=>{
+        const d = document.createElement('div');
+        d.className = 'psw';
+        d.style.background = `rgb(${c[0]},${c[1]},${c[2]})`;
+        d.dataset.l = PAL_NAMES[i];
+        bar.appendChild(d);
     });
+})();
 
-    // ================================================================
-    // 对比度校验
-    // ================================================================
-    function getRelativeLuminance(hex) {
-        const r = parseInt(hex.slice(1,3),16)/255;
-        const g = parseInt(hex.slice(3,5),16)/255;
-        const b = parseInt(hex.slice(5,7),16)/255;
-        const lin = c => c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4);
-        return 0.2126*lin(r) + 0.7152*lin(g) + 0.0722*lin(b);
+// ================================================================
+// 全局状态
+// ================================================================
+let logoImg = null;
+let isScanning = false;
+let camDevs = [];
+let vidStream = null;
+let scanRAF = null;
+let lastFT = 0, fCnt = 0, fpsCnt = 0, fpsT = 0, curFps = 0;
+let dbgOn = false;
+
+const sVid = document.getElementById('sVid');
+const procCvs = document.getElementById('procCvs');
+const procCtx = procCvs.getContext('2d', {willReadFrequently: true});
+const dbgCvs = document.getElementById('dbgCvs');
+const dbgCtx = dbgCvs.getContext('2d');
+const PROC_SZ = 400;
+
+// ================================================================
+// UI 辅助
+// ================================================================
+function switchTab(t) {
+    document.querySelectorAll('.tbtn').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+    document.querySelectorAll('.tc').forEach(c => c.classList.toggle('on', c.id === 'tab-' + t));
+    if (t !== 'scan' && isScanning) doStop();
+    if (t === 'scan') checkEnv();
+}
+function toast(msg, type='info') {
+    const c = document.getElementById('toastC');
+    const d = document.createElement('div');
+    d.className = 'toast ' + type;
+    const ic = {success:'✅',error:'❌',warning:'⚠️',info:'ℹ️'};
+    d.innerHTML = `<span>${ic[type]||''}</span><span>${msg}</span>`;
+    c.appendChild(d);
+    setTimeout(()=>{if(d.parentNode)d.parentNode.removeChild(d)},3000);
+}
+function toggleDbg() {
+    dbgOn = !dbgOn;
+    document.getElementById('dPanel').classList.toggle('show', dbgOn);
+    document.getElementById('dbgBtn').textContent = dbgOn ? '🔍隐藏' : '🔍调试';
+}
+
+// ================================================================
+// 对比度校验
+// ================================================================
+function lum(hex) {
+    const r=parseInt(hex.slice(1,3),16)/255, g=parseInt(hex.slice(3,5),16)/255, b=parseInt(hex.slice(5,7),16)/255;
+    const f=c=>c<=.03928?c/12.92:Math.pow((c+.055)/1.055,2.4);
+    return .2126*f(r)+.7152*f(g)+.0722*f(b);
+}
+function chkContrast() {
+    const fg=document.getElementById('fgC').value, bg=document.getElementById('bgC').value;
+    const w=document.getElementById('cWarn');
+    const r=(Math.max(lum(fg),lum(bg))+.05)/(Math.min(lum(fg),lum(bg))+.05);
+    document.getElementById('fgH').textContent=fg;
+    document.getElementById('bgH').textContent=bg;
+    if(lum(bg)<lum(fg)){
+        w.className='cwarn show danger';
+        document.getElementById('cWarnI').textContent='⚠️';
+        document.getElementById('cWarnT').textContent='背景色比前景深！定位点需要深色前景+浅色背景。';
+    } else if(r<3){
+        w.className='cwarn show danger';
+        document.getElementById('cWarnI').textContent='⚠️';
+        document.getElementById('cWarnT').textContent=`对比度不足(${r.toFixed(1)}:1)，定位点可能无法识别！`;
+    } else {
+        w.className='cwarn show ok';
+        document.getElementById('cWarnI').textContent='✅';
+        document.getElementById('cWarnT').textContent=`定位点对比度 ${r.toFixed(1)}:1，良好。`;
     }
-    function getContrastRatio(h1, h2) {
-        const l1 = getRelativeLuminance(h1), l2 = getRelativeLuminance(h2);
-        return (Math.max(l1,l2)+0.05)/(Math.min(l1,l2)+0.05);
-    }
-    function checkContrast() {
-        const fg = document.getElementById('fgColor').value;
-        const bg = document.getElementById('bgColor').value;
-        const w = document.getElementById('contrastWarning');
-        const ratio = getContrastRatio(fg, bg);
-        const fgL = getRelativeLuminance(fg), bgL = getRelativeLuminance(bg);
-        document.getElementById('fgHex').textContent = fg;
-        document.getElementById('bgHex').textContent = bg;
-        if (bgL < fgL) {
-            w.className = 'contrast-warning show danger';
-            w.querySelector('.warn-icon').textContent = '⚠️';
-            w.querySelector('.warn-text').textContent = '背景色比前景色深！定位点需深色前景+浅色背景。';
-        } else if (ratio < 3) {
-            w.className = 'contrast-warning show danger';
-            w.querySelector('.warn-icon').textContent = '⚠️';
-            w.querySelector('.warn-text').textContent = `对比度不足（${ratio.toFixed(1)}:1），定位点可能无法识别！`;
-        } else {
-            w.className = 'contrast-warning show success';
-            w.querySelector('.warn-icon').textContent = '✅';
-            w.querySelector('.warn-text').textContent = `定位点对比度 ${ratio.toFixed(1)}:1，良好。`;
+}
+document.getElementById('fgC').addEventListener('input',chkContrast);
+document.getElementById('bgC').addEventListener('input',chkContrast);
+
+// ================================================================
+// Logo 上传
+// ================================================================
+document.getElementById('logoIn').addEventListener('change',function(e){
+    const f=e.target.files[0]; if(!f) return;
+    const r=new FileReader();
+    r.onload=function(ev){
+        const img=new Image();
+        img.onload=function(){
+            logoImg=img;
+            document.getElementById('logoArea').classList.add('has');
+            document.getElementById('logoTxt').textContent='✅ '+f.name;
+            toast('Logo 上传成功','success');
+        };
+        img.src=ev.target.result;
+    };
+    r.readAsDataURL(f);
+});
+
+// ================================================================
+// 【生成器核心】CRC-8 校验（多项式 0x07）
+// ================================================================
+function crc8(data) {
+    let crc = 0;
+    for (let i = 0; i < data.length; i++) {
+        crc ^= data[i];
+        for (let j = 0; j < 8; j++) {
+            crc = (crc & 0x80) ? ((crc << 1) ^ 0x07) : (crc << 1);
+            crc &= 0xFF;
         }
     }
-    document.getElementById('fgColor').addEventListener('input', checkContrast);
-    document.getElementById('bgColor').addEventListener('input', checkContrast);
+    return crc;
+}
 
-    document.getElementById('logoInput').addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(ev) {
-            const img = new Image();
-            img.onload = function() {
-                logoImage = img;
-                document.getElementById('logoUploadArea').classList.add('has-file');
-                document.getElementById('logoFileName').textContent = `✅ ${file.name}`;
-                document.getElementById('logoFileName').classList.remove('hidden');
-                showToast('Logo 上传成功', 'success');
-            };
-            img.src = ev.target.result;
-        };
-        reader.readAsDataURL(file);
-    });
+// ================================================================
+// 【生成器核心】文本 → 数据帧（字节数组）
+// 帧格式：[长度高字节][长度低字节][数据字节...][CRC-8]
+// ================================================================
+function buildFrame(text) {
+    const enc = new TextEncoder();
+    const bytes = enc.encode(text);
+    const len = bytes.length;
+    // 帧 = 2字节长度 + 数据 + 1字节CRC
+    const frame = new Uint8Array(2 + len + 1);
+    frame[0] = (len >> 8) & 0xFF;  // 长度高字节
+    frame[1] = len & 0xFF;         // 长度低字节
+    frame.set(bytes, 2);            // 数据
+    frame[frame.length - 1] = crc8(bytes); // CRC校验
+    return frame;
+}
 
-    function isFinderPatternRegion(x, y, mc) {
-        if (x < 7 && y < 7) return true;
-        if (x >= mc-7 && y < 7) return true;
-        if (x < 7 && y >= mc-7) return true;
+// ================================================================
+// 【生成器核心】字节数组 → 比特流 → 颜色索引数组
+// 每 3 bits 一组 → 颜色索引 0-7
+// ================================================================
+function bytesToColorIndices(frameBytes) {
+    // 转为比特数组
+    const bits = [];
+    for (let i = 0; i < frameBytes.length; i++) {
+        for (let b = 7; b >= 0; b--) {
+            bits.push((frameBytes[i] >> b) & 1);
+        }
+    }
+    // 补齐到 3 的倍数（尾部填0）
+    while (bits.length % 3 !== 0) bits.push(0);
+    // 每 3 bits → 颜色索引
+    const indices = [];
+    for (let i = 0; i < bits.length; i += 3) {
+        const idx = (bits[i] << 2) | (bits[i+1] << 1) | bits[i+2];
+        indices.push(idx);
+    }
+    return indices;
+}
+
+// ================================================================
+// 【生成器核心】计算矩阵边长
+// 需要容纳：3个 7×7 定位点 + 数据颜色格子
+// ================================================================
+function calcMatrixSize(colorCount) {
+    // 最小边长 15（7+1+7，定位点间至少1格间距）
+    // 可用数据格 = S*S - 3*49（三个定位点各占49格，S≥15时不重叠）
+    // 需要 S*S - 147 >= colorCount
+    let s = 15;
+    while (s * s - 147 < colorCount) s++;
+    return s;
+}
+
+// ================================================================
+// 【生成器核心】定位点图案（7×7 "回"字形）
+// 1=黑, 0=白
+// ================================================================
+const FINDER_PATTERN = [
+    [1,1,1,1,1,1,1],
+    [1,0,0,0,0,0,1],
+    [1,0,1,1,1,0,1],
+    [1,0,1,1,1,0,1],
+    [1,0,1,1,1,0,1],
+    [1,0,0,0,0,0,1],
+    [1,1,1,1,1,1,1],
+];
+
+// ================================================================
+// 【生成器核心】构建完整矩阵
+// -1 = 背景（白）
+// -2 = 定位点黑
+// -3 = 定位点白
+// 0-7 = 数据颜色索引
+// ================================================================
+function buildMatrix(colorIndices, size) {
+    // 初始化：全部为背景
+    const matrix = Array.from({length: size}, () => Array(size).fill(-1));
+
+    // 标记函数：某格子是否被定位点占用
+    function isFinderArea(r, c) {
+        // 左上
+        if (r < 7 && c < 7) return true;
+        // 右上
+        if (r < 7 && c >= size - 7) return true;
+        // 左下
+        if (r >= size - 7 && c < 7) return true;
         return false;
     }
 
-    function computeDataHash(text) {
-        let h = 0;
-        for (let i = 0; i < text.length; i++) {
-            h = ((h << 5) - h) + text.charCodeAt(i);
-            h = h & h;
-        }
-        return Math.abs(h);
-    }
-    function pickColorForModule(x, y, dh) {
-        return PALETTE_8_HEX[(x * 7 + y * 13 + dh) % 8];
-    }
+    // 绘制三个定位点
+    // 左上 (0,0)
+    for (let r = 0; r < 7; r++)
+        for (let c = 0; c < 7; c++)
+            matrix[r][c] = FINDER_PATTERN[r][c] ? -2 : -3;
+    // 右上 (0, size-7)
+    for (let r = 0; r < 7; r++)
+        for (let c = 0; c < 7; c++)
+            matrix[r][size - 7 + c] = FINDER_PATTERN[r][c] ? -2 : -3;
+    // 左下 (size-7, 0)
+    for (let r = 0; r < 7; r++)
+        for (let c = 0; c < 7; c++)
+            matrix[size - 7 + r][c] = FINDER_PATTERN[r][c] ? -2 : -3;
 
-    // ================================================================
-    // 【关键修复】生成二维码 - 强制使用 Byte 模式 + UTF-8 编码
-    // ================================================================
-    function generateQR() {
-        const text = document.getElementById('qrText').value.trim();
-        if (!text) { showToast('请输入编码内容', 'warning'); return; }
-        
-        const fg = document.getElementById('fgColor').value;
-        const bg = document.getElementById('bgColor').value;
-        const dh = computeDataHash(text);
-
-        try {
-            const qr = qrcode(0, 'M');
-            
-            // 【关键修复】将文本转为 UTF-8 字节数组，然后使用 Byte 模式
-            // 这样可以确保中文、日文、韩文等多字节字符正确编码
-            const utf8Bytes = [];
-            const encoder = new TextEncoder();
-            const encoded = encoder.encode(text);
-            
-            // 将 UTF-8 字节数组转为 Latin1 字符串（qrcode-generator 的 Byte 模式需要）
-            let byteString = '';
-            for (let i = 0; i < encoded.length; i++) {
-                byteString += String.fromCharCode(encoded[i]);
+    // 按行优先顺序填充数据颜色
+    let idx = 0;
+    for (let r = 0; r < size && idx < colorIndices.length; r++) {
+        for (let c = 0; c < size && idx < colorIndices.length; c++) {
+            if (!isFinderArea(r, c)) {
+                matrix[r][c] = colorIndices[idx];
+                idx++;
             }
-            
-            // 使用 Byte 模式添加数据
-            qr.addData(byteString, 'Byte');
-            qr.make();
-            
-            const mc = qr.getModuleCount();
-            const cs = 14, mg = 24;
-            const qs = mc * cs, ts = qs + mg * 2;
-            const canvas = document.getElementById('qrCanvas');
-            canvas.width = ts; canvas.height = ts;
-            const ctx = canvas.getContext('2d');
+        }
+    }
 
-            ctx.fillStyle = bg;
-            ctx.fillRect(0, 0, ts, ts);
+    return matrix;
+}
 
-            for (let r = 0; r < mc; r++) {
-                for (let c = 0; c < mc; c++) {
-                    if (qr.isDark(r, c)) {
-                        ctx.fillStyle = isFinderPatternRegion(c, r, mc) ? fg : pickColorForModule(c, r, dh);
-                        ctx.fillRect(mg + c*cs, mg + r*cs, cs, cs);
-                    }
+// ================================================================
+// 【生成器核心】Canvas 绘制矩阵
+// ================================================================
+function drawMatrix(matrix, cellSize, fgColor, bgColor) {
+    const size = matrix.length;
+    const margin = Math.max(cellSize, 16);
+    const total = size * cellSize + margin * 2;
+
+    const canvas = document.getElementById('qrCvs');
+    canvas.width = total;
+    canvas.height = total;
+    const ctx = canvas.getContext('2d');
+
+    // 背景
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, total, total);
+
+    for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+            const v = matrix[r][c];
+            const x = margin + c * cellSize;
+            const y = margin + r * cellSize;
+
+            if (v === -2) {
+                // 定位点黑色
+                ctx.fillStyle = fgColor;
+                ctx.fillRect(x, y, cellSize, cellSize);
+            } else if (v === -3) {
+                // 定位点白色（已用背景色覆盖，这里显式画以确保清晰）
+                ctx.fillStyle = bgColor;
+                ctx.fillRect(x, y, cellSize, cellSize);
+            } else if (v >= 0 && v <= 7) {
+                // 数据颜色
+                const pal = PALETTE[v];
+                ctx.fillStyle = `rgb(${pal[0]},${pal[1]},${pal[2]})`;
+                ctx.fillRect(x, y, cellSize, cellSize);
+            }
+            // v === -1: 背景，已绘制
+        }
+    }
+
+    // Logo
+    if (logoImg) {
+        const qrPx = size * cellSize;
+        const maxLogo = qrPx * 0.25; // 面积25% → 边长50%... 不，面积25%→边长50%
+        // 实际上面积25%意味着边长=50%，但为了安全用更小
+        const maxSide = Math.sqrt(0.20) * qrPx; // 面积20%
+        let lw, lh;
+        const ar = logoImg.width / logoImg.height;
+        if (ar > 1) { lw = Math.min(logoImg.width, maxSide); lh = lw / ar; }
+        else { lh = Math.min(logoImg.height, maxSide); lw = lh * ar; }
+        if (lw > maxSide) { lw = maxSide; lh = lw / ar; }
+
+        const lx = margin + (qrPx - lw) / 2;
+        const ly = margin + (qrPx - lh) / 2;
+        const pd = 6;
+
+        // 白色背景
+        ctx.fillStyle = bgColor;
+        ctx.beginPath();
+        const rr = 8;
+        const rx = lx-pd, ry = ly-pd, rw = lw+pd*2, rh = lh+pd*2;
+        ctx.moveTo(rx+rr,ry);ctx.lineTo(rx+rw-rr,ry);ctx.quadraticCurveTo(rx+rw,ry,rx+rw,ry+rr);
+        ctx.lineTo(rx+rw,ry+rh-rr);ctx.quadraticCurveTo(rx+rw,ry+rh,rx+rw-rr,ry+rh);
+        ctx.lineTo(rx+rr,ry+rh);ctx.quadraticCurveTo(rx,ry+rh,rx,ry+rh-rr);
+        ctx.lineTo(rx,ry+rr);ctx.quadraticCurveTo(rx,ry,rx+rr,ry);
+        ctx.closePath();ctx.fill();
+
+        ctx.drawImage(logoImg, lx, ly, lw, lh);
+    }
+
+    return { total, margin, size, cellSize };
+}
+
+// ================================================================
+// 生成入口
+// ================================================================
+function doGenerate() {
+    const text = document.getElementById('qrText').value.trim();
+    if (!text) { toast('请输入内容','warning'); return; }
+
+    const fg = document.getElementById('fgC').value;
+    const bg = document.getElementById('bgC').value;
+
+    try {
+        // 1. 构建数据帧
+        const frame = buildFrame(text);
+        // 2. 转颜色索引
+        const indices = bytesToColorIndices(frame);
+        // 3. 计算矩阵大小
+        const sz = calcMatrixSize(indices.length);
+        // 4. 构建矩阵
+        const matrix = buildMatrix(indices, sz);
+        // 5. 计算合适的格子大小（确保输出图像不会太大）
+        const maxOutput = 500; // 最大输出像素
+        const cellSz = Math.max(4, Math.floor((maxOutput - 32) / sz));
+        // 6. 绘制
+        const info = drawMatrix(matrix, cellSz, fg, bg);
+
+        // 显示
+        document.getElementById('qrCvs').classList.remove('hidden');
+        document.getElementById('pholder').classList.add('hidden');
+        document.getElementById('dlSec').classList.remove('hidden');
+        document.getElementById('infoGrid').classList.remove('hidden');
+
+        // 信息面板
+        document.getElementById('infoSize').textContent = sz + '×' + sz;
+        document.getElementById('infoCap').textContent = text.length + ' 字符';
+        const dataCells = sz * sz - 147;
+        document.getElementById('infoCells').textContent = indices.length + '/' + dataCells;
+
+        toast(`生成成功！矩阵 ${sz}×${sz}，密度提升 3 倍`, 'success');
+    } catch (err) {
+        console.error(err);
+        toast('生成失败：' + err.message, 'error');
+    }
+}
+
+function doDownload() {
+    const c = document.getElementById('qrCvs');
+    if (!c.width) { toast('请先生成','warning'); return; }
+    const a = document.createElement('a');
+    a.download = `hd_color_qr_v${VER}_${Date.now()}.png`;
+    a.href = c.toDataURL('image/png');
+    a.click();
+    toast('已下载','success');
+}
+
+// ================================================================
+// 【解码器核心】环境检测
+// ================================================================
+function checkEnv() {
+    const w = document.getElementById('envW');
+    const b = document.getElementById('startBtn');
+    if (!window.isSecureContext || !(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
+        w.classList.remove('hidden'); b.disabled = true;
+        b.innerHTML = '<span>🚫</span> 不支持';
+    } else {
+        w.classList.add('hidden'); b.disabled = false;
+        b.innerHTML = '<span>▶️</span> 开始扫描';
+    }
+}
+
+// ================================================================
+// 摄像头枚举
+// ================================================================
+async function enumCams() {
+    const ts = await navigator.mediaDevices.getUserMedia({video:true,audio:false});
+    ts.getTracks().forEach(t=>t.stop());
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    camDevs = devs.filter(d=>d.kind==='videoinput');
+    if(!camDevs.length) throw new Error('NoCamera');
+    const sel = document.getElementById('camSel');
+    sel.innerHTML = '';
+    const bk=['back','rear','environment','后置','背面','后摄','主摄'];
+    const sorted = camDevs.map(d=>{
+        const l=(d.label||'').toLowerCase();
+        let s=0;
+        if(bk.some(k=>l.includes(k)))s+=100;
+        if(!d.label)s+=10;
+        return {d,s};
+    }).sort((a,b)=>b.s-a.s).map(x=>x.d);
+    sorted.forEach((d,i)=>{
+        const o=document.createElement('option');
+        o.value=d.deviceId; o.textContent=d.label||`摄像头${i+1}`;
+        sel.appendChild(o);
+    });
+    sel.classList.remove('hidden');
+}
+
+// ================================================================
+// 启动扫描
+// ================================================================
+async function doStart() {
+    if (isScanning) return;
+    const sb = document.getElementById('startBtn');
+    const st = document.getElementById('sStatus');
+    sb.disabled = true;
+    sb.innerHTML = '<span class="spinner"></span> 初始化...';
+    st.innerHTML = '<div class="spinner dk" style="margin:0 auto 8px"></div><p>检测摄像头...</p>';
+
+    try {
+        if (!camDevs.length) await enumCams();
+        const sel = document.getElementById('camSel');
+        const did = sel.value || (camDevs[0]?camDevs[0].deviceId:null);
+        if (!did) throw {name:'NotFoundError'};
+
+        vidStream = await navigator.mediaDevices.getUserMedia({
+            video:{deviceId:{exact:did},width:{ideal:720},height:{ideal:720},facingMode:{ideal:'environment'}},
+            audio:false
+        });
+        sVid.srcObject = vidStream;
+        await sVid.play();
+        procCvs.width = PROC_SZ; procCvs.height = PROC_SZ;
+
+        isScanning = true; fCnt = 0; fpsCnt = 0; fpsT = performance.now(); lastFT = 0;
+        st.classList.add('hidden');
+        document.getElementById('sLine').classList.add('on');
+        sb.classList.add('hidden');
+        document.getElementById('stopBtn').classList.remove('hidden');
+        toast('摄像头已启动','info');
+        scanRAF = requestAnimationFrame(scanLoop);
+    } catch(e) {
+        sb.disabled = false; sb.innerHTML = '<span>▶️</span> 开始扫描';
+        handleCamErr(e);
+    }
+}
+
+function handleCamErr(e) {
+    const st = document.getElementById('sStatus');
+    const n = e?.name||'';
+    let m='启动失败',ic='❌',d=e?.message||'未知';
+    if(n==='NotAllowedError'){ic='🔒';m='权限被拒绝';d='请在设置中允许摄像头';}
+    else if(n==='NotFoundError'){ic='📷';m='未检测到摄像头';d='请确认设备有摄像头';}
+    else if(n==='NotReadableError'){ic='⚠️';m='摄像头被占用';d='请关闭其他应用';}
+    st.innerHTML=`<div class="si">${ic}</div><p style="font-weight:600;color:var(--g700);margin-bottom:4px">${m}</p><p style="font-size:12px;color:var(--g500)">${d}</p>`;
+    st.classList.remove('hidden');
+    toast(m,'error');
+}
+
+function doStop() {
+    isScanning = false;
+    if(scanRAF){cancelAnimationFrame(scanRAF);scanRAF=null;}
+    if(vidStream){vidStream.getTracks().forEach(t=>t.stop());vidStream=null;}
+    sVid.srcObject=null;
+    const st=document.getElementById('sStatus');
+    st.innerHTML='<div class="si">📷</div><p>点击下方按钮启动</p>';
+    st.classList.remove('hidden');
+    document.getElementById('sLine').classList.remove('on');
+    const sb=document.getElementById('startBtn');
+    sb.classList.remove('hidden');sb.disabled=false;sb.innerHTML='<span>▶️</span> 开始扫描';
+    document.getElementById('stopBtn').classList.add('hidden');
+}
+
+// ================================================================
+// 【解码器核心】扫描循环
+// ================================================================
+function scanLoop(ts) {
+    if (!isScanning) return;
+    if (ts - lastFT < 200) { scanRAF = requestAnimationFrame(scanLoop); return; }
+    lastFT = ts;
+
+    fpsCnt++;
+    if (ts - fpsT >= 1000) {
+        curFps = fpsCnt; fpsCnt = 0; fpsT = ts;
+        if (dbgOn) document.getElementById('dbgFps').textContent = curFps + ' FPS';
+    }
+
+    const vw = sVid.videoWidth, vh = sVid.videoHeight;
+    if (!vw || !vh) { scanRAF = requestAnimationFrame(scanLoop); return; }
+
+    const sz = Math.min(vw, vh);
+    const sx = (vw - sz) / 2, sy = (vh - sz) / 2;
+    procCtx.drawImage(sVid, sx, sy, sz, sz, 0, 0, PROC_SZ, PROC_SZ);
+
+    const imgData = procCtx.getImageData(0, 0, PROC_SZ, PROC_SZ);
+    fCnt++;
+
+    // 尝试解码
+    const result = tryDecode(imgData);
+
+    if (dbgOn) {
+        document.getElementById('stFr').textContent = fCnt;
+        document.getElementById('stPat').textContent = result?.patterns || 0;
+        document.getElementById('stDec').textContent = result?.patterns >= 3 ? '解码中' : '搜索中';
+    }
+
+    if (result && result.text) {
+        doStop();
+        showResult(result.text);
+        toast('🎉 解码成功！','success');
+        if (navigator.vibrate) navigator.vibrate([100,50,100]);
+        return;
+    }
+
+    scanRAF = requestAnimationFrame(scanLoop);
+}
+
+// ================================================================
+// 【解码器核心】灰度化 + 二值化（Otsu）
+// ================================================================
+function toBinary(imageData) {
+    const d = imageData.data;
+    const n = d.length / 4;
+    const gray = new Uint8Array(n);
+    const hist = new Int32Array(256);
+
+    for (let i = 0; i < n; i++) {
+        const j = i * 4;
+        const g = Math.round(d[j]*0.299 + d[j+1]*0.587 + d[j+2]*0.114);
+        gray[i] = g;
+        hist[g]++;
+    }
+
+    // Otsu
+    let sum = 0;
+    for (let i = 0; i < 256; i++) sum += i * hist[i];
+    let sB = 0, wB = 0, maxV = 0, thr = 128;
+    for (let t = 0; t < 256; t++) {
+        wB += hist[t]; if (!wB) continue;
+        const wF = n - wB; if (!wF) break;
+        sB += t * hist[t];
+        const mB = sB / wB, mF = (sum - sB) / wF;
+        const v = wB * wF * (mB - mF) * (mB - mF);
+        if (v > maxV) { maxV = v; thr = t; }
+    }
+
+    const bin = new Uint8Array(n);
+    for (let i = 0; i < n; i++) bin[i] = gray[i] < thr ? 1 : 0;
+    return { bin, gray, thr, w: imageData.width, h: imageData.height };
+}
+
+// ================================================================
+// 【解码器核心】定位点检测 — 行扫描 1:1:3:1:1 比例法
+// ================================================================
+function findPatterns(binData, w, h) {
+    const candidates = [];
+
+    // 逐行扫描（每隔2行）
+    for (let y = 0; y < h; y += 2) {
+        // 记录连续同色段
+        const runs = [];
+        let curColor = binData[y * w];
+        let runLen = 1;
+
+        for (let x = 1; x < w; x++) {
+            const c = binData[y * w + x];
+            if (c === curColor) {
+                runLen++;
+            } else {
+                runs.push({ c: curColor, len: runLen, ex: x });
+                curColor = c;
+                runLen = 1;
+            }
+        }
+        runs.push({ c: curColor, len: runLen, ex: w });
+
+        // 滑动窗口找 B:W:B:W:B = 黑:白:黑:白:黑
+        for (let i = 0; i <= runs.length - 5; i++) {
+            const r = runs.slice(i, i + 5);
+            // 必须是 黑 白 黑 白 黑
+            if (r[0].c !== 0 || r[1].c !== 1 || r[2].c !== 0 || r[3].c !== 1 || r[4].c !== 0) continue;
+
+            const total = r[0].len + r[1].len + r[2].len + r[3].len + r[4].len;
+            if (total < 7) continue; // 太小
+
+            // 检查比例 1:1:3:1:1（允许±50%误差）
+            const unit = total / 7;
+            let ok = true;
+            const expected = [1, 1, 3, 1, 1];
+            for (let k = 0; k < 5; k++) {
+                const ratio = r[k].len / unit;
+                if (ratio < expected[k] * 0.4 || ratio > expected[k] * 1.8) { ok = false; break; }
+            }
+            if (!ok) continue;
+
+            // 计算中心 X
+            const startX = r[0].ex - r[0].len;
+            const endX = r[4].ex;
+            const cx = (startX + endX) / 2;
+            candidates.push({ x: cx, y: y, size: total });
+        }
+    }
+
+    // 聚类：将相近的候选点合并
+    return clusterCandidates(candidates);
+}
+
+// ================================================================
+// 【解码器核心】候选点聚类 → 找到三个定位点
+// ================================================================
+function clusterCandidates(cands) {
+    if (cands.length < 3) return null;
+
+    // 按 size 排序，取大小合理的候选（定位点应该大小相近）
+    const sizes = cands.map(c => c.size).sort((a, b) => a - b);
+    const medianSize = sizes[Math.floor(sizes.length / 2)];
+    const filtered = cands.filter(c => c.size > medianSize * 0.4 && c.size < medianSize * 2.5);
+
+    if (filtered.length < 3) return null;
+
+    // 简单网格聚类
+    const gridSize = medianSize * 1.5;
+    const clusters = [];
+
+    for (const c of filtered) {
+        let found = false;
+        for (const cl of clusters) {
+            const dx = c.x - cl.cx, dy = c.y - cl.cy;
+            if (Math.sqrt(dx*dx + dy*dy) < gridSize) {
+                // 加权平均
+                cl.cx = (cl.cx * cl.n + c.x) / (cl.n + 1);
+                cl.cy = (cl.cy * cl.n + c.y) / (cl.n + 1);
+                cl.cs = (cl.cs * cl.n + c.size) / (cl.n + 1);
+                cl.n++;
+                found = true;
+                break;
+            }
+        }
+        if (!found) clusters.push({ cx: c.x, cy: c.y, cs: c.size, n: 1 });
+    }
+
+    // 按成员数排序，取前三个最大的聚类
+    clusters.sort((a, b) => b.n - a.n);
+    if (clusters.length < 3) return null;
+
+    const top3 = clusters.slice(0, 3);
+
+    // 确定哪个是左上、右上、左下
+    // 左上：x+y 最小
+    // 右上：x-y 最大（或 x 最大）
+    // 左下：y-x 最大（或 y 最大）
+    const sorted = assignCorners(top3);
+    return sorted;
+}
+
+function assignCorners(pts) {
+    // 计算每个点的 x+y, x-y
+    const scored = pts.map(p => ({
+        ...p,
+        sum: p.cx + p.cy,  // 左上最小
+        diff: p.cx - p.cy   // 右上最大
+    }));
+
+    // 左上：sum 最小
+    sorted_arr = [...scored].sort((a, b) => a.sum - b.sum);
+    const topLeft = sorted_arr[0];
+
+    // 剩余两个中，diff 大的是右上，小的是左下
+    const rest = scored.filter(p => p !== topLeft);
+    const topRight = rest[0].diff > rest[1].diff ? rest[0] : rest[1];
+    const bottomLeft = rest[0].diff > rest[1].diff ? rest[1] : rest[0];
+
+    return {
+        tl: { x: topLeft.cx, y: topLeft.cy, size: topLeft.cs },
+        tr: { x: topRight.cx, y: topRight.cy, size: topRight.cs },
+        bl: { x: bottomLeft.cx, y: bottomLeft.cy, size: bottomLeft.cs }
+    };
+}
+
+// ================================================================
+// 【解码器核心】从定位点推算矩阵参数
+// ================================================================
+function calcGrid(corners, imgW, imgH) {
+    const { tl, tr, bl } = corners;
+
+    // 模块像素大小（从定位点大小推算）
+    const avgPatSize = (tl.size + tr.size + bl.size) / 3;
+    const moduleSize = avgPatSize / 7; // 定位点 = 7 模块
+
+    // 矩阵边长 S
+    // 左上到右上的像素距离 = (S - 7) 个模块间距 + 7 模块（右上定位点自身）
+    // 实际上：左上中心到右上中心 = S - 7 个模块
+    const distH = Math.sqrt((tr.x - tl.x)**2 + (tr.y - tl.y)**2);
+    const distV = Math.sqrt((bl.x - tl.x)**2 + (bl.y - tl.y)**2);
+    const avgDist = (distH + distV) / 2;
+
+    // S - 7 = avgDist / moduleSize
+    const S = Math.round(avgDist / moduleSize + 7);
+
+    if (S < 15 || S > 200) return null; // 不合理
+
+    // 原点（矩阵左上角像素坐标）
+    // 左上定位点中心在矩阵坐标 (3, 3)
+    const originX = tl.x - 3 * moduleSize;
+    const originY = tl.y - 3 * moduleSize;
+
+    return { S, moduleSize, originX, originY, corners };
+}
+
+// ================================================================
+// 【解码器核心】颜色采样 + 最近邻匹配
+// ================================================================
+function sampleAndDecode(imageData, grid) {
+    const { S, moduleSize, originX, originY } = grid;
+    const d = imageData.data;
+    const w = imageData.width;
+
+    // 判断定位点区域的函数
+    function isFinder(r, c) {
+        if (r < 7 && c < 7) return true;
+        if (r < 7 && c >= S - 7) return true;
+        if (r >= S - 7 && c < 7) return true;
+        return false;
+    }
+
+    // 收集数据区的颜色索引
+    const indices = [];
+
+    for (let r = 0; r < S; r++) {
+        for (let c = 0; c < S; c++) {
+            if (isFinder(r, c)) continue;
+
+            // 该模块中心的像素坐标
+            const px = Math.round(originX + (c + 0.5) * moduleSize);
+            const py = Math.round(originY + (r + 0.5) * moduleSize);
+
+            if (px < 0 || px >= w || py < 0 || py >= w) continue;
+
+            // 采样中心区域（3×3像素取平均，减少噪声）
+            let sr = 0, sg = 0, sb = 0, cnt = 0;
+            const halfSample = Math.max(1, Math.floor(moduleSize * 0.2));
+            for (let dy = -halfSample; dy <= halfSample; dy++) {
+                for (let dx = -halfSample; dx <= halfSample; dx++) {
+                    const sx = px + dx, sy = py + dy;
+                    if (sx < 0 || sx >= w || sy < 0 || sy >= w) continue;
+                    const idx = (sy * w + sx) * 4;
+                    sr += d[idx]; sg += d[idx+1]; sb += d[idx+2];
+                    cnt++;
                 }
             }
+            if (cnt === 0) continue;
+            sr /= cnt; sg /= cnt; sb /= cnt;
 
-            if (logoImage) drawLogo(ctx, ts, mg, qs, bg);
-
-            canvas.classList.remove('hidden');
-            document.getElementById('qrPlaceholder').classList.add('hidden');
-            document.getElementById('downloadSection').classList.remove('hidden');
-            showToast('彩色二维码生成成功！支持中文等多语言字符', 'success');
-        } catch (err) {
-            console.error(err);
-            showToast('生成失败：' + err.message, 'error');
+            // 最近邻匹配：找调色板中距离最近的颜色
+            let minDist = Infinity, bestIdx = 0;
+            for (let i = 0; i < PALETTE.length; i++) {
+                const p = PALETTE[i];
+                const dist = (sr-p[0])**2 + (sg-p[1])**2 + (sb-p[2])**2;
+                if (dist < minDist) { minDist = dist; bestIdx = i; }
+            }
+            indices.push(bestIdx);
         }
     }
 
-    function drawLogo(ctx, ts, mg, qs, bg) {
-        const mx = qs * 0.5;
-        let lw, lh;
-        const ar = logoImage.width / logoImage.height;
-        if (ar > 1) { lw = Math.min(logoImage.width, mx); lh = lw / ar; }
-        else { lh = Math.min(logoImage.height, mx); lw = lh * ar; }
-        if (lw > mx) { lw = mx; lh = lw / ar; }
-        if (lh > mx) { lh = mx; lw = lh * ar; }
-        const lx = (ts-lw)/2, ly = (ts-lh)/2, pd = 10;
-        ctx.fillStyle = bg;
-        roundRect(ctx, lx-pd, ly-pd, lw+pd*2, lh+pd*2, 10);
-        ctx.fill();
-        ctx.drawImage(logoImage, lx, ly, lw, lh);
+    return indices;
+}
+
+// ================================================================
+// 【解码器核心】颜色索引 → 比特流 → 数据帧 → 文本
+// ================================================================
+function indicesToText(indices) {
+    // 颜色索引 → 比特流
+    const bits = [];
+    for (const idx of indices) {
+        bits.push((idx >> 2) & 1);
+        bits.push((idx >> 1) & 1);
+        bits.push(idx & 1);
     }
 
-    function roundRect(ctx, x, y, w, h, r) {
-        ctx.beginPath();
-        ctx.moveTo(x+r, y); ctx.lineTo(x+w-r, y);
-        ctx.quadraticCurveTo(x+w, y, x+w, y+r); ctx.lineTo(x+w, y+h-r);
-        ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h); ctx.lineTo(x+r, y+h);
-        ctx.quadraticCurveTo(x, y+h, x, y+h-r); ctx.lineTo(x, y+r);
-        ctx.quadraticCurveTo(x, y, x+r, y); ctx.closePath();
+    // 比特流 → 字节
+    const totalBytes = Math.floor(bits.length / 8);
+    if (totalBytes < 3) return null; // 太短
+
+    const bytes = new Uint8Array(totalBytes);
+    for (let i = 0; i < totalBytes; i++) {
+        let b = 0;
+        for (let j = 0; j < 8; j++) {
+            b = (b << 1) | (bits[i * 8 + j] || 0);
+        }
+        bytes[i] = b;
     }
 
-    function downloadQR() {
-        const c = document.getElementById('qrCanvas');
-        if (!c.width) { showToast('请先生成', 'warning'); return; }
-        const a = document.createElement('a');
-        a.download = `color_qr_v${APP_VERSION}_${Date.now()}.png`;
-        a.href = c.toDataURL('image/png');
-        a.click();
-        showToast('已下载', 'success');
+    // 解析帧：[长度高][长度低][数据...][CRC]
+    const dataLen = (bytes[0] << 8) | bytes[1];
+    if (dataLen <= 0 || dataLen > totalBytes - 3) return null;
+
+    const dataBytes = bytes.slice(2, 2 + dataLen);
+    const receivedCRC = bytes[2 + dataLen];
+    const calcCRC = crc8(dataBytes);
+
+    if (receivedCRC !== calcCRC) {
+        console.warn(`CRC校验失败: 收到${receivedCRC}, 计算${calcCRC}`);
+        return null;
     }
 
-    window.addEventListener('DOMContentLoaded', () => {
-        checkContrast();
-        checkEnvironment();
-    });
-    </script>
+    // UTF-8 解码
+    try {
+        const decoder = new TextDecoder('utf-8', { fatal: true });
+        return decoder.decode(dataBytes);
+    } catch {
+        return null;
+    }
+}
+
+// ================================================================
+// 【解码器核心】完整解码流程
+// ================================================================
+function tryDecode(imageData) {
+    // 1. 二值化
+    const { bin, w, h } = toBinary(imageData);
+
+    // 2. 检测定位点
+    const corners = findPatterns(bin, w, h);
+    if (!corners) return { patterns: 0 };
+
+    // 3. 推算网格
+    const grid = calcGrid(corners, w, h);
+    if (!grid) return { patterns: 3 };
+
+    // 4. 采样颜色并解码
+    const indices = sampleAndDecode(imageData, grid);
+    if (indices.length < 3) return { patterns: 3 };
+
+    // 5. 还原文本
+    const text = indicesToText(indices);
+
+    // 调试视图
+    if (dbgOn) {
+        drawDebugView(bin, w, h, grid);
+    }
+
+    return { patterns: 3, text, grid };
+}
+
+// ================================================================
+// 调试视图：在二值化图像上标记定位点
+// ================================================================
+function drawDebugView(bin, w, h, grid) {
+    const scale = 256 / w;
+    dbgCvs.width = 256; dbgCvs.height = 256;
+
+    const imgData = dbgCtx.createImageData(256, 256);
+    for (let y = 0; y < 256; y++) {
+        for (let x = 0; x < 256; x++) {
+            const sx = Math.floor(x / scale), sy = Math.floor(y / scale);
+            const v = bin[sy * w + sx];
+            const idx = (y * 256 + x) * 4;
+            const val = v ? 0 : 255;
+            imgData.data[idx] = val;
+            imgData.data[idx+1] = val;
+            imgData.data[idx+2] = val;
+            imgData.data[idx+3] = 255;
+        }
+    }
+
+    // 画定位点标记
+    if (grid && grid.corners) {
+        const { tl, tr, bl } = grid.corners;
+        const drawCross = (cx, cy, color) => {
+            const px = Math.round(cx * scale), py = Math.round(cy * scale);
+            for (let d = -4; d <= 4; d++) {
+                const idx1 = (py * 256 + Math.max(0,Math.min(255,px+d))) * 4;
+                imgData.data[idx1] = color[0]; imgData.data[idx1+1] = color[1]; imgData.data[idx1+2] = color[2];
+                const idx2 = (Math.max(0,Math.min(255,py+d)) * 256 + px) * 4;
+                imgData.data[idx2] = color[0]; imgData.data[idx2+1] = color[1]; imgData.data[idx2+2] = color[2];
+            }
+        };
+        drawCross(tl.x, tl.y, [255, 0, 0]);   // 红=左上
+        drawCross(tr.x, tr.y, [0, 255, 0]);   // 绿=右上
+        drawCross(bl.x, bl.y, [0, 100, 255]); // 蓝=左下
+    }
+
+    dbgCtx.putImageData(imgData, 0, 0);
+}
+
+// ================================================================
+// 结果展示
+// ================================================================
+function showResult(text) {
+    const rd = document.getElementById('sResult');
+    document.getElementById('resTxt').textContent = text;
+    const ra = document.getElementById('resAct');
+    ra.innerHTML = '';
+
+    const isUrl = /^https?:\/\//i.test(text) || /^www\./i.test(text);
+    if (isUrl) {
+        const url = text.startsWith('www.') ? 'https://' + text : text;
+        const b = document.createElement('button');
+        b.className = 'btn btn-p'; b.innerHTML = '<span>🔗</span> 新窗口打开';
+        b.onclick = () => window.open(url, '_blank');
+        ra.appendChild(b);
+    }
+    const cp = document.createElement('button');
+    cp.className = 'btn btn-s'; cp.innerHTML = '<span>📋</span> 复制';
+    cp.onclick = () => {
+        navigator.clipboard.writeText(text).then(()=>toast('已复制','success'))
+        .catch(()=>{
+            const t=document.createElement('textarea');t.value=text;
+            document.body.appendChild(t);t.select();document.execCommand('copy');
+            document.body.removeChild(t);toast('已复制','success');
+        });
+    };
+    ra.appendChild(cp);
+
+    const rs = document.createElement('button');
+    rs.className = 'btn btn-s'; rs.innerHTML = '<span>🔄</span> 重新扫描';
+    rs.onclick = () => { rd.classList.remove('show'); doStart(); };
+    ra.appendChild(rs);
+
+    rd.classList.add('show');
+}
+
+// ================================================================
+// 图片上传解码
+// ================================================================
+document.getElementById('scanFIn').addEventListener('change', function(e) {
+    const f = e.target.files[0]; if (!f) return;
+    document.getElementById('scanFArea').classList.add('has');
+    toast('正在解码...','info');
+
+    const img = new Image();
+    img.onload = function() {
+        const sz = Math.min(img.width, img.height);
+        const sx = (img.width - sz) / 2, sy = (img.height - sz) / 2;
+        procCvs.width = PROC_SZ; procCvs.height = PROC_SZ;
+        procCtx.drawImage(img, sx, sy, sz, sz, 0, 0, PROC_SZ, PROC_SZ);
+        const imgData = procCtx.getImageData(0, 0, PROC_SZ, PROC_SZ);
+
+        const result = tryDecode(imgData);
+        if (dbgOn) {
+            document.getElementById('stPat').textContent = result?.patterns || 0;
+            document.getElementById('stDec').textContent = result?.text ? '成功' : '失败';
+        }
+
+        if (result && result.text) {
+            showResult(result.text);
+            toast('🎉 图片解码成功！','success');
+        } else {
+            toast('识别失败。请确保是本工具生成的彩色二维码，且图片清晰正对。','error');
+        }
+    };
+    img.src = URL.createObjectURL(f);
+    e.target.value = '';
+});
+
+// ================================================================
+// 初始化
+// ================================================================
+window.addEventListener('DOMContentLoaded', () => {
+    chkContrast();
+    checkEnv();
+});
+</script>
 </body>
 </html>
