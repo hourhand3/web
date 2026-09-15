@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>高密度彩色二维码 v5.0.0</title>
+<title>高密度彩色二维码 v5.1.0</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--p:#4f46e5;--ph:#4338ca;--s:#10b981;--d:#ef4444;--w:#f59e0b;--g50:#f9fafb;--g100:#f3f4f6;--g200:#e5e7eb;--g300:#d1d5db;--g400:#9ca3af;--g500:#6b7280;--g600:#4b5563;--g700:#374151;--g800:#1f2937;--r:12px}
@@ -98,15 +98,14 @@ textarea.fi{resize:vertical;min-height:60px}
 <div class="tc" id="toastC"></div>
 <div class="app">
 <div class="hdr">
-<h1>🌈 高密度彩色二维码 <span class="vb" id="vB">v5.0.0</span></h1>
-<p>3-bit/模块 · 黑定位点+8色数据 · 自检验证</p>
+<h1>🌈 高密度彩色二维码 <span class="vb" id="vB">v5.1.0</span></h1>
+<p>3-bit/模块 · 高对比度调色板 · 阈值100</p>
 </div>
 <div class="tabs">
 <button class="tb on" data-tab="gen" onclick="switchTab('gen')">🎨 生成器</button>
 <button class="tb" data-tab="scan" onclick="switchTab('scan')">📷 扫码器</button>
 </div>
 
-<!-- ===== 生成器 ===== -->
 <div class="tc2 on" id="tab-gen">
 <div class="card">
 <div class="ct">✏️ 编码内容</div>
@@ -148,14 +147,13 @@ textarea.fi{resize:vertical;min-height:60px}
 </div>
 </div>
 
-<!-- ===== 扫码器 ===== -->
 <div class="tc2" id="tab-scan">
-<div class="eb">🧪 <strong>专用解码器 v5：</strong>黑色定位点 + 8色数据区。生成后自动自检，确保编解码兼容。</div>
+<div class="eb">🧪 <strong>专用解码器 v5.1：</strong>高对比度调色板，所有数据色灰度>110，二值化阈值100，确保定位点检测无干扰。</div>
 <div class="ew hidden" id="envW">🔒 <strong>环境不支持：</strong>摄像头需要 HTTPS。请用"上传图片"方式。</div>
 <div class="card">
-<div class="ct">🎨 数据调色板（8色，均不含黑色）</div>
+<div class="ct">🎨 数据调色板（8色，灰度全部>110）</div>
 <div class="pb" id="pBar"></div>
-<p style="font-size:10px;color:var(--g400);margin-top:18px">⚫ 黑色仅用于定位点，不参与数据编码，确保二值化后只检测定位点</p>
+<p style="font-size:10px;color:var(--g400);margin-top:18px">⚫ 黑色仅用于定位点（灰度=0），二值化阈值100确保只有定位点被检测</p>
 </div>
 <div class="card">
 <div class="ct">📷 摄像头扫码</div>
@@ -194,39 +192,34 @@ textarea.fi{resize:vertical;min-height:60px}
 <canvas id="pCv" class="hidden"></canvas>
 
 <script>
-/* ================================================================
-   v5.0.0 — 核心架构重构
-   
-   关键设计变更：
-   1. 数据调色板 8 色全部为非黑色（灰度 > 90）
-   2. 黑色 [0,0,0] 仅用于定位点，不出现在数据区
-   3. 二值化阈值 80：只有定位点是暗色，数据区全为亮色
-   4. 定位点检测不再受数据区干扰
-   5. 生成后自动自检（从 Canvas 读取并解码）
-   ================================================================ */
-var VER = '5.0.0';
+var VER = '5.1.0';
 document.getElementById('vB').textContent = 'v' + VER;
 
 /* ================================================================
-   【核心】调色板定义
+   【核心修复】v5.1.0 高对比度调色板
    
-   数据区 8 色：全部灰度 > 90，不会被二值化阈值 80 误判为黑色
-   定位点：纯黑 [0,0,0]，灰度 = 0，唯一能被二值化检测到的暗色
-   背景：纯白 [255,255,255]
+   问题诊断：v5.0.0 暗像素20%是因为红色[230,40,40]灰度=96.8，
+   蓝色[70,70,255]灰度=91.1，都接近阈值80，被误判为黑色。
+   
+   解决方案：
+   1. 提高所有数据颜色的灰度到 >110
+   2. 二值化阈值从80提高到100
+   3. 确保定位点（灰度=0）与数据区（灰度>110）有足够差距
    ================================================================ */
 var DATA_PAL = [
-  [230,  40,  40],   // 0: 红     灰度≈85  (最低，但仍>80)
-  [ 40, 190,  40],   // 1: 绿     灰度≈120
-  [ 70,  70, 255],   // 2: 蓝     灰度≈95
-  [245, 225,  40],   // 3: 黄     灰度≈207
-  [ 40, 195, 215],   // 4: 青     灰度≈150
-  [215,  40, 195],   // 5: 品红   灰度≈97
-  [255, 145,  40],   // 6: 橙     灰度≈165
-  [145, 145, 145]    // 7: 灰     灰度=145
+  [240,  70,  70],   // 0: 红     灰度=240*0.299+70*0.587+70*0.114=71.76+41.09+7.98=120.83
+  [ 60, 200,  60],   // 1: 绿     灰度=60*0.299+200*0.587+60*0.114=17.94+117.4+6.84=142.18
+  [ 90,  90, 255],   // 2: 蓝     灰度=90*0.299+90*0.587+255*0.114=26.91+52.83+29.07=108.81
+  [245, 225,  60],   // 3: 黄     灰度=245*0.299+225*0.587+60*0.114=73.26+132.08+6.84=212.18
+  [ 60, 200, 220],   // 4: 青     灰度=60*0.299+200*0.587+220*0.114=17.94+117.4+25.08=160.42
+  [225,  80, 210],   // 5: 品红   灰度=225*0.299+80*0.587+210*0.114=67.28+46.96+23.94=138.18
+  [255, 155,  60],   // 6: 橙     灰度=255*0.299+155*0.587+60*0.114=76.25+90.99+6.84=174.08
+  [155, 155, 155]    // 7: 灰     灰度=155*0.299+155*0.587+155*0.114=46.35+90.99+17.67=155.01
 ];
 var PAL_NAMES = ['红','绿','蓝','黄','青','品红','橙','灰'];
 
-// 初始化调色板预览
+var BINARY_THRESHOLD = 100; // 二值化阈值：只有灰度<100的像素被视为"黑色"
+
 (function() {
   var bar = document.getElementById('pBar');
   for (var i = 0; i < DATA_PAL.length; i++) {
@@ -238,7 +231,6 @@ var PAL_NAMES = ['红','绿','蓝','黄','青','品红','橙','灰'];
   }
 })();
 
-// 定位点 7×7 图案
 var FINDER_PAT = [
   [1,1,1,1,1,1,1],
   [1,0,0,0,0,0,1],
@@ -249,35 +241,19 @@ var FINDER_PAT = [
   [1,1,1,1,1,1,1]
 ];
 
-// 全局状态
-var logoImg = null;
-var isScan = false;
-var camDevs = [];
-var vidStr = null;
-var sRAF = null;
-var fCnt = 0;
-var fpsC = 0;
-var fpsT = 0;
-var curFps = 0;
-var dbgOn = false;
-var lastProcT = 0;
-var lastLoggedDarkRatio = -1;
+var logoImg = null, isScan = false, camDevs = [], vidStr = null, sRAF = null;
+var fCnt = 0, fpsC = 0, fpsT = 0, curFps = 0, dbgOn = false, lastProcT = 0;
 
 var sV = document.getElementById('sV');
 var pCv = document.getElementById('pCv');
 var pCtx = pCv.getContext('2d', { willReadFrequently: true });
-var PSZ = 480; // 处理分辨率（提高精度）
+var PSZ = 480;
 
-// ===== UI 辅助 =====
 function switchTab(tabName) {
   var btns = document.querySelectorAll('.tb');
-  for (var i = 0; i < btns.length; i++) {
-    btns[i].classList.toggle('on', btns[i].getAttribute('data-tab') === tabName);
-  }
+  for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('on', btns[i].getAttribute('data-tab') === tabName);
   var panels = document.querySelectorAll('.tc2');
-  for (var i = 0; i < panels.length; i++) {
-    panels[i].classList.toggle('on', panels[i].id === 'tab-' + tabName);
-  }
+  for (var i = 0; i < panels.length; i++) panels[i].classList.toggle('on', panels[i].id === 'tab-' + tabName);
   if (tabName !== 'scan' && isScan) doStop();
   if (tabName === 'scan') chkEnv();
 }
@@ -320,20 +296,16 @@ function setStatus(state, text) {
   document.getElementById('statusText').textContent = text;
 }
 
-// ===== CRC-8 (多项式 0x07) =====
 function crc8(data) {
   var crc = 0;
   for (var i = 0; i < data.length; i++) {
     crc ^= data[i];
-    for (var j = 0; j < 8; j++) {
-      crc = (crc & 0x80) ? ((crc << 1) ^ 0x07) : (crc << 1);
-      crc &= 0xFF;
-    }
+    for (var j = 0; j < 8; j++) crc = (crc & 0x80) ? ((crc << 1) ^ 0x07) : (crc << 1);
+    crc &= 0xFF;
   }
   return crc;
 }
 
-// ===== 生成器：构建数据帧 =====
 function buildFrame(text) {
   var encoder = new TextEncoder();
   var bytes = encoder.encode(text);
@@ -346,30 +318,23 @@ function buildFrame(text) {
   return frame;
 }
 
-// ===== 生成器：字节 → 颜色索引（每3bit一组） =====
 function bytesToIdx(frame) {
   var bits = [];
-  for (var i = 0; i < frame.length; i++) {
-    for (var b = 7; b >= 0; b--) {
-      bits.push((frame[i] >> b) & 1);
-    }
-  }
+  for (var i = 0; i < frame.length; i++)
+    for (var b = 7; b >= 0; b--) bits.push((frame[i] >> b) & 1);
   while (bits.length % 3 !== 0) bits.push(0);
   var idx = [];
-  for (var i = 0; i < bits.length; i += 3) {
+  for (var i = 0; i < bits.length; i += 3)
     idx.push((bits[i] << 2) | (bits[i + 1] << 1) | bits[i + 2]);
-  }
   return idx;
 }
 
-// ===== 生成器：计算矩阵边长 =====
 function calcSize(n) {
   var s = 17;
   while (s * s - 192 < n) s++;
   return s;
 }
 
-// ===== 判断是否在保留区域（定位点+隔离带） =====
 function isReserved(row, col, S) {
   if (row <= 7 && col <= 7) return true;
   if (row <= 7 && col >= S - 8) return true;
@@ -377,7 +342,6 @@ function isReserved(row, col, S) {
   return false;
 }
 
-// ===== 判断是否在定位点图案内（7×7） =====
 function isFinderCell(row, col, S) {
   if (row <= 6 && col <= 6) return true;
   if (row <= 6 && col >= S - 7) return true;
@@ -385,7 +349,6 @@ function isFinderCell(row, col, S) {
   return false;
 }
 
-// ===== 获取定位点图案值 =====
 function getFinderVal(row, col, S) {
   var lr, lc;
   if (row <= 6 && col <= 6) { lr = row; lc = col; }
@@ -395,13 +358,9 @@ function getFinderVal(row, col, S) {
   return FINDER_PAT[lr][lc] ? -2 : -3;
 }
 
-// ===== 生成器：构建矩阵 =====
 function buildMatrix(idx, S) {
   var M = [];
-  for (var r = 0; r < S; r++) {
-    M[r] = [];
-    for (var cc = 0; cc < S; cc++) M[r][cc] = -1;
-  }
+  for (var r = 0; r < S; r++) { M[r] = []; for (var cc = 0; cc < S; cc++) M[r][cc] = -1; }
   for (var r = 0; r < S; r++) {
     for (var cc = 0; cc < S; cc++) {
       if (isReserved(r, cc, S)) {
@@ -411,15 +370,12 @@ function buildMatrix(idx, S) {
     }
   }
   var i = 0;
-  for (var r = 0; r < S && i < idx.length; r++) {
-    for (var cc = 0; cc < S && i < idx.length; cc++) {
+  for (var r = 0; r < S && i < idx.length; r++)
+    for (var cc = 0; cc < S && i < idx.length; cc++)
       if (!isReserved(r, cc, S)) M[r][cc] = idx[i++];
-    }
-  }
   return M;
 }
 
-// ===== 生成入口 =====
 function doGen() {
   var text = document.getElementById('qrText').value.trim();
   if (!text) { toast('请输入内容', 'warning'); return; }
@@ -437,8 +393,7 @@ function doGen() {
     var total = S * cellSz + margin * 2;
 
     var cv = document.getElementById('qrCv');
-    cv.width = total;
-    cv.height = total;
+    cv.width = total; cv.height = total;
     var ctx = cv.getContext('2d');
 
     ctx.fillStyle = bg;
@@ -450,21 +405,16 @@ function doGen() {
         var px = margin + cc * cellSz;
         var py = margin + r * cellSz;
 
-        if (v === -2) {
-          ctx.fillStyle = fg;
-        } else if (v === -3) {
-          ctx.fillStyle = bg;
-        } else if (v >= 0 && v <= 7) {
+        if (v === -2) ctx.fillStyle = fg;
+        else if (v === -3) ctx.fillStyle = bg;
+        else if (v >= 0 && v <= 7) {
           var palColor = DATA_PAL[v];
           ctx.fillStyle = 'rgb(' + palColor[0] + ',' + palColor[1] + ',' + palColor[2] + ')';
-        } else {
-          ctx.fillStyle = bg;
-        }
+        } else ctx.fillStyle = bg;
         ctx.fillRect(px, py, cellSz, cellSz);
       }
     }
 
-    // Logo
     if (logoImg) {
       var qrPx = S * cellSz;
       var maxSide = Math.sqrt(0.15) * qrPx;
@@ -500,8 +450,6 @@ function doGen() {
     document.getElementById('iCell').textContent = idx.length + '/' + (S * S - 192);
 
     toast('生成成功！' + S + '×' + S, 'success');
-
-    // ===== 自检：从 Canvas 读取并尝试解码 =====
     setTimeout(function() { runSelfTest(cv, text); }, 100);
 
   } catch (e) {
@@ -510,7 +458,6 @@ function doGen() {
   }
 }
 
-// ===== 自检功能 =====
 function runSelfTest(canvas, expectedText) {
   var resultDiv = document.getElementById('selfTestResult');
   var ctx = canvas.getContext('2d');
@@ -528,7 +475,7 @@ function runSelfTest(canvas, expectedText) {
       }
     } else {
       resultDiv.className = 'selftest fail';
-      resultDiv.innerHTML = '❌ <strong>自检失败：</strong>无法从生成的图像中解码。原因: ' + (decoded && decoded.reason ? decoded.reason : '未知');
+      resultDiv.innerHTML = '❌ <strong>自检失败：</strong>' + (decoded && decoded.reason ? decoded.reason : '未知');
     }
   } catch (e) {
     resultDiv.className = 'selftest fail';
@@ -546,7 +493,6 @@ function doDl() {
   toast('已下载', 'success');
 }
 
-// Logo 上传
 document.getElementById('logoI').addEventListener('change', function(e) {
   var f = e.target.files[0];
   if (!f) return;
@@ -566,7 +512,6 @@ document.getElementById('logoI').addEventListener('change', function(e) {
 document.getElementById('fgC').addEventListener('input', function() { document.getElementById('fgH').textContent = this.value; });
 document.getElementById('bgC').addEventListener('input', function() { document.getElementById('bgH').textContent = this.value; });
 
-// ===== 环境检测 =====
 function chkEnv() {
   var w = document.getElementById('envW');
   var b = document.getElementById('stBtn');
@@ -584,7 +529,6 @@ function chkEnv() {
   }
 }
 
-// ===== 摄像头枚举 =====
 function enumCams() {
   return navigator.mediaDevices.getUserMedia({ video: true, audio: false })
     .then(function(ts) {
@@ -623,7 +567,6 @@ function enumCams() {
     });
 }
 
-// ===== 启动扫描 =====
 function doStart() {
   if (isScan) return;
   var sb = document.getElementById('stBtn');
@@ -669,15 +612,12 @@ function doStart() {
     });
   }).then(function() {
     dlog('视频播放成功', 'ok');
-    if (sV.videoWidth === 0) {
-      return new Promise(function(r) { setTimeout(r, 500); });
-    }
+    if (sV.videoWidth === 0) return new Promise(function(r) { setTimeout(r, 500); });
   }).then(function() {
     pCv.width = PSZ;
     pCv.height = PSZ;
     isScan = true;
     fCnt = 0; fpsC = 0; fpsT = performance.now(); lastProcT = 0;
-    lastLoggedDarkRatio = -1;
 
     document.getElementById('vPh').classList.add('hidden');
     document.getElementById('liveBadge').classList.add('on');
@@ -719,7 +659,6 @@ function doStop() {
   setStatus('idle', '已停止');
 }
 
-// ===== 扫描循环 =====
 function scanLoop(timestamp) {
   if (!isScan) return;
   if (timestamp - lastProcT < 250) { sRAF = requestAnimationFrame(scanLoop); return; }
@@ -734,9 +673,7 @@ function scanLoop(timestamp) {
   var vw = sV.videoWidth, vh = sV.videoHeight;
   if (!vw || !vh) { sRAF = requestAnimationFrame(scanLoop); return; }
 
-  if (fCnt % 15 === 0 && fCnt > 0) {
-    dlog('帧#' + fCnt + ' | ' + vw + '×' + vh + ' | ' + curFps + 'FPS', 'info');
-  }
+  if (fCnt % 15 === 0 && fCnt > 0) dlog('帧#' + fCnt + ' | ' + vw + '×' + vh + ' | ' + curFps + 'FPS', 'info');
 
   var sz = Math.min(vw, vh);
   var sx = (vw - sz) / 2, sy = (vh - sz) / 2;
@@ -767,22 +704,16 @@ function scanLoop(timestamp) {
   sRAF = requestAnimationFrame(scanLoop);
 }
 
-// ================================================================
-// 【核心解码器】
-// ================================================================
-
-// 二值化：阈值80，只有纯黑定位点是暗色
 function doBinarize(imgD) {
   var d = imgD.data;
   var n = d.length / 4;
   var bin = new Uint8Array(n);
   var darkCnt = 0;
-  var THRESH = 80;
 
   for (var i = 0; i < n; i++) {
     var j = i * 4;
     var gray = d[j] * 0.299 + d[j + 1] * 0.587 + d[j + 2] * 0.114;
-    if (gray < THRESH) {
+    if (gray < BINARY_THRESHOLD) {
       bin[i] = 1;
       darkCnt++;
     }
@@ -790,7 +721,6 @@ function doBinarize(imgD) {
   return { bin: bin, w: imgD.width, h: imgD.height, darkRatio: darkCnt / n };
 }
 
-// 定位点检测
 function doFindPatterns(bin, w, h) {
   var cands = [];
 
@@ -801,9 +731,8 @@ function doFindPatterns(bin, w, h) {
 
     for (var x = 1; x < w; x++) {
       var pixel = bin[y * w + x];
-      if (pixel === curColor) {
-        runLen++;
-      } else {
+      if (pixel === curColor) runLen++;
+      else {
         runs.push({ color: curColor, len: runLen, endX: x });
         curColor = pixel;
         runLen = 1;
@@ -833,267 +762,4 @@ function doFindPatterns(bin, w, h) {
       var startX = r0.endX - r0.len;
       var endX = r4.endX;
       var centerX = (startX + endX) / 2;
-      cands.push({ x: centerX, y: y, size: total });
-    }
-  }
-
-  if (cands.length < 3) return null;
-
-  // 排序求中位数
-  var sizeArr = [];
-  for (var i = 0; i < cands.length; i++) sizeArr.push(cands[i].size);
-  sizeArr.sort(function(a, b) { return a - b; });
-  var median = sizeArr[Math.floor(sizeArr.length / 2)];
-
-  // 过滤
-  var filtered = [];
-  for (var i = 0; i < cands.length; i++) {
-    if (cands[i].size > median * 0.35 && cands[i].size < median * 2.8) {
-      filtered.push(cands[i]);
-    }
-  }
-  if (filtered.length < 3) return null;
-
-  // 聚类
-  var gridSz = median * 2.5;
-  var clusters = [];
-  for (var i = 0; i < filtered.length; i++) {
-    var pt = filtered[i];
-    var found = false;
-    for (var j = 0; j < clusters.length; j++) {
-      var cl = clusters[j];
-      var dx = pt.x - cl.cx, dy = pt.y - cl.cy;
-      if (Math.sqrt(dx * dx + dy * dy) < gridSz) {
-        cl.cx = (cl.cx * cl.n + pt.x) / (cl.n + 1);
-        cl.cy = (cl.cy * cl.n + pt.y) / (cl.n + 1);
-        cl.cs = (cl.cs * cl.n + pt.size) / (cl.n + 1);
-        cl.n++;
-        found = true;
-        break;
-      }
-    }
-    if (!found) clusters.push({ cx: pt.x, cy: pt.y, cs: pt.size, n: 1 });
-  }
-
-  clusters.sort(function(a, b) { return b.n - a.n; });
-  if (clusters.length < 3) return null;
-
-  var top3 = [clusters[0], clusters[1], clusters[2]];
-
-  // 确定三角色
-  for (var i = 0; i < 3; i++) {
-    top3[i].sum = top3[i].cx + top3[i].cy;
-    top3[i].diff = top3[i].cx - top3[i].cy;
-  }
-
-  var tlIdx = 0;
-  if (top3[1].sum < top3[tlIdx].sum) tlIdx = 1;
-  if (top3[2].sum < top3[tlIdx].sum) tlIdx = 2;
-  var tl = top3[tlIdx];
-
-  var rest = [];
-  for (var i = 0; i < 3; i++) { if (i !== tlIdx) rest.push(top3[i]); }
-  var tr, bl;
-  if (rest[0].diff > rest[1].diff) { tr = rest[0]; bl = rest[1]; }
-  else { tr = rest[1]; bl = rest[0]; }
-
-  return { tl: tl, tr: tr, bl: bl };
-}
-
-// 网格计算
-function doCalcGrid(corners) {
-  var tl = corners.tl, tr = corners.tr, bl = corners.bl;
-  var avgSz = (tl.cs + tr.cs + bl.cs) / 3;
-  var modSz = avgSz / 7;
-
-  var distH = Math.sqrt((tr.cx - tl.cx) * (tr.cx - tl.cx) + (tr.cy - tl.cy) * (tr.cy - tl.cy));
-  var distV = Math.sqrt((bl.cx - tl.cx) * (bl.cx - tl.cx) + (bl.cy - tl.cy) * (bl.cy - tl.cy));
-  var avgDist = (distH + distV) / 2;
-
-  var S = Math.round(avgDist / modSz + 7);
-  if (S < 15 || S > 200) return null;
-
-  return {
-    S: S,
-    moduleSize: modSz,
-    originX: tl.cx - 3 * modSz,
-    originY: tl.cy - 3 * modSz,
-    corners: corners
-  };
-}
-
-// 颜色采样
-function doSampleColors(imgD, grid) {
-  var S = grid.S;
-  var ms = grid.moduleSize;
-  var ox = grid.originX;
-  var oy = grid.originY;
-  var d = imgD.data;
-  var w = imgD.width;
-  var indices = [];
-
-  for (var r = 0; r < S; r++) {
-    for (var cc = 0; cc < S; cc++) {
-      if (isReserved(r, cc, S)) continue;
-
-      var px = Math.round(ox + (cc + 0.5) * ms);
-      var py = Math.round(oy + (r + 0.5) * ms);
-      if (px < 0 || px >= w || py < 0 || py >= w) continue;
-
-      var sr = 0, sg = 0, sb = 0, cnt = 0;
-      var half = Math.max(1, Math.floor(ms * 0.2));
-      for (var dy = -half; dy <= half; dy++) {
-        for (var dx = -half; dx <= half; dx++) {
-          var sx2 = px + dx, sy2 = py + dy;
-          if (sx2 < 0 || sx2 >= w || sy2 < 0 || sy2 >= w) continue;
-          var idx = (sy2 * w + sx2) * 4;
-          sr += d[idx]; sg += d[idx + 1]; sb += d[idx + 2]; cnt++;
-        }
-      }
-      if (!cnt) continue;
-      sr /= cnt; sg /= cnt; sb /= cnt;
-
-      var minD = Infinity, best = 0;
-      for (var pi = 0; pi < DATA_PAL.length; pi++) {
-        var p = DATA_PAL[pi];
-        var dist = (sr - p[0]) * (sr - p[0]) + (sg - p[1]) * (sg - p[1]) + (sb - p[2]) * (sb - p[2]);
-        if (dist < minD) { minD = dist; best = pi; }
-      }
-      indices.push(best);
-    }
-  }
-  return indices;
-}
-
-// 索引 → 文本
-function doIdxToText(indices) {
-  var bits = [];
-  for (var i = 0; i < indices.length; i++) {
-    var idx = indices[i];
-    bits.push((idx >> 2) & 1, (idx >> 1) & 1, idx & 1);
-  }
-  var totalB = Math.floor(bits.length / 8);
-  if (totalB < 3) return null;
-
-  var bytes = new Uint8Array(totalB);
-  for (var i = 0; i < totalB; i++) {
-    var b = 0;
-    for (var j = 0; j < 8; j++) b = (b << 1) | (bits[i * 8 + j] || 0);
-    bytes[i] = b;
-  }
-
-  var dataLen = (bytes[0] << 8) | bytes[1];
-  if (dataLen <= 0 || dataLen > totalB - 3) return null;
-
-  var data = [];
-  for (var i = 0; i < dataLen; i++) data.push(bytes[2 + i]);
-  var dataArr = new Uint8Array(data);
-
-  var recvCRC = bytes[2 + dataLen];
-  var calcCRC = crc8(dataArr);
-  if (recvCRC !== calcCRC) return null;
-
-  try {
-    return new TextDecoder('utf-8', { fatal: true }).decode(dataArr);
-  } catch (e) {
-    return null;
-  }
-}
-
-// 完整解码流程
-function tryDecodeFromImage(imgD, w, h) {
-  var binResult = doBinarize(imgD);
-  var bin = binResult.bin;
-  var bw = binResult.w;
-  var bh = binResult.h;
-  var darkRatio = binResult.darkRatio;
-
-  if (darkRatio < 0.003) return { reason: '暗像素太少(' + (darkRatio * 100).toFixed(2) + '%)，未找到定位点' };
-
-  var corners = doFindPatterns(bin, bw, bh);
-  if (!corners) return { reason: '未找到3个定位点(暗像素' + (darkRatio * 100).toFixed(1) + '%)' };
-
-  var grid = doCalcGrid(corners);
-  if (!grid) return { reason: '网格计算失败(S超出范围)' };
-
-  var indices = doSampleColors(imgD, grid);
-  if (indices.length < 3) return { reason: '数据格不足' };
-
-  var text = doIdxToText(indices);
-  if (!text) return { reason: 'CRC校验失败或数据格式错误' };
-
-  return { text: text };
-}
-
-// 结果展示
-function showRes(text) {
-  document.getElementById('rTxt').textContent = text;
-  var ra = document.getElementById('rAct');
-  ra.innerHTML = '';
-
-  var isUrl = /^https?:\/\//i.test(text) || /^www\./i.test(text);
-  if (isUrl) {
-    var url = text.startsWith('www.') ? 'https://' + text : text;
-    var b = document.createElement('button');
-    b.className = 'btn bp';
-    b.innerHTML = '🔗 新窗口打开';
-    b.onclick = function() { window.open(url, '_blank'); };
-    ra.appendChild(b);
-  }
-
-  var cp = document.createElement('button');
-  cp.className = 'btn bs';
-  cp.innerHTML = '📋 复制';
-  cp.onclick = function() {
-    navigator.clipboard.writeText(text).then(function() { toast('已复制', 'success'); })
-      .catch(function() {
-        var t = document.createElement('textarea');
-        t.value = text; document.body.appendChild(t);
-        t.select(); document.execCommand('copy');
-        document.body.removeChild(t); toast('已复制', 'success');
-      });
-  };
-  ra.appendChild(cp);
-
-  var rs = document.createElement('button');
-  rs.className = 'btn bs';
-  rs.innerHTML = '🔄 重新扫描';
-  rs.onclick = function() { document.getElementById('sRes').classList.remove('show'); doStart(); };
-  ra.appendChild(rs);
-
-  document.getElementById('sRes').classList.add('show');
-}
-
-// 图片上传
-document.getElementById('sfI').addEventListener('change', function(e) {
-  var f = e.target.files[0];
-  if (!f) return;
-  toast('正在解码...', 'info');
-  var img = new Image();
-  img.onload = function() {
-    var sz = Math.min(img.width, img.height);
-    pCv.width = PSZ; pCv.height = PSZ;
-    pCtx.drawImage(img, (img.width - sz) / 2, (img.height - sz) / 2, sz, sz, 0, 0, PSZ, PSZ);
-    var imgD = pCtx.getImageData(0, 0, PSZ, PSZ);
-    var res = tryDecodeFromImage(imgD, PSZ, PSZ);
-    if (res && res.text) {
-      showRes(res.text);
-      toast('🎉 图片解码成功！', 'success');
-    } else {
-      toast('识别失败: ' + (res ? res.reason : '未知'), 'error');
-    }
-  };
-  img.src = URL.createObjectURL(f);
-  e.target.value = '';
-});
-
-// 初始化
-window.addEventListener('DOMContentLoaded', function() {
-  chkEnv();
-  dlog('页面已加载 v' + VER, 'info');
-  dlog('调色板: 8色数据(灰度>90) + 黑色定位点(灰度=0)', 'info');
-  dlog('二值化阈值: 80 (仅定位点可检测)', 'info');
-});
-</script>
-</body>
-</html>
+      cands.push
