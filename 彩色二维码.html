@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>彩色二维码工具箱 - 矩阵编码 & 扫码</title>
+    <title>彩色二维码工具箱 v2.0.0</title>
 
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -47,8 +47,22 @@
         .app-container { max-width: 640px; margin: 0 auto; padding: 20px 16px 40px; }
 
         .app-header { text-align: center; padding: 24px 0 20px; color: white; }
-        .app-header h1 { font-size: 28px; font-weight: 700; margin-bottom: 6px; text-shadow: 0 2px 4px rgba(0,0,0,0.15); }
+        .app-header h1 { font-size: 26px; font-weight: 700; margin-bottom: 4px; text-shadow: 0 2px 4px rgba(0,0,0,0.15); }
         .app-header p { font-size: 14px; opacity: 0.85; }
+
+        .version-badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.25);
+            color: white;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 20px;
+            margin-left: 6px;
+            vertical-align: middle;
+            letter-spacing: 0.5px;
+            backdrop-filter: blur(4px);
+        }
 
         .tab-bar {
             display: flex; background: rgba(255,255,255,0.2);
@@ -115,8 +129,8 @@
             font-size: 13px; display: none; align-items: flex-start; gap: 8px; line-height: 1.5;
         }
         .contrast-warning.show { display: flex; }
-        .contrast-warning.danger { background: var(--danger-light); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); }
-        .contrast-warning.success { background: var(--success-light); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2); }
+        .contrast-warning.danger { background: var(--danger-light); color: var(--danger); border: 1px solid rgba(239,68,68,0.2); }
+        .contrast-warning.success { background: var(--success-light); color: var(--success); border: 1px solid rgba(16,185,129,0.2); }
         .contrast-warning .warn-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
 
         .experiment-banner {
@@ -128,6 +142,19 @@
         .experiment-banner .banner-icon { font-size: 18px; flex-shrink: 0; }
         .experiment-banner strong { color: #78350f; }
 
+        .decoder-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: linear-gradient(135deg, var(--primary) 0%, #7c3aed 100%);
+            color: white; font-size: 12px; font-weight: 700;
+            padding: 6px 14px; border-radius: 20px;
+            margin-bottom: 16px;
+            animation: pulse-glow 2s ease-in-out infinite;
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 5px rgba(79,70,229,0.3); }
+            50% { box-shadow: 0 0 20px rgba(79,70,229,0.5); }
+        }
+
         .btn {
             display: inline-flex; align-items: center; justify-content: center; gap: 8px;
             padding: 12px 24px; border: none; border-radius: 8px; font-size: 15px;
@@ -135,8 +162,8 @@
             outline: none; text-decoration: none; white-space: nowrap;
         }
         .btn:active { transform: scale(0.97); }
-        .btn-primary { background: var(--primary); color: white; box-shadow: 0 2px 4px rgba(79, 70, 229, 0.3); }
-        .btn-primary:hover { background: var(--primary-hover); box-shadow: 0 4px 8px rgba(79, 70, 229, 0.4); }
+        .btn-primary { background: var(--primary); color: white; box-shadow: 0 2px 4px rgba(79,70,229,0.3); }
+        .btn-primary:hover { background: var(--primary-hover); box-shadow: 0 4px 8px rgba(79,70,229,0.4); }
         .btn-primary:disabled { background: var(--gray-300); color: var(--gray-500); box-shadow: none; cursor: not-allowed; }
         .btn-secondary { background: var(--gray-100); color: var(--gray-700); border: 2px solid var(--gray-200); }
         .btn-secondary:hover { background: var(--gray-200); }
@@ -144,6 +171,7 @@
         .btn-danger:hover { background: #dc2626; }
         .btn-success { background: var(--success); color: white; }
         .btn-success:hover { background: #059669; }
+        .btn-sm { padding: 8px 14px; font-size: 13px; }
         .btn-block { width: 100%; }
         .btn-group { display: flex; gap: 10px; flex-wrap: wrap; }
 
@@ -167,43 +195,171 @@
         .qr-placeholder .placeholder-icon { font-size: 48px; margin-bottom: 8px; }
         .qr-placeholder p { font-size: 14px; }
 
-        /* ==================== 扫码器区域 ==================== */
-        #reader-container {
-            width: 100%; border-radius: 8px; overflow: hidden;
-            background: var(--gray-900); min-height: 250px;
-            display: flex; align-items: center; justify-content: center;
+        /* ==================== 扫码器专用样式 ==================== */
+        .scanner-video-wrap {
             position: relative;
+            width: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            background: var(--gray-900);
+            aspect-ratio: 1 / 1;
         }
-        #reader-container #reader { width: 100%; }
-        #reader-container #reader img { display: none; }
+        .scanner-video-wrap video {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            display: block;
+        }
 
-        /* 覆盖 html5-qrcode 默认样式 */
-        #reader-container #reader__dashboard_section_csr button {
-            background: var(--primary) !important; color: white !important;
-            border: none !important; padding: 10px 20px !important;
-            border-radius: 8px !important; cursor: pointer !important; font-weight: 600 !important;
+        /* 扫描线动画 */
+        .scan-line-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            overflow: hidden;
         }
-        #reader-container #reader__dashboard_section_swaplink {
-            color: var(--primary) !important; text-decoration: none !important; font-weight: 600 !important;
+        .scan-line-overlay.active::after {
+            content: '';
+            position: absolute;
+            left: 10%; right: 10%;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, var(--primary), transparent);
+            box-shadow: 0 0 15px var(--primary);
+            animation: scanLine 2s ease-in-out infinite;
         }
+        @keyframes scanLine {
+            0% { top: 10%; }
+            50% { top: 85%; }
+            100% { top: 10%; }
+        }
+
+        /* 扫描框角标 */
+        .scan-corners {
+            position: absolute;
+            top: 15%; left: 15%; right: 15%; bottom: 15%;
+            pointer-events: none;
+        }
+        .scan-corners::before, .scan-corners::after,
+        .scan-corners span::before, .scan-corners span::after {
+            content: '';
+            position: absolute;
+            width: 24px; height: 24px;
+            border-color: var(--primary);
+            border-style: solid;
+        }
+        .scan-corners::before { top: 0; left: 0; border-width: 3px 0 0 3px; }
+        .scan-corners::after { top: 0; right: 0; border-width: 3px 3px 0 0; }
+        .scan-corners span::before { bottom: 0; left: 0; border-width: 0 0 3px 3px; position: absolute; }
+        .scan-corners span::after { bottom: 0; right: 0; border-width: 0 3px 3px 0; position: absolute; }
 
         .scan-status {
-            text-align: center; padding: 24px 16px; color: var(--gray-400); font-size: 14px;
+            text-align: center; padding: 20px 16px; color: var(--gray-400); font-size: 14px;
         }
         .scan-status .status-icon { font-size: 40px; margin-bottom: 10px; }
-        .scan-status p { max-width: 280px; margin: 0 auto; }
 
-        /* 摄像头选择下拉框 */
+        /* 调试面板 */
+        .debug-panel {
+            background: var(--gray-900);
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 12px;
+            display: none;
+        }
+        .debug-panel.show { display: block; }
+        .debug-panel .debug-title {
+            color: var(--gray-400);
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .debug-panel canvas {
+            width: 100%;
+            border-radius: 4px;
+            image-rendering: pixelated;
+        }
+        .debug-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .debug-stat {
+            background: rgba(255,255,255,0.05);
+            border-radius: 6px;
+            padding: 8px;
+            text-align: center;
+        }
+        .debug-stat .stat-value {
+            color: var(--success);
+            font-size: 16px;
+            font-weight: 700;
+            font-family: monospace;
+        }
+        .debug-stat .stat-label {
+            color: var(--gray-500);
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* 灵敏度滑块 */
+        .slider-group {
+            margin-top: 12px;
+            padding: 12px;
+            background: var(--gray-50);
+            border-radius: 8px;
+        }
+        .slider-group label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--gray-600);
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+        .slider-group input[type="range"] {
+            width: 100%;
+            accent-color: var(--primary);
+        }
+
+        /* 模式切换 */
+        .mode-switch {
+            display: flex;
+            background: var(--gray-100);
+            border-radius: 8px;
+            padding: 3px;
+            margin-bottom: 16px;
+        }
+        .mode-btn {
+            flex: 1;
+            padding: 8px 12px;
+            border: none;
+            background: transparent;
+            color: var(--gray-500);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+        .mode-btn.active {
+            background: white;
+            color: var(--primary);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
         .camera-selector {
-            margin-top: 12px; padding: 10px 14px;
+            margin-bottom: 12px; padding: 10px 14px;
             border: 2px solid var(--gray-200); border-radius: 8px;
             font-size: 14px; color: var(--gray-700); background: var(--gray-50);
             width: 100%; outline: none; cursor: pointer;
-            transition: all 0.2s ease;
         }
-        .camera-selector:focus { border-color: var(--primary); background: white; }
+        .camera-selector:focus { border-color: var(--primary); }
 
-        /* 环境检测提示 */
         .env-warning {
             background: var(--danger-light); border: 1px solid rgba(239,68,68,0.2);
             border-radius: 8px; padding: 14px; margin-bottom: 16px;
@@ -213,7 +369,7 @@
         .env-warning .env-icon { font-size: 20px; flex-shrink: 0; }
 
         .scan-result {
-            background: var(--success-light); border: 2px solid rgba(16, 185, 129, 0.2);
+            background: var(--success-light); border: 2px solid rgba(16,185,129,0.2);
             border-radius: 8px; padding: 16px; margin-top: 16px; display: none;
         }
         .scan-result.show { display: block; animation: slideIn 0.3s ease; }
@@ -225,7 +381,7 @@
             font-size: 14px; color: var(--gray-800); word-break: break-all;
             font-family: monospace; background: white; padding: 10px 12px;
             border-radius: 6px; margin-bottom: 12px;
-            border: 1px solid rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16,185,129,0.15);
         }
         .scan-result .result-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
@@ -246,7 +402,7 @@
         .toast.warning { background: var(--warning); color: white; }
         .toast.info { background: var(--primary); color: white; }
         @keyframes toastIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes toastOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-20px); } }
+        @keyframes toastOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-20px); } }
         @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
         .loading-spinner {
@@ -255,20 +411,39 @@
             border-top-color: white; border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
-        .loading-spinner.dark { border-color: rgba(79, 70, 229, 0.2); border-top-color: var(--primary); }
+        .loading-spinner.dark { border-color: rgba(79,70,229,0.2); border-top-color: var(--primary); }
         @keyframes spin { to { transform: rotate(360deg); } }
 
         .tab-content { display: none; }
         .tab-content.active { display: block; animation: fadeIn 0.3s ease; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
+        /* 调色板预览条 */
+        .palette-bar {
+            display: flex; gap: 3px; margin-top: 10px;
+            padding: 8px; background: var(--gray-50); border-radius: 6px;
+        }
+        .palette-swatch {
+            flex: 1; height: 24px; border-radius: 4px;
+            border: 1px solid rgba(0,0,0,0.08);
+            position: relative;
+        }
+        .palette-swatch::after {
+            content: attr(data-idx);
+            position: absolute; bottom: -16px; left: 50%;
+            transform: translateX(-50%);
+            font-size: 9px; color: var(--gray-400);
+            font-family: monospace;
+        }
+
         @media (max-width: 480px) {
             .app-container { padding: 12px 10px 30px; }
             .card { padding: 18px; }
-            .app-header h1 { font-size: 22px; }
+            .app-header h1 { font-size: 20px; }
             .color-row { grid-template-columns: 1fr; }
             .btn-group { flex-direction: column; }
             .btn-group .btn { width: 100%; }
+            .debug-stats { grid-template-columns: 1fr 1fr; }
         }
 
         .hidden { display: none !important; }
@@ -279,8 +454,8 @@
 
     <div class="app-container">
         <div class="app-header">
-            <h1>🌈 彩色二维码工具箱</h1>
-            <p>矩阵级彩色编码 · 网页扫码识别</p>
+            <h1>🌈 彩色二维码工具箱 <span class="version-badge" id="versionBadge">v2.0.0</span></h1>
+            <p>矩阵级彩色编码 · 专用彩色解码器</p>
         </div>
 
         <div class="tab-bar">
@@ -292,7 +467,7 @@
             </button>
         </div>
 
-        <!-- ==================== 模块一：彩色二维码生成器 ==================== -->
+        <!-- ==================== 生成器 ==================== -->
         <div class="tab-content active" id="tab-generator">
             <div class="card">
                 <div class="card-title"><span class="icon">✏️</span> 编码内容</div>
@@ -300,7 +475,6 @@
                     <textarea class="form-input" id="qrText" placeholder="请输入要编码的文本或网址..." rows="3">https://example.com</textarea>
                 </div>
             </div>
-
             <div class="card">
                 <div class="card-title"><span class="icon">🎨</span> 基础颜色设置</div>
                 <div class="color-row">
@@ -323,11 +497,7 @@
                     <span class="warn-icon"></span>
                     <span class="warn-text"></span>
                 </div>
-                <p style="font-size:12px; color:var(--gray-500); margin-top:12px; line-height:1.6;">
-                    💡 <strong>提示：</strong>前景色用于绘制三个定位点（"回"字形），背景色用于空白区域。中间数据区将由8色调色板自动填充。
-                </p>
             </div>
-
             <div class="card">
                 <div class="card-title"><span class="icon">🖼️</span> Logo 嵌入（可选）</div>
                 <div class="file-upload-area" id="logoUploadArea" onclick="document.getElementById('logoInput').click()">
@@ -336,17 +506,12 @@
                     <div class="file-name hidden" id="logoFileName"></div>
                     <input type="file" id="logoInput" accept="image/*">
                 </div>
-                <p style="font-size:12px; color:var(--gray-400); margin-top:8px;">
-                    💡 Logo 将自动缩放至二维码面积的 25% 以内
-                </p>
             </div>
-
             <div class="card">
-                <button class="btn btn-primary btn-block" id="generateBtn" onclick="generateQR()">
+                <button class="btn btn-primary btn-block" onclick="generateQR()">
                     <span>✨</span> 生成彩色二维码
                 </button>
             </div>
-
             <div class="card">
                 <div class="card-title"><span class="icon">📱</span> 预览与下载</div>
                 <div class="qr-preview-area" id="qrPreviewArea">
@@ -356,7 +521,7 @@
                     </div>
                     <canvas id="qrCanvas" class="hidden"></canvas>
                 </div>
-                <div style="margin-top: 16px;" id="downloadSection" class="hidden">
+                <div style="margin-top:16px;" id="downloadSection" class="hidden">
                     <button class="btn btn-success btn-block" onclick="downloadQR()">
                         <span>💾</span> 下载二维码 (PNG)
                     </button>
@@ -364,49 +529,102 @@
             </div>
         </div>
 
-        <!-- ==================== 模块二：扫码识别器 ==================== -->
+        <!-- ==================== 扫码器 ==================== -->
         <div class="tab-content" id="tab-scanner">
             <div class="experiment-banner">
                 <span class="banner-icon">🧪</span>
                 <div>
-                    <strong>实验模式提示：</strong>本工具生成的彩色二维码为高容量实验模式，普通扫码器可能无法识别，建议配合专用解码器或在光线充足环境下尝试。
+                    <strong>专用解码器已就绪：</strong>本扫码器内置彩色二维码预处理引擎，可将 8 色彩色码转换为标准黑白码后解码。支持本工具生成的所有彩色二维码。
                 </div>
             </div>
 
-            <!-- 环境检测警告（非 HTTPS 时显示） -->
             <div class="env-warning hidden" id="envWarning">
                 <span class="env-icon">🔒</span>
-                <div>
-                    <strong>安全环境检测未通过：</strong>摄像头 API 要求页面必须通过 <strong>HTTPS</strong> 或 <strong>localhost</strong> 访问。当前环境不支持摄像头调用，请使用上传图片方式替代。
+                <div><strong>安全环境检测未通过：</strong>摄像头需要 HTTPS 或 localhost 环境。请使用"上传图片"方式替代。</div>
+            </div>
+
+            <!-- 解码模式切换 -->
+            <div class="card">
+                <div class="card-title"><span class="icon">⚙️</span> 解码模式</div>
+                <div class="mode-switch">
+                    <button class="mode-btn active" onclick="setDecoderMode('color')" id="modeColorBtn">🌈 彩色码专用</button>
+                    <button class="mode-btn" onclick="setDecoderMode('standard')" id="modeStdBtn">⬛ 标准黑白码</button>
+                </div>
+
+                <!-- 调色板参考 -->
+                <div id="paletteReference">
+                    <p style="font-size:12px; color:var(--gray-500); margin-bottom:6px;">解码器将识别以下 8 种颜色为"数据模块"：</p>
+                    <div class="palette-bar" id="paletteBar"></div>
+                </div>
+
+                <!-- 灵敏度调节 -->
+                <div class="slider-group">
+                    <label>
+                        <span>🎯 颜色识别灵敏度</span>
+                        <span id="thresholdValue">130</span>
+                    </label>
+                    <input type="range" id="thresholdSlider" min="50" max="250" value="130" oninput="updateThreshold(this.value)">
+                    <p style="font-size:11px; color:var(--gray-400); margin-top:4px;">
+                        值越小越严格（减少误识别），值越大越宽松（适应更多光线条件）
+                    </p>
                 </div>
             </div>
 
+            <!-- 摄像头扫码 -->
             <div class="card">
                 <div class="card-title"><span class="icon">📷</span> 摄像头扫码</div>
 
-                <!-- 摄像头选择器（枚举到设备后显示） -->
                 <select class="camera-selector hidden" id="cameraSelect">
                     <option value="">-- 请选择摄像头 --</option>
                 </select>
 
-                <div id="reader-container">
-                    <div id="reader"></div>
+                <div class="scanner-video-wrap" id="videoWrap">
+                    <video id="scanVideo" playsinline muted></video>
+                    <div class="scan-line-overlay" id="scanLineOverlay"></div>
+                    <div class="scan-corners"><span></span></div>
                     <div class="scan-status" id="scanStatus">
                         <div class="status-icon">📷</div>
                         <p>点击下方按钮启动摄像头</p>
                     </div>
                 </div>
 
-                <div style="margin-top: 16px;" class="btn-group">
+                <div style="margin-top:12px;" class="btn-group">
                     <button class="btn btn-primary" id="startScanBtn" onclick="startScan()" style="flex:1;">
                         <span>▶️</span> 开始扫描
                     </button>
                     <button class="btn btn-danger hidden" id="stopScanBtn" onclick="stopScan()" style="flex:1;">
                         <span>⏹️</span> 停止扫描
                     </button>
+                    <button class="btn btn-secondary btn-sm" onclick="toggleDebug()" id="debugToggleBtn">
+                        🔍 调试
+                    </button>
+                </div>
+
+                <!-- 调试面板 -->
+                <div class="debug-panel" id="debugPanel">
+                    <div class="debug-title">
+                        <span>🔬 预处理实时视图（二值化结果）</span>
+                        <span id="debugFps" style="color:var(--success);">0 FPS</span>
+                    </div>
+                    <canvas id="debugCanvas" width="256" height="256"></canvas>
+                    <div class="debug-stats">
+                        <div class="debug-stat">
+                            <div class="stat-value" id="statFrames">0</div>
+                            <div class="stat-label">已处理帧</div>
+                        </div>
+                        <div class="debug-stat">
+                            <div class="stat-value" id="statDarkPx">0%</div>
+                            <div class="stat-label">暗像素占比</div>
+                        </div>
+                        <div class="debug-stat">
+                            <div class="stat-value" id="statMode">彩色</div>
+                            <div class="stat-label">解码模式</div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
+            <!-- 上传图片解码 -->
             <div class="card">
                 <div class="card-title"><span class="icon">🖼️</span> 上传图片解码</div>
                 <div class="file-upload-area" id="scanFileArea" onclick="document.getElementById('scanFileInput').click()">
@@ -417,28 +635,85 @@
                 </div>
             </div>
 
+            <!-- 扫码结果 -->
             <div class="scan-result" id="scanResult">
-                <div class="result-label">✅ 扫码结果</div>
+                <div class="result-label">✅ 解码成功</div>
                 <div class="result-text" id="resultText"></div>
                 <div class="result-actions" id="resultActions"></div>
             </div>
         </div>
     </div>
 
+    <!-- 离屏处理 Canvas（不显示） -->
+    <canvas id="processCanvas" class="hidden"></canvas>
+
     <script>
+    // ================================================================
+    // 版本号
+    // ================================================================
+    const APP_VERSION = '2.0.0';
+    document.getElementById('versionBadge').textContent = `v${APP_VERSION}`;
+
     // ================================================================
     // 全局变量
     // ================================================================
-    let html5QrcodeScanner = null;
     let isScanning = false;
     let logoImage = null;
-    let cameraDevices = []; // 存储枚举到的摄像头设备列表
+    let cameraDevices = [];
+    let videoStream = null;
+    let scanRAF = null;           // requestAnimationFrame ID
+    let lastFrameTime = 0;
+    let frameCount = 0;
+    let fpsCounter = 0;
+    let fpsTime = 0;
+    let currentFps = 0;
+    let decoderMode = 'color';    // 'color' | 'standard'
+    let colorThreshold = 130;     // 颜色距离阈值
+    let debugVisible = false;
 
-    // 8 色高对比度调色板
-    const PALETTE_8 = [
-        '#E53935', '#43A047', '#1E88E5', '#FDD835',
-        '#00ACC1', '#8E24AA', '#212121', '#FB8C00'
+    // DOM 引用
+    const scanVideo = document.getElementById('scanVideo');
+    const processCanvas = document.getElementById('processCanvas');
+    const processCtx = processCanvas.getContext('2d', { willReadFrequently: true });
+    const debugCanvas = document.getElementById('debugCanvas');
+    const debugCtx = debugCanvas.getContext('2d');
+
+    // 处理尺寸（正方形裁剪）
+    const PROC_SIZE = 384;
+
+    // ================================================================
+    // 【核心】8 色调色板 —— 生成器与解码器必须完全一致
+    // ================================================================
+    const PALETTE_8_HEX = [
+        '#E53935', // 0: 红
+        '#43A047', // 1: 绿
+        '#1E88E5', // 2: 蓝
+        '#FDD835', // 3: 黄
+        '#00ACC1', // 4: 青
+        '#8E24AA', // 5: 紫
+        '#212121', // 6: 黑
+        '#FB8C00'  // 7: 橙
     ];
+
+    // RGB 形式（用于距离计算）
+    const PALETTE_RGB = PALETTE_8_HEX.map(hex => [
+        parseInt(hex.slice(1, 3), 16),
+        parseInt(hex.slice(3, 5), 16),
+        parseInt(hex.slice(5, 7), 16)
+    ]);
+
+    // 初始化调色板预览条
+    (function initPaletteBar() {
+        const bar = document.getElementById('paletteBar');
+        const names = ['红','绿','蓝','黄','青','紫','黑','橙'];
+        PALETTE_8_HEX.forEach((color, i) => {
+            const swatch = document.createElement('div');
+            swatch.className = 'palette-swatch';
+            swatch.style.background = color;
+            swatch.dataset.idx = names[i];
+            bar.appendChild(swatch);
+        });
+    })();
 
     // ================================================================
     // Tab 切换
@@ -447,52 +722,61 @@
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.tab === tabName);
         });
-        document.querySelectorAll('.tab-content').forEach(content => {
-            content.classList.toggle('active', content.id === `tab-${tabName}`);
+        document.querySelectorAll('.tab-content').forEach(c => {
+            c.classList.toggle('active', c.id === `tab-${tabName}`);
         });
         if (tabName !== 'scanner' && isScanning) stopScan();
-        // 切换到扫码器时检测环境
         if (tabName === 'scanner') checkEnvironment();
     }
 
     // ================================================================
-    // Toast 提示
+    // Toast
     // ================================================================
     function showToast(message, type = 'info') {
         const container = document.getElementById('toastContainer');
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
         const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
-        toast.innerHTML = `<span>${icons[type] || ''}</span><span>${message}</span>`;
+        toast.innerHTML = `<span>${icons[type]||''}</span><span>${message}</span>`;
         container.appendChild(toast);
         setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 3000);
     }
 
     // ================================================================
-    // 【修复核心】环境检测
-    // 在移动端，getUserMedia 要求页面必须通过 HTTPS 或 localhost 访问
-    // 如果是 http:// 或 file:// 环境，navigator.mediaDevices 可能为 undefined
+    // 解码模式切换
+    // ================================================================
+    function setDecoderMode(mode) {
+        decoderMode = mode;
+        document.getElementById('modeColorBtn').classList.toggle('active', mode === 'color');
+        document.getElementById('modeStdBtn').classList.toggle('active', mode === 'standard');
+        document.getElementById('paletteReference').style.display = mode === 'color' ? 'block' : 'none';
+        document.getElementById('statMode').textContent = mode === 'color' ? '彩色' : '标准';
+    }
+
+    function updateThreshold(val) {
+        colorThreshold = parseInt(val);
+        document.getElementById('thresholdValue').textContent = val;
+    }
+
+    function toggleDebug() {
+        debugVisible = !debugVisible;
+        document.getElementById('debugPanel').classList.toggle('show', debugVisible);
+        document.getElementById('debugToggleBtn').textContent = debugVisible ? '🔍 隐藏调试' : '🔍 调试';
+    }
+
+    // ================================================================
+    // 环境检测
     // ================================================================
     function checkEnvironment() {
         const envWarning = document.getElementById('envWarning');
         const startBtn = document.getElementById('startScanBtn');
-
-        // 检测 1: 是否是安全上下文（HTTPS 或 localhost）
         const isSecure = window.isSecureContext;
+        const hasMedia = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
 
-        // 检测 2: navigator.mediaDevices 是否可用
-        const hasMediaDevices = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-
-        if (!isSecure || !hasMediaDevices) {
+        if (!isSecure || !hasMedia) {
             envWarning.classList.remove('hidden');
             startBtn.disabled = true;
-            startBtn.innerHTML = '<span>🚫</span> 当前环境不支持摄像头';
-
-            const statusEl = document.getElementById('scanStatus');
-            statusEl.innerHTML = `
-                <div class="status-icon">🔒</div>
-                <p>摄像头功能需要 HTTPS 环境<br>请使用"上传图片"方式替代</p>
-            `;
+            startBtn.innerHTML = '<span>🚫</span> 环境不支持';
         } else {
             envWarning.classList.add('hidden');
             startBtn.disabled = false;
@@ -501,156 +785,101 @@
     }
 
     // ================================================================
-    // 【修复核心】枚举摄像头设备列表
-    // 直接传 facingMode 对象在部分手机浏览器上会报"未知错误"
-    // 正确做法：先 enumerateDevices 获取设备列表，再用 deviceId 启动
+    // 摄像头枚举（复用修复后的逻辑）
     // ================================================================
     async function enumerateCameras() {
         try {
-            // 第一步：先请求一次权限，否则 enumerateDevices 返回的 label 为空
-            // 这是浏览器的隐私策略：未授权前不暴露设备名称
-            const tempStream = await navigator.mediaDevices.getUserMedia({
-                video: true,
-                audio: false
-            });
-            // 拿到权限后立即释放
-            tempStream.getTracks().forEach(track => track.stop());
+            const tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            tempStream.getTracks().forEach(t => t.stop());
 
-            // 第二步：枚举所有媒体设备
             const devices = await navigator.mediaDevices.enumerateDevices();
-
-            // 第三步：过滤出视频输入设备（摄像头）
             cameraDevices = devices.filter(d => d.kind === 'videoinput');
+            if (cameraDevices.length === 0) throw new Error('No camera found');
 
-            if (cameraDevices.length === 0) {
-                throw new Error('NotFoundError');
-            }
-
-            // 第四步：填充下拉选择框
             const select = document.getElementById('cameraSelect');
             select.innerHTML = '';
 
-            // 智能排序：后置摄像头优先
-            const sorted = sortCameras(cameraDevices);
+            const backKW = ['back','rear','environment','后置','背面','后摄','主摄'];
+            const frontKW = ['front','face','user','前置','前摄','自拍'];
 
-            sorted.forEach((device, index) => {
-                const option = document.createElement('option');
-                option.value = device.deviceId;
-                // 如果 label 为空（某些浏览器隐私模式），用序号代替
-                option.textContent = device.label || `摄像头 ${index + 1}`;
-                select.appendChild(option);
+            const sorted = cameraDevices.map(d => {
+                const label = (d.label || '').toLowerCase();
+                let score = 0;
+                if (backKW.some(k => label.includes(k))) score += 100;
+                if (frontKW.some(k => label.includes(k))) score -= 50;
+                if (!d.label) score += 10;
+                return { device: d, score };
+            }).sort((a, b) => b.score - a.score).map(s => s.device);
+
+            sorted.forEach((d, i) => {
+                const opt = document.createElement('option');
+                opt.value = d.deviceId;
+                opt.textContent = d.label || `摄像头 ${i + 1}`;
+                select.appendChild(opt);
             });
 
-            // 默认选中第一个（已排序，后置优先）
             select.classList.remove('hidden');
-            return sorted;
-
         } catch (err) {
             throw err;
         }
     }
 
-    /**
-     * 智能排序摄像头列表
-     * 优先选择后置摄像头（环境摄像头）
-     * 判断依据：label 中包含 back/rear/environment/后置 等关键词
-     */
-    function sortCameras(devices) {
-        const backKeywords = ['back', 'rear', 'environment', '后置', '背面', '后摄', '主摄'];
-        const frontKeywords = ['front', 'face', 'user', '前置', '前摄', '自拍'];
-
-        const scored = devices.map(device => {
-            const label = (device.label || '').toLowerCase();
-            let score = 0;
-
-            // 后置摄像头加分
-            if (backKeywords.some(kw => label.includes(kw))) {
-                score += 100;
-            }
-            // 前置摄像头减分
-            if (frontKeywords.some(kw => label.includes(kw))) {
-                score -= 50;
-            }
-            // 没有 label 的设备给中等分数（可能是后置）
-            if (!device.label) {
-                score += 10;
-            }
-
-            return { device, score };
-        });
-
-        // 按分数降序排列
-        scored.sort((a, b) => b.score - a.score);
-        return scored.map(s => s.device);
-    }
-
     // ================================================================
-    // 【修复核心】启动扫描 - 使用 deviceId 而非 facingMode
+    // 启动扫描
     // ================================================================
     async function startScan() {
         if (isScanning) return;
 
-        const statusEl = document.getElementById('scanStatus');
         const startBtn = document.getElementById('startScanBtn');
+        const statusEl = document.getElementById('scanStatus');
 
-        // 先禁用按钮防止重复点击
         startBtn.disabled = true;
-        startBtn.innerHTML = '<span class="loading-spinner"></span> 正在初始化...';
-        statusEl.innerHTML = '<div class="loading-spinner dark" style="margin:0 auto 10px;"></div><p>正在检测摄像头设备...</p>';
+        startBtn.innerHTML = '<span class="loading-spinner"></span> 初始化中...';
+        statusEl.innerHTML = '<div class="loading-spinner dark" style="margin:0 auto 10px;"></div><p>正在检测摄像头...</p>';
 
         try {
-            // Step 1: 枚举摄像头（如果还没枚举过）
-            if (cameraDevices.length === 0) {
-                await enumerateCameras();
-            }
+            if (cameraDevices.length === 0) await enumerateCameras();
 
-            // Step 2: 获取用户选择的摄像头 deviceId
             const select = document.getElementById('cameraSelect');
-            const selectedDeviceId = select.value || (cameraDevices.length > 0 ? cameraDevices[0].deviceId : null);
+            const deviceId = select.value || (cameraDevices[0] ? cameraDevices[0].deviceId : null);
+            if (!deviceId) throw { name: 'NotFoundError' };
 
-            if (!selectedDeviceId) {
-                throw { name: 'NotFoundError', message: '未找到任何摄像头设备' };
-            }
-
-            // Step 3: 使用 deviceId 创建扫描器并启动
-            // 这是关键修复：用明确的 deviceId 代替 facingMode 对象
-            html5QrcodeScanner = new Html5Qrcode("reader", {
-                verbose: false
+            // 请求摄像头视频流
+            videoStream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    deviceId: { exact: deviceId },
+                    width: { ideal: 720 },
+                    height: { ideal: 720 },
+                    facingMode: { ideal: 'environment' }
+                },
+                audio: false
             });
 
-            const config = {
-                fps: 10,
-                qrbox: function(viewfinderWidth, viewfinderHeight) {
-                    // 动态计算扫描框大小，适配不同屏幕
-                    const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                    return { width: minEdge * 0.75, height: minEdge * 0.75 };
-                },
-                // 降低对图像质量的过度约束，提高兼容性
-                videoConstraints: {
-                    deviceId: { exact: selectedDeviceId },
-                    // 使用范围约束而非精确约束，提高兼容性
-                    width:  { ideal: 720, min: 480 },
-                    height: { ideal: 720, min: 480 },
-                    facingMode: { ideal: 'environment' }
-                }
-            };
+            scanVideo.srcObject = videoStream;
+            await scanVideo.play();
 
-            await html5QrcodeScanner.start(
-                selectedDeviceId,  // 直接使用 deviceId 字符串
-                config,
-                onScanSuccess,
-                onScanError
-            );
+            // 设置处理 Canvas 尺寸
+            processCanvas.width = PROC_SIZE;
+            processCanvas.height = PROC_SIZE;
 
-            // 启动成功
+            // 启动帧处理循环
             isScanning = true;
+            frameCount = 0;
+            fpsCounter = 0;
+            fpsTime = performance.now();
+            lastFrameTime = 0;
+
             statusEl.classList.add('hidden');
+            document.getElementById('scanLineOverlay').classList.add('active');
             startBtn.classList.add('hidden');
             document.getElementById('stopScanBtn').classList.remove('hidden');
-            showToast('摄像头已启动，请对准二维码', 'info');
+
+            showToast('摄像头已启动，使用专用解码器识别中...', 'info');
+
+            // 开始处理循环
+            scanRAF = requestAnimationFrame(processFrameLoop);
 
         } catch (err) {
-            // 恢复按钮状态
             startBtn.disabled = false;
             startBtn.innerHTML = '<span>▶️</span> 开始扫描';
             handleCameraError(err);
@@ -658,113 +887,270 @@
     }
 
     // ================================================================
-    // 【修复核心】增强错误处理
-    // 覆盖移动端常见的各种错误类型
+    // 【核心】帧处理循环
     // ================================================================
-    function handleCameraError(err) {
-        const statusEl = document.getElementById('scanStatus');
-        const startBtn = document.getElementById('startScanBtn');
-        let message = '';
-        let icon = '❌';
-        let detail = '';
+    function processFrameLoop(timestamp) {
+        if (!isScanning) return;
 
-        // 获取错误名称和消息（兼容不同格式）
-        const errName = err?.name || err?.toString?.() || '';
-        const errMsg = err?.message || err?.toString?.() || '';
+        // 节流：每 150ms 处理一帧（约 6-7 FPS），平衡性能与识别速度
+        if (timestamp - lastFrameTime < 150) {
+            scanRAF = requestAnimationFrame(processFrameLoop);
+            return;
+        }
+        lastFrameTime = timestamp;
 
-        // 逐一匹配各种错误类型
-        if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
-            icon = '🔒';
-            message = '摄像头权限被拒绝';
-            detail = '请在浏览器设置或系统设置中允许本站访问摄像头，然后刷新页面重试。';
-        }
-        else if (errName === 'NotFoundError' || errName === 'DevicesNotFoundError') {
-            icon = '📷';
-            message = '未检测到摄像头设备';
-            detail = '请确认设备已连接摄像头，或使用下方"上传图片"功能替代。';
-        }
-        else if (errName === 'NotReadableError' || errName === 'TrackStartError') {
-            icon = '⚠️';
-            message = '摄像头被占用';
-            detail = '摄像头可能正被其他应用使用（如微信视频通话），请关闭后重试。';
-        }
-        else if (errName === 'OverconstrainedError') {
-            icon = '⚙️';
-            message = '摄像头参数约束不匹配';
-            detail = '当前设备不支持请求的分辨率，正在尝试重新枚举设备...';
-            // 自动重试：清空设备列表，重新枚举
-            cameraDevices = [];
-            detail += '请点击"开始扫描"重试。';
-        }
-        else if (errName === 'AbortError') {
-            icon = '🚫';
-            message = '摄像头启动被中止';
-            detail = '可能是页面切换导致，请重新点击开始扫描。';
-        }
-        else if (errName === 'SecurityError') {
-            icon = '🔒';
-            message = '安全限制';
-            detail = '摄像头功能需要 HTTPS 环境。请确保网址以 https:// 开头。';
-        }
-        else if (errMsg.includes('permission') || errMsg.includes('Permission')) {
-            icon = '🔒';
-            message = '摄像头权限被拒绝';
-            detail = '请在浏览器地址栏左侧点击锁形图标，允许摄像头权限后刷新页面。';
-        }
-        else if (errMsg.includes('device') || errMsg.includes('Device')) {
-            icon = '📷';
-            message = '摄像头设备异常';
-            detail = '请尝试拔插摄像头或重启设备后刷新页面。';
-        }
-        else {
-            // 兜底：未知错误，给出尽可能有用的信息
-            icon = '❓';
-            message = '摄像头启动失败';
-            detail = `错误信息：${errMsg || '未知错误'}<br>建议：刷新页面重试，或使用"上传图片"功能替代。`;
+        // FPS 计算
+        fpsCounter++;
+        if (timestamp - fpsTime >= 1000) {
+            currentFps = fpsCounter;
+            fpsCounter = 0;
+            fpsTime = timestamp;
+            if (debugVisible) {
+                document.getElementById('debugFps').textContent = currentFps + ' FPS';
+            }
         }
 
-        statusEl.innerHTML = `
-            <div class="status-icon">${icon}</div>
-            <p style="font-weight:600; color:var(--gray-700); margin-bottom:6px;">${message}</p>
-            <p style="font-size:13px; color:var(--gray-500);">${detail}</p>
-        `;
-        statusEl.classList.remove('hidden');
+        // 从视频帧中裁剪正方形区域到处理 Canvas
+        const vw = scanVideo.videoWidth;
+        const vh = scanVideo.videoHeight;
+        if (vw === 0 || vh === 0) {
+            scanRAF = requestAnimationFrame(processFrameLoop);
+            return;
+        }
 
-        showToast(`${message}，请查看详情`, 'error');
-        console.error('[扫码器错误详情]', err);
+        const size = Math.min(vw, vh);
+        const sx = (vw - size) / 2;
+        const sy = (vh - size) / 2;
+        processCtx.drawImage(scanVideo, sx, sy, size, size, 0, 0, PROC_SIZE, PROC_SIZE);
+
+        // 获取图像数据
+        const imageData = processCtx.getImageData(0, 0, PROC_SIZE, PROC_SIZE);
+
+        // 预处理：根据模式转换图像
+        let darkPixelRatio = 0;
+        if (decoderMode === 'color') {
+            darkPixelRatio = preprocessColorQR(imageData);
+        } else {
+            darkPixelRatio = preprocessStandard(imageData);
+        }
+
+        // 更新调试面板
+        frameCount++;
+        if (debugVisible) {
+            debugCtx.putImageData(imageData, 0, 0);
+            document.getElementById('statFrames').textContent = frameCount;
+            document.getElementById('statDarkPx').textContent = (darkPixelRatio * 100).toFixed(1) + '%';
+        }
+
+        // 将预处理后的图像数据放回 Canvas（jsQR 需要从 Canvas 或 imageData 读取）
+        processCtx.putImageData(imageData, 0, 0);
+
+        // 调用 jsQR 解码
+        // inversionAttempts: 'dontInvert' 因为我们已确保黑=数据，白=背景
+        const code = jsQR(imageData.data, PROC_SIZE, PROC_SIZE, {
+            inversionAttempts: 'dontInvert'
+        });
+
+        if (code && code.data) {
+            // 解码成功！
+            onScanSuccess(code.data);
+            return;
+        }
+
+        // 如果彩色模式失败，尝试反转（以防颜色判断反了）
+        if (decoderMode === 'color') {
+            // 反转黑白
+            const data = imageData.data;
+            for (let i = 0; i < data.length; i += 4) {
+                const v = data[i] === 0 ? 255 : 0;
+                data[i] = v; data[i+1] = v; data[i+2] = v;
+            }
+            const codeInverted = jsQR(imageData.data, PROC_SIZE, PROC_SIZE, {
+                inversionAttempts: 'dontInvert'
+            });
+            if (codeInverted && codeInverted.data) {
+                onScanSuccess(codeInverted.data);
+                return;
+            }
+        }
+
+        // 继续下一帧
+        scanRAF = requestAnimationFrame(processFrameLoop);
     }
 
     // ================================================================
-    // 扫码成功回调
+    // 【核心算法 1】彩色二维码预处理
+    //
+    // 原理：
+    //   遍历每个像素，计算其到 8 色调色板中最近颜色的欧氏距离。
+    //   如果距离 < 阈值 → 该像素属于"数据模块" → 涂黑
+    //   否则 → 该像素属于"背景" → 涂白
+    //
+    // 这样就把彩色马赛克二维码转换成了标准黑白二维码，
+    // 然后交给 jsQR 进行标准解码。
+    //
+    // 为什么不用简单的灰度二值化？
+    //   因为黄色 (#FDD835) 的灰度值很高（约 200+），
+    //   在标准二值化中会被误判为"白色背景"，导致数据丢失。
+    //   而通过颜色距离匹配，黄色能被正确识别为"数据模块"。
+    // ================================================================
+    function preprocessColorQR(imageData) {
+        const data = imageData.data;
+        const len = data.length;
+        const thresholdSq = colorThreshold * colorThreshold;
+        let darkCount = 0;
+        const totalPixels = len / 4;
+
+        // 预取调色板 RGB 值（避免循环内重复访问）
+        const p0r = PALETTE_RGB[0][0], p0g = PALETTE_RGB[0][1], p0b = PALETTE_RGB[0][2];
+        const p1r = PALETTE_RGB[1][0], p1g = PALETTE_RGB[1][1], p1b = PALETTE_RGB[1][2];
+        const p2r = PALETTE_RGB[2][0], p2g = PALETTE_RGB[2][1], p2b = PALETTE_RGB[2][2];
+        const p3r = PALETTE_RGB[3][0], p3g = PALETTE_RGB[3][1], p3b = PALETTE_RGB[3][2];
+        const p4r = PALETTE_RGB[4][0], p4g = PALETTE_RGB[4][1], p4b = PALETTE_RGB[4][2];
+        const p5r = PALETTE_RGB[5][0], p5g = PALETTE_RGB[5][1], p5b = PALETTE_RGB[5][2];
+        const p6r = PALETTE_RGB[6][0], p6g = PALETTE_RGB[6][1], p6b = PALETTE_RGB[6][2];
+        const p7r = PALETTE_RGB[7][0], p7g = PALETTE_RGB[7][1], p7b = PALETTE_RGB[7][2];
+
+        for (let i = 0; i < len; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+
+            // 计算到 8 种调色板颜色的最小平方距离
+            let minDistSq = Infinity;
+
+            let d0 = (r-p0r)*(r-p0r) + (g-p0g)*(g-p0g) + (b-p0b)*(b-p0b);
+            if (d0 < minDistSq) minDistSq = d0;
+
+            let d1 = (r-p1r)*(r-p1r) + (g-p1g)*(g-p1g) + (b-p1b)*(b-p1b);
+            if (d1 < minDistSq) minDistSq = d1;
+
+            let d2 = (r-p2r)*(r-p2r) + (g-p2g)*(g-p2g) + (b-p2b)*(b-p2b);
+            if (d2 < minDistSq) minDistSq = d2;
+
+            let d3 = (r-p3r)*(r-p3r) + (g-p3g)*(g-p3g) + (b-p3b)*(b-p3b);
+            if (d3 < minDistSq) minDistSq = d3;
+
+            let d4 = (r-p4r)*(r-p4r) + (g-p4g)*(g-p4g) + (b-p4b)*(b-p4b);
+            if (d4 < minDistSq) minDistSq = d4;
+
+            let d5 = (r-p5r)*(r-p5r) + (g-p5g)*(g-p5g) + (b-p5b)*(b-p5b);
+            if (d5 < minDistSq) minDistSq = d5;
+
+            let d6 = (r-p6r)*(r-p6r) + (g-p6g)*(g-p6g) + (b-p6b)*(b-p6b);
+            if (d6 < minDistSq) minDistSq = d6;
+
+            let d7 = (r-p7r)*(r-p7r) + (g-p7g)*(g-p7g) + (b-p7b)*(b-p7b);
+            if (d7 < minDistSq) minDistSq = d7;
+
+            // 判断：距离 < 阈值 → 数据模块（黑），否则 → 背景（白）
+            if (minDistSq < thresholdSq) {
+                data[i] = 0; data[i+1] = 0; data[i+2] = 0;
+                darkCount++;
+            } else {
+                data[i] = 255; data[i+1] = 255; data[i+2] = 255;
+            }
+            data[i+3] = 255;
+        }
+
+        return darkCount / totalPixels;
+    }
+
+    // ================================================================
+    // 【核心算法 2】标准黑白码预处理（备用模式）
+    //
+    // 使用自适应阈值（简化版 Otsu）进行二值化
+    // 用于解码普通黑白二维码
+    // ================================================================
+    function preprocessStandard(imageData) {
+        const data = imageData.data;
+        const len = data.length;
+        const totalPixels = len / 4;
+
+        // 第一步：计算灰度直方图
+        const histogram = new Array(256).fill(0);
+        const grayValues = new Uint8Array(totalPixels);
+
+        for (let i = 0; i < len; i += 4) {
+            // ITU-R BT.601 灰度公式
+            const gray = Math.round(data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114);
+            grayValues[i / 4] = gray;
+            histogram[gray]++;
+        }
+
+        // 第二步：Otsu 算法求最优阈值
+        let sum = 0;
+        for (let i = 0; i < 256; i++) sum += i * histogram[i];
+
+        let sumB = 0, wB = 0, wF = 0;
+        let maxVariance = 0;
+        let threshold = 128; // 默认值
+
+        for (let t = 0; t < 256; t++) {
+            wB += histogram[t];
+            if (wB === 0) continue;
+            wF = totalPixels - wB;
+            if (wF === 0) break;
+
+            sumB += t * histogram[t];
+            const mB = sumB / wB;
+            const mF = (sum - sumB) / wF;
+            const variance = wB * wF * (mB - mF) * (mB - mF);
+
+            if (variance > maxVariance) {
+                maxVariance = variance;
+                threshold = t;
+            }
+        }
+
+        // 第三步：应用阈值二值化
+        let darkCount = 0;
+        for (let i = 0; i < len; i += 4) {
+            const gray = grayValues[i / 4];
+            if (gray < threshold) {
+                data[i] = 0; data[i+1] = 0; data[i+2] = 0;
+                darkCount++;
+            } else {
+                data[i] = 255; data[i+1] = 255; data[i+2] = 255;
+            }
+            data[i+3] = 255;
+        }
+
+        return darkCount / totalPixels;
+    }
+
+    // ================================================================
+    // 扫码成功
     // ================================================================
     function onScanSuccess(decodedText) {
         stopScan();
         showScanResult(decodedText);
-        showToast('扫码成功！', 'success');
-        if (navigator.vibrate) navigator.vibrate(200);
+        showToast('🎉 解码成功！', 'success');
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
     }
-
-    function onScanError() { /* 忽略每帧未识别回调 */ }
 
     // ================================================================
     // 停止扫描
     // ================================================================
     function stopScan() {
-        if (html5QrcodeScanner && isScanning) {
-            html5QrcodeScanner.stop().then(() => {
-                html5QrcodeScanner.clear();
-                isScanning = false;
-            }).catch((err) => {
-                console.warn('停止扫描时出错:', err);
-                isScanning = false;
-            });
-        } else {
-            isScanning = false;
+        isScanning = false;
+
+        if (scanRAF) {
+            cancelAnimationFrame(scanRAF);
+            scanRAF = null;
         }
+
+        if (videoStream) {
+            videoStream.getTracks().forEach(t => t.stop());
+            videoStream = null;
+        }
+
+        scanVideo.srcObject = null;
 
         const statusEl = document.getElementById('scanStatus');
         statusEl.innerHTML = '<div class="status-icon">📷</div><p>点击下方按钮启动摄像头</p>';
         statusEl.classList.remove('hidden');
+        document.getElementById('scanLineOverlay').classList.remove('active');
 
         const startBtn = document.getElementById('startScanBtn');
         startBtn.classList.remove('hidden');
@@ -774,7 +1160,46 @@
     }
 
     // ================================================================
-    // 展示扫码结果
+    // 摄像头错误处理
+    // ================================================================
+    function handleCameraError(err) {
+        const statusEl = document.getElementById('scanStatus');
+        const errName = err?.name || '';
+        let message = '', icon = '❌', detail = '';
+
+        if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
+            icon = '🔒'; message = '摄像头权限被拒绝';
+            detail = '请在浏览器/系统设置中允许摄像头权限后刷新页面。';
+        } else if (errName === 'NotFoundError') {
+            icon = '📷'; message = '未检测到摄像头';
+            detail = '请确认设备有摄像头，或使用"上传图片"功能。';
+        } else if (errName === 'NotReadableError') {
+            icon = '⚠️'; message = '摄像头被占用';
+            detail = '请关闭其他使用摄像头的应用后重试。';
+        } else if (errName === 'OverconstrainedError') {
+            icon = '⚙️'; message = '参数不匹配';
+            detail = '正在重新检测设备，请重试。';
+            cameraDevices = [];
+        } else if (errName === 'SecurityError') {
+            icon = '🔒'; message = '安全限制';
+            detail = '需要 HTTPS 环境。';
+        } else {
+            icon = '❓'; message = '启动失败';
+            detail = `错误：${err?.message || '未知'}。请刷新页面重试。`;
+        }
+
+        statusEl.innerHTML = `
+            <div class="status-icon">${icon}</div>
+            <p style="font-weight:600;color:var(--gray-700);margin-bottom:4px;">${message}</p>
+            <p style="font-size:13px;color:var(--gray-500);">${detail}</p>
+        `;
+        statusEl.classList.remove('hidden');
+        showToast(message, 'error');
+        console.error('[Scanner Error]', err);
+    }
+
+    // ================================================================
+    // 展示结果
     // ================================================================
     function showScanResult(text) {
         const resultDiv = document.getElementById('scanResult');
@@ -786,18 +1211,19 @@
         const isUrl = /^https?:\/\//i.test(text) || /^www\./i.test(text);
         if (isUrl) {
             const url = text.startsWith('www.') ? 'https://' + text : text;
-            const openBtn = document.createElement('button');
-            openBtn.className = 'btn btn-primary';
-            openBtn.innerHTML = '<span>🔗</span> 在新窗口打开';
-            openBtn.onclick = () => window.open(url, '_blank');
-            resultActions.appendChild(openBtn);
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-primary';
+            btn.innerHTML = '<span>🔗</span> 新窗口打开';
+            btn.onclick = () => window.open(url, '_blank');
+            resultActions.appendChild(btn);
         }
 
         const copyBtn = document.createElement('button');
         copyBtn.className = 'btn btn-secondary';
-        copyBtn.innerHTML = '<span>📋</span> 复制内容';
+        copyBtn.innerHTML = '<span>📋</span> 复制';
         copyBtn.onclick = () => {
-            navigator.clipboard.writeText(text).then(() => showToast('已复制', 'success'))
+            navigator.clipboard.writeText(text)
+                .then(() => showToast('已复制', 'success'))
                 .catch(() => {
                     const ta = document.createElement('textarea');
                     ta.value = text; document.body.appendChild(ta);
@@ -823,15 +1249,83 @@
     document.getElementById('scanFileInput').addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (!file) return;
+
         document.getElementById('scanFileArea').classList.add('has-file');
         document.getElementById('scanFileName').textContent = `✅ ${file.name}`;
         document.getElementById('scanFileName').classList.remove('hidden');
-        showToast('正在解析图片...', 'info');
 
-        const tempScanner = new Html5Qrcode("reader", { verbose: false });
-        tempScanner.scanFile(file, true)
-            .then(decodedText => { showScanResult(decodedText); showToast('图片解码成功！', 'success'); })
-            .catch(() => showToast('图片中未找到二维码，请确认图片清晰', 'error'));
+        showToast('正在使用专用解码器解析...', 'info');
+
+        const img = new Image();
+        img.onload = function() {
+            // 将图片绘制到处理 Canvas
+            const size = Math.min(img.width, img.height);
+            const sx = (img.width - size) / 2;
+            const sy = (img.height - size) / 2;
+
+            processCanvas.width = PROC_SIZE;
+            processCanvas.height = PROC_SIZE;
+            processCtx.drawImage(img, sx, sy, size, size, 0, 0, PROC_SIZE, PROC_SIZE);
+
+            const imageData = processCtx.getImageData(0, 0, PROC_SIZE, PROC_SIZE);
+
+            // 预处理
+            if (decoderMode === 'color') {
+                preprocessColorQR(imageData);
+            } else {
+                preprocessStandard(imageData);
+            }
+
+            // 调试面板显示
+            if (debugVisible) {
+                debugCtx.putImageData(imageData, 0, 0);
+            }
+
+            // 尝试解码
+            let code = jsQR(imageData.data, PROC_SIZE, PROC_SIZE, {
+                inversionAttempts: 'dontInvert'
+            });
+
+            // 如果失败，尝试反转
+            if (!code) {
+                const d = imageData.data;
+                for (let i = 0; i < d.length; i += 4) {
+                    const v = d[i] === 0 ? 255 : 0;
+                    d[i] = v; d[i+1] = v; d[i+2] = v;
+                }
+                code = jsQR(imageData.data, PROC_SIZE, PROC_SIZE, {
+                    inversionAttempts: 'dontInvert'
+                });
+            }
+
+            // 彩色模式失败后，再尝试标准模式
+            if (!code && decoderMode === 'color') {
+                processCtx.drawImage(img, sx, sy, size, size, 0, 0, PROC_SIZE, PROC_SIZE);
+                const imageData2 = processCtx.getImageData(0, 0, PROC_SIZE, PROC_SIZE);
+                preprocessStandard(imageData2);
+                code = jsQR(imageData2.data, PROC_SIZE, PROC_SIZE, {
+                    inversionAttempts: 'dontInvert'
+                });
+                if (!code) {
+                    const d2 = imageData2.data;
+                    for (let i = 0; i < d2.length; i += 4) {
+                        const v = d2[i] === 0 ? 255 : 0;
+                        d2[i] = v; d2[i+1] = v; d2[i+2] = v;
+                    }
+                    code = jsQR(imageData2.data, PROC_SIZE, PROC_SIZE, {
+                        inversionAttempts: 'dontInvert'
+                    });
+                }
+            }
+
+            if (code && code.data) {
+                showScanResult(code.data);
+                showToast('🎉 图片解码成功！', 'success');
+            } else {
+                showToast('识别失败。请确保扫描的是本工具生成的彩色二维码，并检查图片清晰度。', 'error');
+            }
+        };
+        img.src = URL.createObjectURL(file);
         e.target.value = '';
     });
 
@@ -839,45 +1333,38 @@
     // 对比度校验
     // ================================================================
     function getRelativeLuminance(hex) {
-        const r = parseInt(hex.slice(1, 3), 16) / 255;
-        const g = parseInt(hex.slice(3, 5), 16) / 255;
-        const b = parseInt(hex.slice(5, 7), 16) / 255;
-        const linearize = (c) => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-        return 0.2126 * linearize(r) + 0.7152 * linearize(g) + 0.0722 * linearize(b);
+        const r = parseInt(hex.slice(1,3),16)/255;
+        const g = parseInt(hex.slice(3,5),16)/255;
+        const b = parseInt(hex.slice(5,7),16)/255;
+        const lin = c => c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4);
+        return 0.2126*lin(r) + 0.7152*lin(g) + 0.0722*lin(b);
     }
-
-    function getContrastRatio(hex1, hex2) {
-        const l1 = getRelativeLuminance(hex1);
-        const l2 = getRelativeLuminance(hex2);
-        return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+    function getContrastRatio(h1, h2) {
+        const l1 = getRelativeLuminance(h1), l2 = getRelativeLuminance(h2);
+        return (Math.max(l1,l2)+0.05)/(Math.min(l1,l2)+0.05);
     }
-
     function checkContrast() {
-        const fgColor = document.getElementById('fgColor').value;
-        const bgColor = document.getElementById('bgColor').value;
-        const warning = document.getElementById('contrastWarning');
-        const ratio = getContrastRatio(fgColor, bgColor);
-        const fgLum = getRelativeLuminance(fgColor);
-        const bgLum = getRelativeLuminance(bgColor);
-
-        document.getElementById('fgHex').textContent = fgColor;
-        document.getElementById('bgHex').textContent = bgColor;
-
-        if (bgLum < fgLum) {
-            warning.className = 'contrast-warning show danger';
-            warning.querySelector('.warn-icon').textContent = '⚠️';
-            warning.querySelector('.warn-text').textContent = '警告：背景色比前景色深！定位点需要深色前景+浅色背景。';
+        const fg = document.getElementById('fgColor').value;
+        const bg = document.getElementById('bgColor').value;
+        const w = document.getElementById('contrastWarning');
+        const ratio = getContrastRatio(fg, bg);
+        const fgL = getRelativeLuminance(fg), bgL = getRelativeLuminance(bg);
+        document.getElementById('fgHex').textContent = fg;
+        document.getElementById('bgHex').textContent = bg;
+        if (bgL < fgL) {
+            w.className = 'contrast-warning show danger';
+            w.querySelector('.warn-icon').textContent = '⚠️';
+            w.querySelector('.warn-text').textContent = '背景色比前景色深！定位点需深色前景+浅色背景。';
         } else if (ratio < 3) {
-            warning.className = 'contrast-warning show danger';
-            warning.querySelector('.warn-icon').textContent = '⚠️';
-            warning.querySelector('.warn-text').textContent = `警告：对比度不足（${ratio.toFixed(1)}:1），定位点可能无法识别！`;
+            w.className = 'contrast-warning show danger';
+            w.querySelector('.warn-icon').textContent = '⚠️';
+            w.querySelector('.warn-text').textContent = `对比度不足（${ratio.toFixed(1)}:1），定位点可能无法识别！`;
         } else {
-            warning.className = 'contrast-warning show success';
-            warning.querySelector('.warn-icon').textContent = '✅';
-            warning.querySelector('.warn-text').textContent = `定位点对比度 ${ratio.toFixed(1)}:1，颜色搭配良好。`;
+            w.className = 'contrast-warning show success';
+            w.querySelector('.warn-icon').textContent = '✅';
+            w.querySelector('.warn-text').textContent = `定位点对比度 ${ratio.toFixed(1)}:1，良好。`;
         }
     }
-
     document.getElementById('fgColor').addEventListener('input', checkContrast);
     document.getElementById('bgColor').addEventListener('input', checkContrast);
 
@@ -888,7 +1375,7 @@
         const file = e.target.files[0];
         if (!file) return;
         const reader = new FileReader();
-        reader.onload = function(event) {
+        reader.onload = function(ev) {
             const img = new Image();
             img.onload = function() {
                 logoImage = img;
@@ -897,81 +1384,70 @@
                 document.getElementById('logoFileName').classList.remove('hidden');
                 showToast('Logo 上传成功', 'success');
             };
-            img.src = event.target.result;
+            img.src = ev.target.result;
         };
         reader.readAsDataURL(file);
     });
 
     // ================================================================
-    // 定位点区域检测
+    // 定位点检测
     // ================================================================
-    function isFinderPatternRegion(x, y, moduleCount) {
+    function isFinderPatternRegion(x, y, mc) {
         if (x < 7 && y < 7) return true;
-        if (x >= moduleCount - 7 && y < 7) return true;
-        if (x < 7 && y >= moduleCount - 7) return true;
+        if (x >= mc-7 && y < 7) return true;
+        if (x < 7 && y >= mc-7) return true;
         return false;
     }
 
     // ================================================================
-    // 数据哈希 & 颜色选择
+    // 哈希 & 颜色选择
     // ================================================================
     function computeDataHash(text) {
-        let hash = 0;
+        let h = 0;
         for (let i = 0; i < text.length; i++) {
-            hash = ((hash << 5) - hash) + text.charCodeAt(i);
-            hash = hash & hash;
+            h = ((h << 5) - h) + text.charCodeAt(i);
+            h = h & h;
         }
-        return Math.abs(hash);
+        return Math.abs(h);
     }
-
-    function pickColorForModule(x, y, dataHash) {
-        return PALETTE_8[(x * 7 + y * 13 + dataHash) % 8];
+    function pickColorForModule(x, y, dh) {
+        return PALETTE_8_HEX[(x * 7 + y * 13 + dh) % 8];
     }
 
     // ================================================================
-    // 彩色二维码生成
+    // 生成二维码
     // ================================================================
     function generateQR() {
         const text = document.getElementById('qrText').value.trim();
-        if (!text) { showToast('请输入要编码的内容', 'warning'); return; }
-
-        const fgColor = document.getElementById('fgColor').value;
-        const bgColor = document.getElementById('bgColor').value;
-        const dataHash = computeDataHash(text);
+        if (!text) { showToast('请输入编码内容', 'warning'); return; }
+        const fg = document.getElementById('fgColor').value;
+        const bg = document.getElementById('bgColor').value;
+        const dh = computeDataHash(text);
 
         try {
             const qr = qrcode(0, 'M');
             qr.addData(text);
             qr.make();
-
-            const moduleCount = qr.getModuleCount();
-            const cellSize = 14;
-            const margin = 24;
-            const qrSize = moduleCount * cellSize;
-            const totalSize = qrSize + margin * 2;
-
+            const mc = qr.getModuleCount();
+            const cs = 14, mg = 24;
+            const qs = mc * cs, ts = qs + mg * 2;
             const canvas = document.getElementById('qrCanvas');
-            canvas.width = totalSize;
-            canvas.height = totalSize;
+            canvas.width = ts; canvas.height = ts;
             const ctx = canvas.getContext('2d');
 
-            ctx.fillStyle = bgColor;
-            ctx.fillRect(0, 0, totalSize, totalSize);
+            ctx.fillStyle = bg;
+            ctx.fillRect(0, 0, ts, ts);
 
-            for (let row = 0; row < moduleCount; row++) {
-                for (let col = 0; col < moduleCount; col++) {
-                    if (qr.isDark(row, col)) {
-                        if (isFinderPatternRegion(col, row, moduleCount)) {
-                            ctx.fillStyle = fgColor;
-                        } else {
-                            ctx.fillStyle = pickColorForModule(col, row, dataHash);
-                        }
-                        ctx.fillRect(margin + col * cellSize, margin + row * cellSize, cellSize, cellSize);
+            for (let r = 0; r < mc; r++) {
+                for (let c = 0; c < mc; c++) {
+                    if (qr.isDark(r, c)) {
+                        ctx.fillStyle = isFinderPatternRegion(c, r, mc) ? fg : pickColorForModule(c, r, dh);
+                        ctx.fillRect(mg + c*cs, mg + r*cs, cs, cs);
                     }
                 }
             }
 
-            if (logoImage) drawLogoOnQR(ctx, totalSize, margin, qrSize, bgColor);
+            if (logoImage) drawLogo(ctx, ts, mg, qs, bg);
 
             canvas.classList.remove('hidden');
             document.getElementById('qrPlaceholder').classList.add('hidden');
@@ -983,47 +1459,38 @@
         }
     }
 
-    function drawLogoOnQR(ctx, totalSize, margin, qrSize, bgColor) {
-        const maxLogoSize = qrSize * 0.5;
-        let logoWidth, logoHeight;
+    function drawLogo(ctx, ts, mg, qs, bg) {
+        const mx = qs * 0.5;
+        let lw, lh;
         const ar = logoImage.width / logoImage.height;
-        if (ar > 1) { logoWidth = Math.min(logoImage.width, maxLogoSize); logoHeight = logoWidth / ar; }
-        else { logoHeight = Math.min(logoImage.height, maxLogoSize); logoWidth = logoHeight * ar; }
-        if (logoWidth > maxLogoSize) { logoWidth = maxLogoSize; logoHeight = logoWidth / ar; }
-        if (logoHeight > maxLogoSize) { logoHeight = maxLogoSize; logoWidth = logoHeight * ar; }
-
-        const logoX = (totalSize - logoWidth) / 2;
-        const logoY = (totalSize - logoHeight) / 2;
-        const padding = 10;
-
-        ctx.fillStyle = bgColor;
-        roundRect(ctx, logoX - padding, logoY - padding, logoWidth + padding * 2, logoHeight + padding * 2, 10);
+        if (ar > 1) { lw = Math.min(logoImage.width, mx); lh = lw / ar; }
+        else { lh = Math.min(logoImage.height, mx); lw = lh * ar; }
+        if (lw > mx) { lw = mx; lh = lw / ar; }
+        if (lh > mx) { lh = mx; lw = lh * ar; }
+        const lx = (ts-lw)/2, ly = (ts-lh)/2, pd = 10;
+        ctx.fillStyle = bg;
+        roundRect(ctx, lx-pd, ly-pd, lw+pd*2, lh+pd*2, 10);
         ctx.fill();
-        ctx.drawImage(logoImage, logoX, logoY, logoWidth, logoHeight);
+        ctx.drawImage(logoImage, lx, ly, lw, lh);
     }
 
     function roundRect(ctx, x, y, w, h, r) {
         ctx.beginPath();
-        ctx.moveTo(x + r, y);
-        ctx.lineTo(x + w - r, y);
-        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-        ctx.lineTo(x + w, y + h - r);
-        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-        ctx.lineTo(x + r, y + h);
-        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-        ctx.lineTo(x, y + r);
-        ctx.quadraticCurveTo(x, y, x + r, y);
-        ctx.closePath();
+        ctx.moveTo(x+r, y); ctx.lineTo(x+w-r, y);
+        ctx.quadraticCurveTo(x+w, y, x+w, y+r); ctx.lineTo(x+w, y+h-r);
+        ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h); ctx.lineTo(x+r, y+h);
+        ctx.quadraticCurveTo(x, y+h, x, y+h-r); ctx.lineTo(x, y+r);
+        ctx.quadraticCurveTo(x, y, x+r, y); ctx.closePath();
     }
 
     function downloadQR() {
-        const canvas = document.getElementById('qrCanvas');
-        if (!canvas.width) { showToast('请先生成二维码', 'warning'); return; }
-        const link = document.createElement('a');
-        link.download = `color_qrcode_${Date.now()}.png`;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-        showToast('二维码已下载', 'success');
+        const c = document.getElementById('qrCanvas');
+        if (!c.width) { showToast('请先生成', 'warning'); return; }
+        const a = document.createElement('a');
+        a.download = `color_qr_v${APP_VERSION}_${Date.now()}.png`;
+        a.href = c.toDataURL('image/png');
+        a.click();
+        showToast('已下载', 'success');
     }
 
     // ================================================================
