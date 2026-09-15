@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>高密度彩色二维码 v5.1.0</title>
+<title>高密度彩色二维码 v6.0.0</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--p:#4f46e5;--ph:#4338ca;--s:#10b981;--d:#ef4444;--w:#f59e0b;--g50:#f9fafb;--g100:#f3f4f6;--g200:#e5e7eb;--g300:#d1d5db;--g400:#9ca3af;--g500:#6b7280;--g600:#4b5563;--g700:#374151;--g800:#1f2937;--r:12px}
@@ -24,8 +24,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 textarea.fi{resize:vertical;min-height:60px}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 18px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:.2s;outline:0}
 .btn:active{transform:scale(.97)}
-.bp{background:var(--p);color:#fff}
-.bp:hover{background:var(--ph)}
+.bp{background:var(--p);color:#fff}.bp:hover{background:var(--ph)}
 .bp:disabled{background:var(--g300);color:var(--g500);cursor:not-allowed}
 .bs{background:var(--g100);color:var(--g700);border:2px solid var(--g200)}
 .bd{background:var(--d);color:#fff}
@@ -103,19 +102,15 @@ textarea.fi{resize:vertical;min-height:60px}
 <div class="tc" id="toastC"></div>
 <div class="app">
 <div class="hdr">
-<h1>🌈 高密度彩色二维码 <span class="vb" id="vB">v5.1.0</span></h1>
-<p>3-bit/模块 · 高对比度调色板 · 专用解码器</p>
+<h1>🌈 高密度彩色二维码 <span class="vb" id="vB">v6.0.0</span></h1>
+<p>灰度+饱和度联合二值化 · 手机摄像头适配</p>
 </div>
 <div class="tabs">
 <button class="tb on" data-tab="gen" onclick="switchTab('gen')">🎨 生成器</button>
 <button class="tb" data-tab="scan" onclick="switchTab('scan')">📷 扫码器</button>
 </div>
-
 <div class="tc2 on" id="tab-gen">
-<div class="card">
-<div class="ct">✏️ 编码内容</div>
-<textarea class="fi" id="qrText" rows="3" placeholder="输入文本...">你好World 123</textarea>
-</div>
+<div class="card"><div class="ct">✏️ 编码内容</div><textarea class="fi" id="qrText" rows="3" placeholder="输入文本...">你好World 123</textarea></div>
 <div class="card">
 <div class="ct">🎨 定位点颜色</div>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
@@ -129,14 +124,7 @@ textarea.fi{resize:vertical;min-height:60px}
 </div>
 </div>
 </div>
-<div class="card">
-<div class="ct">🖼️ Logo（可选）</div>
-<div class="fup" id="logoA" onclick="document.getElementById('logoI').click()">
-<div style="font-size:24px;margin-bottom:2px">📁</div>
-<div style="font-size:12px;color:var(--g500)" id="logoT">点击上传 Logo</div>
-<input type="file" id="logoI" accept="image/*">
-</div>
-</div>
+<div class="card"><div class="ct">🖼️ Logo（可选）</div><div class="fup" id="logoA" onclick="document.getElementById('logoI').click()"><div style="font-size:24px;margin-bottom:2px">📁</div><div style="font-size:12px;color:var(--g500)" id="logoT">点击上传 Logo</div><input type="file" id="logoI" accept="image/*"></div></div>
 <div class="card"><button class="btn bp bblk" onclick="doGen()">✨ 生成高密度彩色码</button></div>
 <div class="card">
 <div class="ct">📱 预览</div>
@@ -151,14 +139,13 @@ textarea.fi{resize:vertical;min-height:60px}
 <div style="margin-top:10px" id="dlS" class="hidden"><button class="btn bo bblk" onclick="doDl()">💾 下载 PNG</button></div>
 </div>
 </div>
-
 <div class="tc2" id="tab-scan">
-<div class="eb">🧪 <strong>专用解码器 v5.1：</strong>高对比度调色板，数据色灰度全部>110，二值化阈值100，确保定位点检测无干扰。</div>
+<div class="eb">🧪 <strong>v6.0.0 核心改进：</strong>灰度+饱和度联合二值化，手机摄像头拍暗的彩色模块不会被误判为黑色。默认优先后置摄像头。</div>
 <div class="ew hidden" id="envW">🔒 <strong>环境不支持：</strong>摄像头需要 HTTPS。请用"上传图片"方式。</div>
 <div class="card">
-<div class="ct">🎨 数据调色板（8色，灰度全部>110）</div>
+<div class="ct">🎨 数据调色板（8色）</div>
 <div class="pb" id="pBar"></div>
-<p style="font-size:10px;color:var(--g400);margin-top:18px">⚫ 黑色仅用于定位点（灰度=0），阈值100确保只有定位点被检测为黑色</p>
+<p style="font-size:10px;color:var(--g400);margin-top:18px">⚫ 黑色仅用于定位点。解码器用灰度+饱和度双重过滤，只检测"又暗又无彩色"的像素为定位点</p>
 </div>
 <div class="card">
 <div class="ct">📷 摄像头扫码</div>
@@ -175,755 +162,149 @@ textarea.fi{resize:vertical;min-height:60px}
 </div>
 <div class="status-bar idle" id="statusBar"><div class="dot"></div><span id="statusText">等待启动</span></div>
 <div class="dbg" id="dbgLog"></div>
-<div style="margin-top:8px;text-align:center">
-<button class="btn bs bsm" onclick="togDbg()" id="dbgB">🔍 显示调试日志</button>
-</div>
+<div style="margin-top:8px;text-align:center"><button class="btn bs bsm" onclick="togDbg()" id="dbgB">🔍 显示调试日志</button></div>
 </div>
 <div class="card">
 <div class="ct">🖼️ 上传图片解码</div>
-<div class="fup" onclick="document.getElementById('sfI').click()">
-<div style="font-size:24px;margin-bottom:2px">🖼️</div>
-<div style="font-size:12px;color:var(--g500)">选择彩色二维码图片</div>
-<input type="file" id="sfI" accept="image/*">
+<div class="fup" onclick="document.getElementById('sfI').click()"><div style="font-size:24px;margin-bottom:2px">🖼️</div><div style="font-size:12px;color:var(--g500)">选择彩色二维码图片</div><input type="file" id="sfI" accept="image/*"></div>
 </div>
-</div>
-<div class="sr" id="sRes">
-<div style="font-size:11px;font-weight:600;color:var(--s);margin-bottom:4px">✅ 解码成功</div>
-<div class="rt" id="rTxt"></div>
-<div class="ra" id="rAct"></div>
-</div>
+<div class="sr" id="sRes"><div style="font-size:11px;font-weight:600;color:var(--s);margin-bottom:4px">✅ 解码成功</div><div class="rt" id="rTxt"></div><div class="ra" id="rAct"></div></div>
 </div>
 </div>
 <canvas id="pCv" class="hidden"></canvas>
-
 <script>
-var VER = '5.1.0';
-document.getElementById('vB').textContent = 'v' + VER;
+var VER='6.0.0';
+document.getElementById('vB').textContent='v'+VER;
 
-var DATA_PAL = [
-  [240, 70, 70],
-  [60, 200, 60],
-  [90, 90, 255],
-  [245, 225, 60],
-  [60, 200, 220],
-  [225, 80, 210],
-  [255, 155, 60],
-  [155, 155, 155]
+var DATA_PAL=[
+  [240,70,70],[60,200,60],[90,90,255],[245,225,60],
+  [60,200,220],[225,80,210],[255,155,60],[155,155,155]
 ];
-var PAL_NAMES = ['红','绿','蓝','黄','青','品红','橙','灰'];
-var BINARY_THRESHOLD = 100;
+var PAL_NAMES=['红','绿','蓝','黄','青','品红','橙','灰'];
+var FINDER_PAT=[[1,1,1,1,1,1,1],[1,0,0,0,0,0,1],[1,0,1,1,1,0,1],[1,0,1,1,1,0,1],[1,0,1,1,1,0,1],[1,0,0,0,0,0,1],[1,1,1,1,1,1,1]];
 
-var FINDER_PAT = [
-  [1,1,1,1,1,1,1],
-  [1,0,0,0,0,0,1],
-  [1,0,1,1,1,0,1],
-  [1,0,1,1,1,0,1],
-  [1,0,1,1,1,0,1],
-  [1,0,0,0,0,0,1],
-  [1,1,1,1,1,1,1]
-];
+var logoImg=null,isScan=false,camDevs=[],vidStr=null,sRAF=null;
+var fCnt=0,fpsC=0,fpsT=0,curFps=0,dbgOn=false,lastProcT=0;
+var sV=document.getElementById('sV');
+var pCv=document.getElementById('pCv');
+var pCtx=pCv.getContext('2d',{willReadFrequently:true});
+var PSZ=480;
 
-var logoImg = null;
-var isScan = false;
-var camDevs = [];
-var vidStr = null;
-var sRAF = null;
-var fCnt = 0;
-var fpsC = 0;
-var fpsT = 0;
-var curFps = 0;
-var dbgOn = false;
-var lastProcT = 0;
+(function(){var bar=document.getElementById('pBar');for(var i=0;i<DATA_PAL.length;i++){var d=document.createElement('div');d.className='ps';d.style.background='rgb('+DATA_PAL[i][0]+','+DATA_PAL[i][1]+','+DATA_PAL[i][2]+')';d.setAttribute('data-l',PAL_NAMES[i]);bar.appendChild(d)}})();
 
-var sV = document.getElementById('sV');
-var pCv = document.getElementById('pCv');
-var pCtx = pCv.getContext('2d', { willReadFrequently: true });
-var PSZ = 480;
+function switchTab(t){var b=document.querySelectorAll('.tb');for(var i=0;i<b.length;i++)b[i].classList.toggle('on',b[i].getAttribute('data-tab')===t);var p=document.querySelectorAll('.tc2');for(var i=0;i<p.length;i++)p[i].classList.toggle('on',p[i].id==='tab-'+t);if(t!=='scan'&&isScan)doStop();if(t==='scan')chkEnv()}
+function toast(m,t){t=t||'info';var c=document.getElementById('toastC'),d=document.createElement('div');d.className='tt '+t;var ic={success:'✅',error:'❌',warning:'⚠️',info:'ℹ️'};d.innerHTML='<span>'+(ic[t]||'')+'</span><span>'+m+'</span>';c.appendChild(d);setTimeout(function(){if(d.parentNode)d.parentNode.removeChild(d)},3000)}
+function togDbg(){dbgOn=!dbgOn;document.getElementById('dbgLog').classList.toggle('show',dbgOn);document.getElementById('dbgB').textContent=dbgOn?'🔍 隐藏调试日志':'🔍 显示调试日志'}
+function dlog(m,t){t=t||'info';var el=document.getElementById('dbgLog'),d=document.createElement('div');d.className='l l-'+t;var n=new Date(),ts=n.toLocaleTimeString('zh-CN',{hour12:false}),ms=String(n.getMilliseconds());while(ms.length<3)ms='0'+ms;d.textContent='['+ts+'.'+ms+'] '+m;el.appendChild(d);el.scrollTop=el.scrollHeight;console.log('[QR-'+t+'] '+m)}
+function setStatus(s,t){var b=document.getElementById('statusBar');b.className='status-bar '+s;document.getElementById('statusText').textContent=t}
 
-(function initPalette() {
-  var bar = document.getElementById('pBar');
-  for (var i = 0; i < DATA_PAL.length; i++) {
-    var d = document.createElement('div');
-    d.className = 'ps';
-    d.style.background = 'rgb(' + DATA_PAL[i][0] + ',' + DATA_PAL[i][1] + ',' + DATA_PAL[i][2] + ')';
-    d.setAttribute('data-l', PAL_NAMES[i]);
-    bar.appendChild(d);
+function crc8(data){var c=0;for(var i=0;i<data.length;i++){c^=data[i];for(var j=0;j<8;j++)c=(c&0x80)?((c<<1)^0x07):(c<<1);c&=0xFF}return c}
+function buildFrame(text){var enc=new TextEncoder(),bytes=enc.encode(text),len=bytes.length,f=new Uint8Array(2+len+1);f[0]=(len>>8)&0xFF;f[1]=len&0xFF;for(var i=0;i<len;i++)f[2+i]=bytes[i];f[f.length-1]=crc8(bytes);return f}
+function bytesToIdx(frame){var bits=[];for(var i=0;i<frame.length;i++)for(var b=7;b>=0;b--)bits.push((frame[i]>>b)&1);while(bits.length%3!==0)bits.push(0);var idx=[];for(var i=0;i<bits.length;i+=3)idx.push((bits[i]<<2)|(bits[i+1]<<1)|bits[i+2]);return idx}
+function calcSize(n){var s=17;while(s*s-192<n)s++;return s}
+function isReserved(r,c,S){return(r<=7&&c<=7)||(r<=7&&c>=S-8)||(r>=S-8&&c<=7)}
+function isFinderCell(r,c,S){return(r<=6&&c<=6)||(r<=6&&c>=S-7)||(r>=S-7&&c<=6)}
+function getFinderVal(r,c,S){var lr,lc;if(r<=6&&c<=6){lr=r;lc=c}else if(r<=6&&c>=S-7){lr=r;lc=c-(S-7)}else if(r>=S-7&&c<=6){lr=r-(S-7);lc=c}else return 0;return FINDER_PAT[lr][lc]?-2:-3}
+function buildMatrix(idx,S){var M=[];for(var r=0;r<S;r++){M[r]=[];for(var c=0;c<S;c++)M[r][c]=-1}for(var r=0;r<S;r++)for(var c=0;c<S;c++){if(isReserved(r,c,S)){if(isFinderCell(r,c,S))M[r][c]=getFinderVal(r,c,S);else M[r][c]=-3}}var i=0;for(var r=0;r<S&&i<idx.length;r++)for(var c=0;c<S&&i<idx.length;c++)if(!isReserved(r,c,S))M[r][c]=idx[i++];return M}
+
+function doGen(){var text=document.getElementById('qrText').value.trim();if(!text){toast('请输入内容','warning');return}var fg=document.getElementById('fgC').value,bg=document.getElementById('bgC').value;try{var frame=buildFrame(text),idx=bytesToIdx(frame),S=calcSize(idx.length),M=buildMatrix(idx,S),cellSz=Math.max(10,Math.floor(460/S)),margin=cellSz*2,total=S*cellSz+margin*2,cv=document.getElementById('qrCv');cv.width=total;cv.height=total;var ctx=cv.getContext('2d');ctx.fillStyle=bg;ctx.fillRect(0,0,total,total);for(var r=0;r<S;r++)for(var c=0;c<S;c++){var v=M[r][c],px=margin+c*cellSz,py=margin+r*cellSz;if(v===-2)ctx.fillStyle=fg;else if(v===-3)ctx.fillStyle=bg;else if(v>=0&&v<=7){var pc=DATA_PAL[v];ctx.fillStyle='rgb('+pc[0]+','+pc[1]+','+pc[2]+')'}else ctx.fillStyle=bg;ctx.fillRect(px,py,cellSz,cellSz)}if(logoImg){var qrPx=S*cellSz,maxSide=Math.sqrt(0.15)*qrPx,lw,lh,ar=logoImg.width/logoImg.height;if(ar>1){lw=Math.min(logoImg.width,maxSide);lh=lw/ar}else{lh=Math.min(logoImg.height,maxSide);lw=lh*ar}if(lw>maxSide){lw=maxSide;lh=lw/ar}var lx=margin+(qrPx-lw)/2,ly=margin+(qrPx-lh)/2,pd=6;ctx.fillStyle=bg;var rr=8,rx=lx-pd,ry=ly-pd,rw=lw+pd*2,rh=lh+pd*2;ctx.beginPath();ctx.moveTo(rx+rr,ry);ctx.lineTo(rx+rw-rr,ry);ctx.quadraticCurveTo(rx+rw,ry,rx+rw,ry+rr);ctx.lineTo(rx+rw,ry+rh-rr);ctx.quadraticCurveTo(rx+rw,ry+rh,rx+rw-rr,ry+rh);ctx.lineTo(rx+rr,ry+rh);ctx.quadraticCurveTo(rx,ry+rh,rx,ry+rh-rr);ctx.lineTo(rx,ry+rr);ctx.quadraticCurveTo(rx,ry,rx+rr,ry);ctx.closePath();ctx.fill();ctx.drawImage(logoImg,lx,ly,lw,lh)}cv.classList.remove('hidden');document.getElementById('phld').classList.add('hidden');document.getElementById('dlS').classList.remove('hidden');document.getElementById('iGrid').classList.remove('hidden');document.getElementById('iSz').textContent=S+'×'+S;document.getElementById('iCap').textContent=text.length+'字符';document.getElementById('iCell').textContent=idx.length+'/'+(S*S-192);toast('生成成功！'+S+'×'+S,'success');setTimeout(function(){runSelfTest(cv,text)},100)}catch(e){console.error(e);toast('生成失败：'+e.message,'error')}}
+
+function runSelfTest(canvas,expected){var rd=document.getElementById('selfTestResult'),ctx=canvas.getContext('2d'),imgD=ctx.getImageData(0,0,canvas.width,canvas.height);try{var dec=tryDecode(imgD,canvas.width,canvas.height);if(dec&&dec.text){if(dec.text===expected){rd.className='selftest pass';rd.innerHTML='✅ <strong>自检通过！</strong> "'+dec.text+'"'}else{rd.className='selftest fail';rd.innerHTML='⚠️ 期望"'+expected+'"，得到"'+dec.text+'"'}}else{rd.className='selftest fail';rd.innerHTML='❌ 自检失败：'+(dec&&dec.reason?dec.reason:'未知')}}catch(e){rd.className='selftest fail';rd.innerHTML='❌ '+e.message}}
+
+function doDl(){var cv=document.getElementById('qrCv');if(!cv.width){toast('请先生成','warning');return}var a=document.createElement('a');a.download='hdqr_v'+VER+'_'+Date.now()+'.png';a.href=cv.toDataURL('image/png');a.click();toast('已下载','success')}
+document.getElementById('logoI').addEventListener('change',function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){var img=new Image();img.onload=function(){logoImg=img;document.getElementById('logoA').classList.add('has');document.getElementById('logoT').textContent='✅ '+f.name;toast('Logo上传成功','success')};img.src=ev.target.result};r.readAsDataURL(f)});
+document.getElementById('fgC').addEventListener('input',function(){document.getElementById('fgH').textContent=this.value});
+document.getElementById('bgC').addEventListener('input',function(){document.getElementById('bgH').textContent=this.value});
+
+function chkEnv(){var w=document.getElementById('envW'),b=document.getElementById('stBtn');var ok=window.isSecureContext&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia;if(!ok){w.classList.remove('hidden');b.disabled=true;b.innerHTML='🚫 不支持';setStatus('error','需要HTTPS')}else{w.classList.add('hidden');b.disabled=false;b.innerHTML='▶️ 开始扫描';setStatus('idle','等待启动')}}
+
+function enumCams(){return navigator.mediaDevices.getUserMedia({video:true,audio:false}).then(function(ts){ts.getTracks().forEach(function(t){t.stop()});return navigator.mediaDevices.enumerateDevices()}).then(function(devs){camDevs=[];for(var i=0;i<devs.length;i++)if(devs[i].kind==='videoinput')camDevs.push(devs[i]);dlog('发现'+camDevs.length+'个摄像头','ok');if(!camDevs.length)throw new Error('NoCamera');var sel=document.getElementById('camSel');sel.innerHTML='';var bk=['back','rear','environment','后置','背面','后摄','主摄'];var scored=[];for(var i=0;i<camDevs.length;i++){var label=(camDevs[i].label||'').toLowerCase(),s=0;for(var k=0;k<bk.length;k++)if(label.indexOf(bk[k])>=0){s+=100;break}if(!camDevs[i].label)s+=10;scored.push({d:camDevs[i],s:s})}scored.sort(function(a,b){return b.s-a.s});for(var i=0;i<scored.length;i++){var o=document.createElement('option');o.value=scored[i].d.deviceId;o.textContent=scored[i].d.label||('摄像头'+(i+1));sel.appendChild(o)}sel.classList.remove('hidden');dlog('默认选中: '+sel.options[0].textContent,'info')})}
+
+function doStart(){if(isScan)return;var sb=document.getElementById('stBtn');sb.disabled=true;sb.innerHTML='<span class="sp"></span> 初始化...';setStatus('idle','初始化中...');dlog('=== 启动扫描 ===','info');var p=camDevs.length?Promise.resolve():enumCams();p.then(function(){var sel=document.getElementById('camSel'),did=sel.value||(camDevs[0]?camDevs[0].deviceId:null);if(!did)throw{name:'NotFoundError'};dlog('摄像头: '+did.substring(0,8)+'...','info');return navigator.mediaDevices.getUserMedia({video:{deviceId:{exact:did},width:{ideal:1280},height:{ideal:720}},audio:false})}).then(function(stream){vidStr=stream;var track=stream.getVideoTracks()[0],settings=track.getSettings();dlog('视频流: '+settings.width+'×'+settings.height,'ok');sV.srcObject=vidStr;sV.setAttribute('playsinline','true');sV.setAttribute('muted','true');return new Promise(function(resolve){var to=setTimeout(function(){dlog('视频就绪超时','warn');resolve()},5000);sV.onloadeddata=function(){clearTimeout(to);dlog('视频就绪: '+sV.videoWidth+'×'+sV.videoHeight,'ok');resolve()}})}).then(function(){return sV.play().catch(function(){dlog('play()失败，静音重试','warn');sV.muted=true;return sV.play()})}).then(function(){dlog('视频播放成功','ok');if(sV.videoWidth===0)return new Promise(function(r){setTimeout(r,500)})}).then(function(){pCv.width=PSZ;pCv.height=PSZ;isScan=true;fCnt=0;fpsC=0;fpsT=performance.now();lastProcT=0;document.getElementById('vPh').classList.add('hidden');document.getElementById('liveBadge').classList.add('on');document.getElementById('fpsBadge').classList.add('on');document.getElementById('stBtn').classList.add('hidden');document.getElementById('spBtn').classList.remove('hidden');setStatus('running','正在扫描...');dlog('✅ 扫描循环启动','ok');toast('摄像头已启动','info');sRAF=requestAnimationFrame(scanLoop)}).catch(function(e){dlog('❌ 启动失败: '+(e.message||e.name||String(e)),'err');sb.disabled=false;sb.innerHTML='▶️ 开始扫描';var n=(e&&e.name)||'',m='启动失败';if(n==='NotAllowedError')m='权限被拒绝';else if(n==='NotFoundError')m='未检测到摄像头';else if(n==='NotReadableError')m='摄像头被占用';setStatus('error',m);toast(m,'error')})}
+
+function doStop(){dlog('停止扫描','info');isScan=false;if(sRAF){cancelAnimationFrame(sRAF);sRAF=null}if(vidStr){vidStr.getTracks().forEach(function(t){t.stop()});vidStr=null}sV.srcObject=null;document.getElementById('vPh').classList.remove('hidden');document.getElementById('liveBadge').classList.remove('on');document.getElementById('fpsBadge').classList.remove('on');var sb=document.getElementById('stBtn');sb.classList.remove('hidden');sb.disabled=false;sb.innerHTML='▶️ 开始扫描';document.getElementById('spBtn').classList.add('hidden');setStatus('idle','已停止')}
+
+function scanLoop(ts){if(!isScan)return;if(ts-lastProcT<250){sRAF=requestAnimationFrame(scanLoop);return}lastProcT=ts;fpsC++;if(ts-fpsT>=1000){curFps=fpsC;fpsC=0;fpsT=ts;document.getElementById('fpsBadge').textContent=curFps+' FPS'}var vw=sV.videoWidth,vh=sV.videoHeight;if(!vw||!vh){sRAF=requestAnimationFrame(scanLoop);return}if(fCnt%15===0&&fCnt>0)dlog('帧#'+fCnt+' | '+vw+'×'+vh+' | '+curFps+'FPS','info');var sz=Math.min(vw,vh),sx=(vw-sz)/2,sy=(vh-sz)/2;pCtx.drawImage(sV,sx,sy,sz,sz,0,0,PSZ,PSZ);var imgD;try{imgD=pCtx.getImageData(0,0,PSZ,PSZ)}catch(e){sRAF=requestAnimationFrame(scanLoop);return}fCnt++;try{var res=tryDecode(imgD,PSZ,PSZ);if(res&&res.text){dlog('🎉 解码成功! "'+res.text+'"','ok');doStop();showRes(res.text);toast('🎉 解码成功！','success');if(navigator.vibrate)navigator.vibrate([100,50,100]);return}else if(res&&res.reason&&fCnt%30===0){dlog('未识别: '+res.reason,'warn')}}catch(e){dlog('解码异常: '+e.message,'err')}sRAF=requestAnimationFrame(scanLoop)}
+
+/* ================================================================
+   【v6.0.0 核心修复】灰度+饱和度联合二值化
+   
+   问题根因：手机摄像头拍摄时，彩色模块会被自动曝光压暗，
+   导致原本灰度>110的颜色在照片中灰度可能降到60以下。
+   之前纯灰度阈值(100)会把大量数据区彩色误判为黑色。
+   
+   新方案：同时检查灰度和饱和度
+   - 定位点黑色：灰度低(<80) 且 饱和度低(<0.25) → 标记为1
+   - 数据区彩色：即使灰度低，但饱和度高(>0.25) → 不标记
+   - 背景白色：灰度高(>80) → 不标记
+   
+   示例：
+   - 纯黑[0,0,0]: gray=0, sat=0 → ✅ 标记
+   - 红色[240,70,70]拍暗为[120,25,25]: gray=53, sat=0.79 → ❌ 不标记
+   - 灰色[155,155,155]: gray=155, sat=0 → ❌ 不标记(gray>80)
+   ================================================================ */
+function doBinarize(imgD){
+  var d=imgD.data,n=d.length/4,bin=new Uint8Array(n),darkCnt=0;
+  var GRAY_THRESH=80,SAT_THRESH=0.25;
+  for(var i=0;i<n;i++){
+    var j=i*4,r=d[j],g=d[j+1],b=d[j+2];
+    var gray=r*0.299+g*0.587+b*0.114;
+    var maxC=Math.max(r,g,b),minC=Math.min(r,g,b);
+    var sat=maxC>0?(maxC-minC)/maxC:0;
+    if(gray<GRAY_THRESH&&sat<SAT_THRESH){bin[i]=1;darkCnt++}
   }
-})();
-
-function switchTab(tabName) {
-  var btns = document.querySelectorAll('.tb');
-  for (var i = 0; i < btns.length; i++) {
-    btns[i].classList.toggle('on', btns[i].getAttribute('data-tab') === tabName);
-  }
-  var panels = document.querySelectorAll('.tc2');
-  for (var i = 0; i < panels.length; i++) {
-    panels[i].classList.toggle('on', panels[i].id === 'tab-' + tabName);
-  }
-  if (tabName !== 'scan' && isScan) doStop();
-  if (tabName === 'scan') chkEnv();
+  return{bin:bin,w:imgD.width,h:imgD.height,darkRatio:darkCnt/n}
 }
 
-function toast(msg, type) {
-  type = type || 'info';
-  var container = document.getElementById('toastC');
-  var d = document.createElement('div');
-  d.className = 'tt ' + type;
-  var icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
-  d.innerHTML = '<span>' + (icons[type] || '') + '</span><span>' + msg + '</span>';
-  container.appendChild(d);
-  setTimeout(function() {
-    if (d.parentNode) d.parentNode.removeChild(d);
-  }, 3000);
-}
-
-function togDbg() {
-  dbgOn = !dbgOn;
-  document.getElementById('dbgLog').classList.toggle('show', dbgOn);
-  document.getElementById('dbgB').textContent = dbgOn ? '🔍 隐藏调试日志' : '🔍 显示调试日志';
-}
-
-function dlog(msg, type) {
-  type = type || 'info';
-  var el = document.getElementById('dbgLog');
-  var d = document.createElement('div');
-  d.className = 'l l-' + type;
-  var now = new Date();
-  var ts = now.toLocaleTimeString('zh-CN', { hour12: false });
-  var ms = String(now.getMilliseconds());
-  while (ms.length < 3) ms = '0' + ms;
-  d.textContent = '[' + ts + '.' + ms + '] ' + msg;
-  el.appendChild(d);
-  el.scrollTop = el.scrollHeight;
-  console.log('[QR-' + type + '] ' + msg);
-}
-
-function setStatus(state, text) {
-  var bar = document.getElementById('statusBar');
-  bar.className = 'status-bar ' + state;
-  document.getElementById('statusText').textContent = text;
-}
-
-function crc8(data) {
-  var crc = 0;
-  for (var i = 0; i < data.length; i++) {
-    crc ^= data[i];
-    for (var j = 0; j < 8; j++) {
-      crc = (crc & 0x80) ? ((crc << 1) ^ 0x07) : (crc << 1);
-      crc &= 0xFF;
+function doFindPatterns(bin,w,h){
+  var cands=[];
+  for(var y=0;y<h;y+=2){
+    var runs=[],curColor=bin[y*w],runLen=1;
+    for(var x=1;x<w;x++){var px=bin[y*w+x];if(px===curColor)runLen++;else{runs.push({color:curColor,len:runLen,endX:x});curColor=px;runLen=1}}
+    runs.push({color:curColor,len:runLen,endX:w});
+    for(var i=0;i<=runs.length-5;i++){
+      var r0=runs[i],r1=runs[i+1],r2=runs[i+2],r3=runs[i+3],r4=runs[i+4];
+      if(r0.color!==1||r1.color!==0||r2.color!==1||r3.color!==0||r4.color!==0)continue;
+      var total=r0.len+r1.len+r2.len+r3.len+r4.len;
+      if(total<7)continue;
+      var unit=total/7,ok=true,expected=[1,1,3,1,1],runArr=[r0,r1,r2,r3,r4];
+      for(var k=0;k<5;k++){var ratio=runArr[k].len/unit;if(ratio<expected[k]*0.3||ratio>expected[k]*2.0){ok=false;break}}
+      if(!ok)continue;
+      var startX=r0.endX-r0.len,endX=r4.endX,centerX=(startX+endX)/2;
+      cands.push({x:centerX,y:y,size:total})
     }
   }
-  return crc;
+  if(cands.length<3)return null;
+  var sizeArr=[];for(var i=0;i<cands.length;i++)sizeArr.push(cands[i].size);
+  sizeArr.sort(function(a,b){return a-b});
+  var median=sizeArr[Math.floor(sizeArr.length/2)];
+  var filtered=[];for(var i=0;i<cands.length;i++)if(cands[i].size>median*0.35&&cands[i].size<median*2.8)filtered.push(cands[i]);
+  if(filtered.length<3)return null;
+  var gridSz=median*2.5,clusters=[];
+  for(var i=0;i<filtered.length;i++){var pt=filtered[i],found=false;for(var j=0;j<clusters.length;j++){var cl=clusters[j],dx=pt.x-cl.cx,dy=pt.y-cl.cy;if(Math.sqrt(dx*dx+dy*dy)<gridSz){cl.cx=(cl.cx*cl.n+pt.x)/(cl.n+1);cl.cy=(cl.cy*cl.n+pt.y)/(cl.n+1);cl.cs=(cl.cs*cl.n+pt.size)/(cl.n+1);cl.n++;found=true;break}}if(!found)clusters.push({cx:pt.x,cy:pt.y,cs:pt.size,n:1})}
+  clusters.sort(function(a,b){return b.n-a.n});
+  if(clusters.length<3)return null;
+  var top3=[clusters[0],clusters[1],clusters[2]];
+  for(var i=0;i<3;i++){top3[i].sum=top3[i].cx+top3[i].cy;top3[i].diff=top3[i].cx-top3[i].cy}
+  var tlIdx=0;if(top3[1].sum<top3[tlIdx].sum)tlIdx=1;if(top3[2].sum<top3[tlIdx].sum)tlIdx=2;
+  var tl=top3[tlIdx],rest=[];for(var i=0;i<3;i++)if(i!==tlIdx)rest.push(top3[i]);
+  var tr,bl;if(rest[0].diff>rest[1].diff){tr=rest[0];bl=rest[1]}else{tr=rest[1];bl=rest[0]}
+  return{tl:tl,tr:tr,bl:bl}
 }
 
-function buildFrame(text) {
-  var encoder = new TextEncoder();
-  var bytes = encoder.encode(text);
-  var len = bytes.length;
-  var frame = new Uint8Array(2 + len + 1);
-  frame[0] = (len >> 8) & 0xFF;
-  frame[1] = len & 0xFF;
-  for (var i = 0; i < len; i++) frame[2 + i] = bytes[i];
-  frame[frame.length - 1] = crc8(bytes);
-  return frame;
-}
+function doCalcGrid(corners){var tl=corners.tl,tr=corners.tr,bl=corners.bl,avgSz=(tl.cs+tr.cs+bl.cs)/3,modSz=avgSz/7,distH=Math.sqrt((tr.cx-tl.cx)*(tr.cx-tl.cx)+(tr.cy-tl.cy)*(tr.cy-tl.cy)),distV=Math.sqrt((bl.cx-tl.cx)*(bl.cx-tl.cx)+(bl.cy-tl.cy)*(bl.cy-tl.cy)),S=Math.round((distH+distV)/2/modSz+7);if(S<15||S>200)return null;return{S:S,moduleSize:modSz,originX:tl.cx-3*modSz,originY:tl.cy-3*modSz,corners:corners}}
 
-function bytesToIdx(frame) {
-  var bits = [];
-  for (var i = 0; i < frame.length; i++) {
-    for (var b = 7; b >= 0; b--) bits.push((frame[i] >> b) & 1);
-  }
-  while (bits.length % 3 !== 0) bits.push(0);
-  var idx = [];
-  for (var i = 0; i < bits.length; i += 3) {
-    idx.push((bits[i] << 2) | (bits[i + 1] << 1) | bits[i + 2]);
-  }
-  return idx;
-}
+function doSampleColors(imgD,grid){var S=grid.S,ms=grid.moduleSize,ox=grid.originX,oy=grid.originY,d=imgD.data,w=imgD.width,indices=[];for(var r=0;r<S;r++)for(var c=0;c<S;c++){if(isReserved(r,c,S))continue;var px=Math.round(ox+(c+0.5)*ms),py=Math.round(oy+(r+0.5)*ms);if(px<0||px>=w||py<0||py>=w)continue;var sr=0,sg=0,sb=0,cnt=0,half=Math.max(1,Math.floor(ms*0.2));for(var dy=-half;dy<=half;dy++)for(var dx=-half;dx<=half;dx++){var sx2=px+dx,sy2=py+dy;if(sx2<0||sx2>=w||sy2<0||sy2>=w)continue;var idx=(sy2*w+sx2)*4;sr+=d[idx];sg+=d[idx+1];sb+=d[idx+2];cnt++}if(!cnt)continue;sr/=cnt;sg/=cnt;sb/=cnt;var minD=Infinity,best=0;for(var pi=0;pi<DATA_PAL.length;pi++){var p=DATA_PAL[pi],dist=(sr-p[0])*(sr-p[0])+(sg-p[1])*(sg-p[1])+(sb-p[2])*(sb-p[2]);if(dist<minD){minD=dist;best=pi}}indices.push(best)}return indices}
 
-function calcSize(n) {
-  var s = 17;
-  while (s * s - 192 < n) s++;
-  return s;
-}
+function doIdxToText(indices){var bits=[];for(var i=0;i<indices.length;i++){var idx=indices[i];bits.push((idx>>2)&1,(idx>>1)&1,idx&1)}var totalB=Math.floor(bits.length/8);if(totalB<3)return null;var bytes=new Uint8Array(totalB);for(var i=0;i<totalB;i++){var b=0;for(var j=0;j<8;j++)b=(b<<1)|(bits[i*8+j]||0);bytes[i]=b}var dataLen=(bytes[0]<<8)|bytes[1];if(dataLen<=0||dataLen>totalB-3)return null;var data=[];for(var i=0;i<dataLen;i++)data.push(bytes[2+i]);var dataArr=new Uint8Array(data);if(bytes[2+dataLen]!==crc8(dataArr))return null;try{return new TextDecoder('utf-8',{fatal:true}).decode(dataArr)}catch(e){return null}}
 
-function isReserved(row, col, S) {
-  if (row <= 7 && col <= 7) return true;
-  if (row <= 7 && col >= S - 8) return true;
-  if (row >= S - 8 && col <= 7) return true;
-  return false;
-}
+function tryDecode(imgD,w,h){var br=doBinarize(imgD),bin=br.bin,bw=br.w,bh=br.h,dr=br.darkRatio;if(dr<0.003)return{reason:'暗像素太少('+((dr*100).toFixed(2))+'%)'};var corners=doFindPatterns(bin,bw,bh);if(!corners)return{reason:'未找到3个定位点(暗像素'+((dr*100).toFixed(1))+'%)'};var grid=doCalcGrid(corners);if(!grid)return{reason:'网格计算失败'};var indices=doSampleColors(imgD,grid);if(indices.length<3)return{reason:'数据格不足'};var text=doIdxToText(indices);if(!text)return{reason:'CRC校验失败'};return{text:text}}
 
-function isFinderCell(row, col, S) {
-  if (row <= 6 && col <= 6) return true;
-  if (row <= 6 && col >= S - 7) return true;
-  if (row >= S - 7 && col <= 6) return true;
-  return false;
-}
+function showRes(text){document.getElementById('rTxt').textContent=text;var ra=document.getElementById('rAct');ra.innerHTML='';var isUrl=/^https?:\/\//i.test(text)||/^www\./i.test(text);if(isUrl){var url=text.startsWith('www.')?'https://'+text:text,b=document.createElement('button');b.className='btn bp';b.innerHTML='🔗 新窗口打开';b.onclick=function(){window.open(url,'_blank')};ra.appendChild(b)}var cp=document.createElement('button');cp.className='btn bs';cp.innerHTML='📋 复制';cp.onclick=function(){navigator.clipboard.writeText(text).then(function(){toast('已复制','success')}).catch(function(){var t=document.createElement('textarea');t.value=text;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);toast('已复制','success')})};ra.appendChild(cp);var rs=document.createElement('button');rs.className='btn bs';rs.innerHTML='🔄 重新扫描';rs.onclick=function(){document.getElementById('sRes').classList.remove('show');doStart()};ra.appendChild(rs);document.getElementById('sRes').classList.add('show')}
 
-function getFinderVal(row, col, S) {
-  var lr, lc;
-  if (row <= 6 && col <= 6) { lr = row; lc = col; }
-  else if (row <= 6 && col >= S - 7) { lr = row; lc = col - (S - 7); }
-  else if (row >= S - 7 && col <= 6) { lr = row - (S - 7); lc = col; }
-  else return 0;
-  return FINDER_PAT[lr][lc] ? -2 : -3;
-}
+document.getElementById('sfI').addEventListener('change',function(e){var f=e.target.files[0];if(!f)return;toast('正在解码...','info');var img=new Image();img.onload=function(){var sz=Math.min(img.width,img.height);pCv.width=PSZ;pCv.height=PSZ;pCtx.drawImage(img,(img.width-sz)/2,(img.height-sz)/2,sz,sz,0,0,PSZ,PSZ);var imgD=pCtx.getImageData(0,0,PSZ,PSZ),res=tryDecode(imgD,PSZ,PSZ);if(res&&res.text){showRes(res.text);toast('🎉 解码成功！','success')}else{toast('识别失败: '+(res?res.reason:'未知'),'error')}};img.src=URL.createObjectURL(f);e.target.value=''});
 
-function buildMatrix(idx, S) {
-  var M = [];
-  for (var r = 0; r < S; r++) {
-    M[r] = [];
-    for (var cc = 0; cc < S; cc++) M[r][cc] = -1;
-  }
-  for (var r = 0; r < S; r++) {
-    for (var cc = 0; cc < S; cc++) {
-      if (isReserved(r, cc, S)) {
-        if (isFinderCell(r, cc, S)) M[r][cc] = getFinderVal(r, cc, S);
-        else M[r][cc] = -3;
-      }
-    }
-  }
-  var i = 0;
-  for (var r = 0; r < S && i < idx.length; r++) {
-    for (var cc = 0; cc < S && i < idx.length; cc++) {
-      if (!isReserved(r, cc, S)) M[r][cc] = idx[i++];
-    }
-  }
-  return M;
-}
-
-function doGen() {
-  var text = document.getElementById('qrText').value.trim();
-  if (!text) { toast('请输入内容', 'warning'); return; }
-  var fg = document.getElementById('fgC').value;
-  var bg = document.getElementById('bgC').value;
-  try {
-    var frame = buildFrame(text);
-    var idx = bytesToIdx(frame);
-    var S = calcSize(idx.length);
-    var M = buildMatrix(idx, S);
-    var cellSz = Math.max(10, Math.floor(460 / S));
-    var margin = cellSz * 2;
-    var total = S * cellSz + margin * 2;
-    var cv = document.getElementById('qrCv');
-    cv.width = total;
-    cv.height = total;
-    var ctx = cv.getContext('2d');
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, total, total);
-    for (var r = 0; r < S; r++) {
-      for (var cc = 0; cc < S; cc++) {
-        var v = M[r][cc];
-        var px = margin + cc * cellSz;
-        var py = margin + r * cellSz;
-        if (v === -2) ctx.fillStyle = fg;
-        else if (v === -3) ctx.fillStyle = bg;
-        else if (v >= 0 && v <= 7) {
-          var pc = DATA_PAL[v];
-          ctx.fillStyle = 'rgb(' + pc[0] + ',' + pc[1] + ',' + pc[2] + ')';
-        } else ctx.fillStyle = bg;
-        ctx.fillRect(px, py, cellSz, cellSz);
-      }
-    }
-    if (logoImg) {
-      var qrPx = S * cellSz;
-      var maxSide = Math.sqrt(0.15) * qrPx;
-      var lw, lh;
-      var ar = logoImg.width / logoImg.height;
-      if (ar > 1) { lw = Math.min(logoImg.width, maxSide); lh = lw / ar; }
-      else { lh = Math.min(logoImg.height, maxSide); lw = lh * ar; }
-      if (lw > maxSide) { lw = maxSide; lh = lw / ar; }
-      var lx = margin + (qrPx - lw) / 2;
-      var ly = margin + (qrPx - lh) / 2;
-      var pd = 6;
-      ctx.fillStyle = bg;
-      var rr = 8, rx = lx - pd, ry = ly - pd, rw = lw + pd * 2, rh = lh + pd * 2;
-      ctx.beginPath();
-      ctx.moveTo(rx + rr, ry); ctx.lineTo(rx + rw - rr, ry);
-      ctx.quadraticCurveTo(rx + rw, ry, rx + rw, ry + rr);
-      ctx.lineTo(rx + rw, ry + rh - rr);
-      ctx.quadraticCurveTo(rx + rw, ry + rh, rx + rw - rr, ry + rh);
-      ctx.lineTo(rx + rr, ry + rh);
-      ctx.quadraticCurveTo(rx, ry + rh, rx, ry + rh - rr);
-      ctx.lineTo(rx, ry + rr);
-      ctx.quadraticCurveTo(rx, ry, rx + rr, ry);
-      ctx.closePath(); ctx.fill();
-      ctx.drawImage(logoImg, lx, ly, lw, lh);
-    }
-    cv.classList.remove('hidden');
-    document.getElementById('phld').classList.add('hidden');
-    document.getElementById('dlS').classList.remove('hidden');
-    document.getElementById('iGrid').classList.remove('hidden');
-    document.getElementById('iSz').textContent = S + '×' + S;
-    document.getElementById('iCap').textContent = text.length + '字符';
-    document.getElementById('iCell').textContent = idx.length + '/' + (S * S - 192);
-    toast('生成成功！' + S + '×' + S, 'success');
-    setTimeout(function() { runSelfTest(cv, text); }, 100);
-  } catch (e) {
-    console.error(e);
-    toast('生成失败：' + e.message, 'error');
-  }
-}
-
-function runSelfTest(canvas, expectedText) {
-  var resultDiv = document.getElementById('selfTestResult');
-  var ctx = canvas.getContext('2d');
-  var imgD = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  try {
-    var decoded = tryDecodeFromImage(imgD, canvas.width, canvas.height);
-    if (decoded && decoded.text) {
-      if (decoded.text === expectedText) {
-        resultDiv.className = 'selftest pass';
-        resultDiv.innerHTML = '✅ <strong>自检通过！</strong> 解码: "' + decoded.text + '"';
-      } else {
-        resultDiv.className = 'selftest fail';
-        resultDiv.innerHTML = '⚠️ 期望 "' + expectedText + '"，得到 "' + decoded.text + '"';
-      }
-    } else {
-      resultDiv.className = 'selftest fail';
-      resultDiv.innerHTML = '❌ 自检失败：' + (decoded && decoded.reason ? decoded.reason : '未知');
-    }
-  } catch (e) {
-    resultDiv.className = 'selftest fail';
-    resultDiv.innerHTML = '❌ 自检异常：' + e.message;
-  }
-}
-
-function doDl() {
-  var cv = document.getElementById('qrCv');
-  if (!cv.width) { toast('请先生成', 'warning'); return; }
-  var a = document.createElement('a');
-  a.download = 'hdqr_v' + VER + '_' + Date.now() + '.png';
-  a.href = cv.toDataURL('image/png');
-  a.click();
-  toast('已下载', 'success');
-}
-
-document.getElementById('logoI').addEventListener('change', function(e) {
-  var f = e.target.files[0];
-  if (!f) return;
-  var r = new FileReader();
-  r.onload = function(ev) {
-    var img = new Image();
-    img.onload = function() {
-      logoImg = img;
-      document.getElementById('logoA').classList.add('has');
-      document.getElementById('logoT').textContent = '✅ ' + f.name;
-      toast('Logo 上传成功', 'success');
-    };
-    img.src = ev.target.result;
-  };
-  r.readAsDataURL(f);
-});
-document.getElementById('fgC').addEventListener('input', function() { document.getElementById('fgH').textContent = this.value; });
-document.getElementById('bgC').addEventListener('input', function() { document.getElementById('bgH').textContent = this.value; });
-
-function chkEnv() {
-  var w = document.getElementById('envW');
-  var b = document.getElementById('stBtn');
-  var ok = window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
-  if (!ok) {
-    w.classList.remove('hidden');
-    b.disabled = true;
-    b.innerHTML = '🚫 环境不支持';
-    setStatus('error', '需要 HTTPS 环境');
-  } else {
-    w.classList.add('hidden');
-    b.disabled = false;
-    b.innerHTML = '▶️ 开始扫描';
-    setStatus('idle', '等待启动');
-  }
-}
-
-function enumCams() {
-  return navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-    .then(function(ts) {
-      ts.getTracks().forEach(function(t) { t.stop(); });
-      return navigator.mediaDevices.enumerateDevices();
-    })
-    .then(function(devs) {
-      camDevs = [];
-      for (var i = 0; i < devs.length; i++) {
-        if (devs[i].kind === 'videoinput') camDevs.push(devs[i]);
-      }
-      dlog('发现 ' + camDevs.length + ' 个摄像头', 'ok');
-      if (!camDevs.length) throw new Error('NoCamera');
-      var sel = document.getElementById('camSel');
-      sel.innerHTML = '';
-      var bk = ['back', 'rear', 'environment', '后置', '背面', '后摄', '主摄'];
-      var scored = [];
-      for (var i = 0; i < camDevs.length; i++) {
-        var label = (camDevs[i].label || '').toLowerCase();
-        var s = 0;
-        for (var k = 0; k < bk.length; k++) {
-          if (label.indexOf(bk[k]) >= 0) { s += 100; break; }
-        }
-        if (!camDevs[i].label) s += 10;
-        scored.push({ d: camDevs[i], s: s });
-      }
-      scored.sort(function(a, b) { return b.s - a.s; });
-      for (var i = 0; i < scored.length; i++) {
-        var o = document.createElement('option');
-        o.value = scored[i].d.deviceId;
-        o.textContent = scored[i].d.label || ('摄像头' + (i + 1));
-        sel.appendChild(o);
-      }
-      sel.classList.remove('hidden');
-    });
-}
-
-function doStart() {
-  if (isScan) return;
-  var sb = document.getElementById('stBtn');
-  sb.disabled = true;
-  sb.innerHTML = '<span class="sp"></span> 初始化...';
-  setStatus('idle', '正在初始化...');
-  dlog('=== 开始启动扫描 ===', 'info');
-  var p = camDevs.length ? Promise.resolve() : enumCams();
-  p.then(function() {
-    var sel = document.getElementById('camSel');
-    var did = sel.value || (camDevs[0] ? camDevs[0].deviceId : null);
-    if (!did) throw { name: 'NotFoundError' };
-    dlog('请求摄像头: ' + did.substring(0, 8) + '...', 'info');
-    return navigator.mediaDevices.getUserMedia({
-      video: { deviceId: { exact: did }, width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: { ideal: 'environment' } },
-      audio: false
-    });
-  }).then(function(stream) {
-    vidStr = stream;
-    var track = stream.getVideoTracks()[0];
-    var settings = track.getSettings();
-    dlog('视频流: ' + settings.width + '×' + settings.height, 'ok');
-    sV.srcObject = vidStr;
-    sV.setAttribute('playsinline', 'true');
-    sV.setAttribute('muted', 'true');
-    return new Promise(function(resolve) {
-      var timeout = setTimeout(function() { dlog('视频就绪超时', 'warn'); resolve(); }, 5000);
-      sV.onloadeddata = function() {
-        clearTimeout(timeout);
-        dlog('视频就绪: ' + sV.videoWidth + '×' + sV.videoHeight, 'ok');
-        resolve();
-      };
-    });
-  }).then(function() {
-    return sV.play().catch(function() {
-      dlog('play()失败，静音重试', 'warn');
-      sV.muted = true;
-      return sV.play();
-    });
-  }).then(function() {
-    dlog('视频播放成功', 'ok');
-    if (sV.videoWidth === 0) return new Promise(function(r) { setTimeout(r, 500); });
-  }).then(function() {
-    pCv.width = PSZ;
-    pCv.height = PSZ;
-    isScan = true;
-    fCnt = 0; fpsC = 0; fpsT = performance.now(); lastProcT = 0;
-    document.getElementById('vPh').classList.add('hidden');
-    document.getElementById('liveBadge').classList.add('on');
-    document.getElementById('fpsBadge').classList.add('on');
-    document.getElementById('stBtn').classList.add('hidden');
-    document.getElementById('spBtn').classList.remove('hidden');
-    setStatus('running', '正在扫描...');
-    dlog('✅ 扫描循环启动', 'ok');
-    toast('摄像头已启动', 'info');
-    sRAF = requestAnimationFrame(scanLoop);
-  }).catch(function(e) {
-    dlog('❌ 启动失败: ' + (e.message || e.name || String(e)), 'err');
-    sb.disabled = false;
-    sb.innerHTML = '▶️ 开始扫描';
-    var n = (e && e.name) || '';
-    var m = '启动失败';
-    if (n === 'NotAllowedError') m = '权限被拒绝';
-    else if (n === 'NotFoundError') m = '未检测到摄像头';
-    else if (n === 'NotReadableError') m = '摄像头被占用';
-    setStatus('error', m);
-    toast(m, 'error');
-  });
-}
-
-function doStop() {
-  dlog('停止扫描', 'info');
-  isScan = false;
-  if (sRAF) { cancelAnimationFrame(sRAF); sRAF = null; }
-  if (vidStr) { vidStr.getTracks().forEach(function(t) { t.stop(); }); vidStr = null; }
-  sV.srcObject = null;
-  document.getElementById('vPh').classList.remove('hidden');
-  document.getElementById('liveBadge').classList.remove('on');
-  document.getElementById('fpsBadge').classList.remove('on');
-  var sb = document.getElementById('stBtn');
-  sb.classList.remove('hidden');
-  sb.disabled = false;
-  sb.innerHTML = '▶️ 开始扫描';
-  document.getElementById('spBtn').classList.add('hidden');
-  setStatus('idle', '已停止');
-}
-
-function scanLoop(timestamp) {
-  if (!isScan) return;
-  if (timestamp - lastProcT < 250) { sRAF = requestAnimationFrame(scanLoop); return; }
-  lastProcT = timestamp;
-  fpsC++;
-  if (timestamp - fpsT >= 1000) {
-    curFps = fpsC; fpsC = 0; fpsT = timestamp;
-    document.getElementById('fpsBadge').textContent = curFps + ' FPS';
-  }
-  var vw = sV.videoWidth, vh = sV.videoHeight;
-  if (!vw || !vh) { sRAF = requestAnimationFrame(scanLoop); return; }
-  if (fCnt % 15 === 0 && fCnt > 0) dlog('帧#' + fCnt + ' | ' + vw + '×' + vh + ' | ' + curFps + 'FPS', 'info');
-  var sz = Math.min(vw, vh);
-  var sx = (vw - sz) / 2, sy = (vh - sz) / 2;
-  pCtx.drawImage(sV, sx, sy, sz, sz, 0, 0, PSZ, PSZ);
-  var imgD;
-  try { imgD = pCtx.getImageData(0, 0, PSZ, PSZ); }
-  catch (e) { sRAF = requestAnimationFrame(scanLoop); return; }
-  fCnt++;
-  try {
-    var res = tryDecodeFromImage(imgD, PSZ, PSZ);
-    if (res && res.text) {
-      dlog('🎉 解码成功! "' + res.text + '"', 'ok');
-      doStop();
-      showRes(res.text);
-      toast('🎉 解码成功！', 'success');
-      if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-      return;
-    } else if (res && res.reason && fCnt % 30 === 0) {
-      dlog('未识别: ' + res.reason, 'warn');
-    }
-  } catch (e) {
-    dlog('解码异常: ' + e.message, 'err');
-  }
-  sRAF = requestAnimationFrame(scanLoop);
-}
-
-function doBinarize(imgD) {
-  var d = imgD.data;
-  var n = d.length / 4;
-  var bin = new Uint8Array(n);
-  var darkCnt = 0;
-  for (var i = 0; i < n; i++) {
-    var j = i * 4;
-    var gray = d[j] * 0.299 + d[j + 1] * 0.587 + d[j + 2] * 0.114;
-    if (gray < BINARY_THRESHOLD) { bin[i] = 1; darkCnt++; }
-  }
-  return { bin: bin, w: imgD.width, h: imgD.height, darkRatio: darkCnt / n };
-}
-
-function doFindPatterns(bin, w, h) {
-  var cands = [];
-  for (var y = 0; y < h; y += 2) {
-    var runs = [];
-    var curColor = bin[y * w];
-    var runLen = 1;
-    for (var x = 1; x < w; x++) {
-      var pixel = bin[y * w + x];
-      if (pixel === curColor) { runLen++; }
-      else { runs.push({ color: curColor, len: runLen, endX: x }); curColor = pixel; runLen = 1; }
-    }
-    runs.push({ color: curColor, len: runLen, endX: w });
-    for (var i = 0; i <= runs.length - 5; i++) {
-      var r0 = runs[i], r1 = runs[i+1], r2 = runs[i+2], r3 = runs[i+3], r4 = runs[i+4];
-      if (r0.color !== 1 || r1.color !== 0 || r2.color !== 1 || r3.color !== 0 || r4.color !== 0) continue;
-      var total = r0.len + r1.len + r2.len + r3.len + r4.len;
-      if (total < 7) continue;
-      var unit = total / 7;
-      var ok = true;
-      var expected = [1, 1, 3, 1, 1];
-      var runArr = [r0, r1, r2, r3, r4];
-      for (var k = 0; k < 5; k++) {
-        var ratio = runArr[k].len / unit;
-        if (ratio < expected[k] * 0.3 || ratio > expected[k] * 2.0) { ok = false; break; }
-      }
-      if (!ok) continue;
-      var startX = r0.endX - r0.len;
-      var endX = r4.endX;
-      var centerX = (startX + endX) / 2;
-      cands.push({ x: centerX, y: y, size: total });
-    }
-  }
-  if (cands.length < 3) return null;
-  var sizeArr = [];
-  for (var i = 0; i < cands.length; i++) sizeArr.push(cands[i].size);
-  sizeArr.sort(function(a, b) { return a - b; });
-  var median = sizeArr[Math.floor(sizeArr.length / 2)];
-  var filtered = [];
-  for (var i = 0; i < cands.length; i++) {
-    if (cands[i].size > median * 0.35 && cands[i].size < median * 2.8) filtered.push(cands[i]);
-  }
-  if (filtered.length < 3) return null;
-  var gridSz = median * 2.5;
-  var clusters = [];
-  for (var i = 0; i < filtered.length; i++) {
-    var pt = filtered[i];
-    var found = false;
-    for (var j = 0; j < clusters.length; j++) {
-      var cl = clusters[j];
-      var dx = pt.x - cl.cx, dy = pt.y - cl.cy;
-      if (Math.sqrt(dx * dx + dy * dy) < gridSz) {
-        cl.cx = (cl.cx * cl.n + pt.x) / (cl.n + 1);
-        cl.cy = (cl.cy * cl.n + pt.y) / (cl.n + 1);
-        cl.cs = (cl.cs * cl.n + pt.size) / (cl.n + 1);
-        cl.n++; found = true; break;
-      }
-    }
-    if (!found) clusters.push({ cx: pt.x, cy: pt.y, cs: pt.size, n: 1 });
-  }
-  clusters.sort(function(a, b) { return b.n - a.n; });
-  if (clusters.length < 3) return null;
-  var top3 = [clusters[0], clusters[1], clusters[2]];
-  for (var i = 0; i < 3; i++) { top3[i].sum = top3[i].cx + top3[i].cy; top3[i].diff = top3[i].cx - top3[i].cy; }
-  var tlIdx = 0;
-  if (top3[1].sum < top3[tlIdx].sum) tlIdx = 1;
-  if (top3[2].sum < top3[tlIdx].sum) tlIdx = 2;
-  var tl = top3[tlIdx];
-  var rest = [];
-  for (var i = 0; i < 3; i++) { if (i !== tlIdx) rest.push(top3[i]); }
-  var tr, bl;
-  if (rest[0].diff > rest[1].diff) { tr = rest[0]; bl = rest[1]; }
-  else { tr = rest[1]; bl = rest[0]; }
-  return { tl: tl, tr: tr, bl: bl };
-}
-
-function doCalcGrid(corners) {
-  var tl = corners.tl, tr = corners.tr, bl = corners.bl;
-  var avgSz = (tl.cs + tr.cs + bl.cs) / 3;
-  var modSz = avgSz / 7;
-  var distH = Math.sqrt((tr.cx - tl.cx) * (tr.cx - tl.cx) + (tr.cy - tl.cy) * (tr.cy - tl.cy));
-  var distV = Math.sqrt((bl.cx - tl.cx) * (bl.cx - tl.cx) + (bl.cy - tl.cy) * (bl.cy - tl.cy));
-  var S = Math.round((distH + distV) / 2 / modSz + 7);
-  if (S < 15 || S > 200) return null;
-  return { S: S, moduleSize: modSz, originX: tl.cx - 3 * modSz, originY: tl.cy - 3 * modSz, corners: corners };
-}
-
-function doSampleColors(imgD, grid) {
-  var S = grid.S, ms = grid.moduleSize, ox = grid.originX, oy = grid.originY;
-  var d = imgD.data, w = imgD.width;
-  var indices = [];
-  for (var r = 0; r < S; r++) {
-    for (var cc = 0; cc < S; cc++) {
-      if (isReserved(r, cc, S)) continue;
-      var px = Math.round(ox + (cc + 0.5) * ms);
-      var py = Math.round(oy + (r + 0.5) * ms);
-      if (px < 0 || px >= w || py < 0 || py >= w) continue;
-      var sr = 0, sg = 0, sb = 0, cnt = 0;
-      var half = Math.max(1, Math.floor(ms * 0.2));
-      for (var dy = -half; dy <= half; dy++) {
-        for (var dx = -half; dx <= half; dx++) {
-          var sx2 = px + dx, sy2 = py + dy;
-          if (sx2 < 0 || sx2 >= w || sy2 < 0 || sy2 >= w) continue;
-          var idx = (sy2 * w + sx2) * 4;
-          sr += d[idx]; sg += d[idx + 1]; sb += d[idx + 2]; cnt++;
-        }
-      }
-      if (!cnt) continue;
-      sr /= cnt; sg /= cnt; sb /= cnt;
-      var minD = Infinity, best = 0;
-      for (var pi = 0; pi < DATA_PAL.length; pi++) {
-        var p = DATA_PAL[pi];
-        var dist = (sr - p[0]) * (sr - p[0]) + (sg - p[1]) * (sg - p[1]) + (sb - p[2]) * (sb - p[2]);
-        if (dist < minD) { minD = dist; best = pi; }
-      }
-      indices.push(best);
-    }
-  }
-  return indices;
-}
-
-function doIdxToText(indices) {
-  var bits = [];
-  for (var i = 0; i < indices.length; i++) {
-    var idx = indices[i];
-    bits.push((idx >> 2) & 1, (idx >> 1) & 1, idx & 1);
-  }
-  var totalB = Math.floor(bits.length / 8);
-  if (totalB < 3) return null;
-  var bytes = new Uint8Array(totalB);
-  for (var i = 0; i < totalB; i++) {
-    var b = 0;
-    for (var j = 0; j < 8; j++) b = (b << 1) | (bits[i * 8 + j] || 0);
-    bytes[i] = b;
-  }
-  var dataLen = (bytes[0] << 8) | bytes[1];
-  if (dataLen <= 0 || dataLen > totalB - 3) return null;
-  var data = [];
-  for (var i = 0; i < dataLen; i++) data.push(bytes[2 + i]);
-  var dataArr = new Uint8Array(data);
-  var recvCRC = bytes[2 + dataLen];
-  var calcCRC = crc8(dataArr);
-  if (recvCRC !== calcCRC) return null;
-  try { return new TextDecoder('utf-8', { fatal: true }).decode(dataArr); }
-  catch (e) { return null; }
-}
-
-function tryDecodeFromImage(imgD, w, h) {
-  var binResult = doBinarize(imgD);
-  var bin = binResult.bin, bw = binResult.w, bh = binResult.h, darkRatio = binResult.darkRatio;
-  if (darkRatio < 0.003) return { reason: '暗像素太少(' + (darkRatio * 100).toFixed(2) + '%)' };
-  var corners = doFindPatterns(bin, bw, bh);
-  if (!corners) return { reason: '未找到3个定位点(暗像素' + (darkRatio * 100).toFixed(1) + '%)' };
-  var grid = doCalcGrid(corners);
-  if (!grid) return { reason: '网格计算失败' };
-  var indices = doSampleColors(imgD, grid);
-  if (indices.length < 3) return { reason: '数据格不足' };
-  var text = doIdxToText(indices);
-  if (!text) return { reason: 'CRC校验失败或数据格式错误' };
-  return { text: text };
-}
-
-function showRes(text) {
-  document.getElementById('rTxt').textContent = text;
-  var ra = document.getElementById('rAct');
-  ra.innerHTML = '';
-  var isUrl = /^https?:\/\//i.test(text) || /^www\./i.test(text);
-  if (isUrl) {
-    var url = text.startsWith('www.') ? 'https://' + text : text;
-    var b = document.createElement('button');
-    b.className = 'btn bp'; b.innerHTML = '🔗 新窗口打开';
-    b.onclick = function() { window.open(url, '_blank'); };
-    ra.appendChild(b);
-  }
-  var cp = document.createElement('button');
-  cp.className = 'btn bs'; cp.innerHTML = '📋 复制';
-  cp.onclick = function() {
-    navigator.clipboard.writeText(text).then(function() { toast('已复制', 'success'); })
-      .catch(function() {
-        var t = document.createElement('textarea');
-        t.value = text; document.body.appendChild(t);
-        t.select(); document.execCommand('copy');
-        document.body.removeChild(t); toast('已复制', 'success');
-      });
-  };
-  ra.appendChild(cp);
-  var rs = document.createElement('button');
-  rs.className = 'btn bs'; rs.innerHTML = '🔄 重新扫描';
-  rs.onclick = function() { document.getElementById('sRes').classList.remove('show'); doStart(); };
-  ra.appendChild(rs);
-  document.getElementById('sRes').classList.add('show');
-}
-
-document.getElementById('sfI').addEventListener('change', function(e) {
-  var f = e.target.files[0];
-  if (!f) return;
-  toast('正在解码...', 'info');
-  var img = new Image();
-  img.onload = function() {
-    var sz = Math.min(img.width, img.height);
-    pCv.width = PSZ; pCv.height = PSZ;
-    pCtx.drawImage(img, (img.width - sz) / 2, (img.height - sz) / 2, sz, sz, 0, 0, PSZ, PSZ);
-    var imgD = pCtx.getImageData(0, 0, PSZ, PSZ);
-    var res = tryDecodeFromImage(imgD, PSZ, PSZ);
-    if (res && res.text) { showRes(res.text); toast('🎉 图片解码成功！', 'success'); }
-    else { toast('识别失败: ' + (res ? res.reason : '未知'), 'error'); }
-  };
-  img.src = URL.createObjectURL(f);
-  e.target.value = '';
-});
-
-window.addEventListener('DOMContentLoaded', function() {
-  chkEnv();
-  dlog('页面已加载 v' + VER, 'info');
-});
+window.addEventListener('DOMContentLoaded',function(){chkEnv();dlog('页面已加载 v'+VER,'info');dlog('二值化: 灰度<80 且 饱和度<0.25 → 黑色(定位点)','info')});
 </script>
 </body>
 </html>
