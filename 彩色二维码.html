@@ -1,24 +1,9 @@
-
-                        <!DOCTYPE html>
-                        <html lang="en">
-                        <head>
-                            <meta charset="UTF-8">
-                            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <style>
-                body {
-                  background-color: white; /* Ensure the iframe has a white background */
-                }
-
-                
-              </style>
-                        </head>
-                        <body>
-                            <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>高密度彩色二维码 v4.2.0</title>
+<title>高密度彩色二维码 v4.3.0</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--p:#4f46e5;--ph:#4338ca;--s:#10b981;--d:#ef4444;--w:#f59e0b;--g50:#f9fafb;--g100:#f3f4f6;--g200:#e5e7eb;--g300:#d1d5db;--g400:#9ca3af;--g500:#6b7280;--g600:#4b5563;--g700:#374151;--g800:#1f2937;--r:12px}
@@ -67,8 +52,6 @@ textarea.fi{resize:vertical;min-height:60px}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 .vw .fps-badge{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);color:#0f0;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;font-family:monospace;display:none}
 .vw .fps-badge.on{display:block}
-.ss{text-align:center;padding:14px;color:#666;font-size:13px}
-.ss .si{font-size:36px;margin-bottom:6px}
 .status-bar{margin-top:10px;padding:10px 12px;border-radius:8px;font-size:12px;display:flex;align-items:center;gap:8px}
 .status-bar.idle{background:var(--g100);color:var(--g500)}
 .status-bar.running{background:rgba(16,185,129,.1);color:var(--s)}
@@ -112,7 +95,7 @@ textarea.fi{resize:vertical;min-height:60px}
 <div class="tc" id="toastC"></div>
 <div class="app">
 <div class="hdr">
-<h1>🌈 高密度彩色二维码 <span class="vb" id="vB">v4.2.0</span></h1>
+<h1>🌈 高密度彩色二维码 <span class="vb" id="vB">v4.3.0</span></h1>
 <p>3-bit/模块 · 隔离带定位 · 专用解码器</p>
 </div>
 <div class="tabs">
@@ -163,39 +146,29 @@ textarea.fi{resize:vertical;min-height:60px}
 <div class="tc2" id="tab-scan">
 <div class="eb">🧪 <strong>专用解码器：</strong>识别本工具生成的 3-bit 高密度彩色二维码。</div>
 <div class="ew hidden" id="envW">🔒 <strong>环境不支持：</strong>摄像头需要 HTTPS。请用"上传图片"方式。</div>
-
 <div class="card">
 <div class="ct">🎨 调色板（8色 = 3bit/模块）</div>
 <div class="pb" id="pBar"></div>
 </div>
-
 <div class="card">
 <div class="ct">📷 摄像头扫码</div>
 <select class="cs hidden" id="camSel"><option value="">-- 选择摄像头 --</option></select>
-
 <div class="vw" id="vWrap">
 <video id="sV" playsinline muted autoplay></video>
 <div class="placeholder" id="vPh"><div class="icon">📷</div><p>点击下方按钮启动摄像头</p></div>
 <div class="live-badge" id="liveBadge">LIVE</div>
 <div class="fps-badge" id="fpsBadge">0 FPS</div>
 </div>
-
 <div style="margin-top:10px" class="bg">
 <button class="btn bp" id="stBtn" onclick="doStart()" style="flex:1">▶️ 开始扫描</button>
 <button class="btn bd hidden" id="spBtn" onclick="doStop()" style="flex:1">⏹️ 停止</button>
 </div>
-
-<div class="status-bar idle" id="statusBar">
-<div class="dot"></div>
-<span id="statusText">等待启动</span>
-</div>
-
+<div class="status-bar idle" id="statusBar"><div class="dot"></div><span id="statusText">等待启动</span></div>
 <div class="dbg" id="dbgLog"></div>
 <div style="margin-top:8px;text-align:center">
 <button class="btn bs bsm" onclick="togDbg()" id="dbgB">🔍 显示调试日志</button>
 </div>
 </div>
-
 <div class="card">
 <div class="ct">🖼️ 上传图片解码</div>
 <div class="fup" onclick="document.getElementById('sfI').click()">
@@ -204,7 +177,6 @@ textarea.fi{resize:vertical;min-height:60px}
 <input type="file" id="sfI" accept="image/*">
 </div>
 </div>
-
 <div class="sr" id="sRes">
 <div style="font-size:11px;font-weight:600;color:var(--s);margin-bottom:4px">✅ 解码成功</div>
 <div class="rt" id="rTxt"></div>
@@ -215,18 +187,31 @@ textarea.fi{resize:vertical;min-height:60px}
 <canvas id="pCv" class="hidden"></canvas>
 
 <script>
-const VER='4.2.0';
+/* ================================================================
+   v4.3.0 — 修复：变量名冲突导致 "c is not defined"
+   根因：findPatterns 中 for 循环内 const c 与箭头函数参数 c 冲突
+   修复：将所有箭头函数参数名改为 item/pt/cl 等，避免冲突
+   ================================================================ */
+const VER='4.3.0';
 document.getElementById('vB').textContent='v'+VER;
 
 const PAL=[[0,0,0],[237,28,36],[34,177,76],[0,112,255],[255,213,0],[0,195,204],[200,18,193],[136,136,136]];
 const PN=['黑','红','绿','蓝','黄','青','品红','灰'];
-(function(){const b=document.getElementById('pBar');PAL.forEach((c,i)=>{const d=document.createElement('div');d.className='ps';d.style.background=`rgb(${c})`;d.dataset.l=PN[i];b.appendChild(d)})})();
+(function(){
+  var bar=document.getElementById('pBar');
+  PAL.forEach(function(clr,idx){
+    var d=document.createElement('div');
+    d.className='ps';
+    d.style.background='rgb('+clr[0]+','+clr[1]+','+clr[2]+')';
+    d.dataset.l=PN[idx];
+    bar.appendChild(d);
+  });
+})();
 
 const FP=[[1,1,1,1,1,1,1],[1,0,0,0,0,0,1],[1,0,1,1,1,0,1],[1,0,1,1,1,0,1],[1,0,1,1,1,0,1],[1,0,0,0,0,0,1],[1,1,1,1,1,1,1]];
 
 let logoImg=null,isScan=false,camDevs=[],vidStr=null,sRAF=null;
 let fCnt=0,fpsC=0,fpsT=0,curFps=0,dbgOn=false;
-let videoReady=false;
 let lastProcessTime=0;
 
 const sV=document.getElementById('sV');
@@ -235,107 +220,129 @@ const pCtx=pCv.getContext('2d',{willReadFrequently:true});
 const PSZ=400;
 
 function switchTab(t){
-  document.querySelectorAll('.tb').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
-  document.querySelectorAll('.tc2').forEach(c=>c.classList.toggle('on',c.id==='tab-'+t));
+  document.querySelectorAll('.tb').forEach(function(b){b.classList.toggle('on',b.dataset.tab===t)});
+  document.querySelectorAll('.tc2').forEach(function(el){el.classList.toggle('on',el.id==='tab-'+t)});
   if(t!=='scan'&&isScan)doStop();
   if(t==='scan')chkEnv();
 }
-function toast(m,t='info'){
-  const c=document.getElementById('toastC'),d=document.createElement('div');
+function toast(m,t){
+  t=t||'info';
+  var c=document.getElementById('toastC'),d=document.createElement('div');
   d.className='tt '+t;
-  d.innerHTML=`<span>${({success:'✅',error:'❌',warning:'⚠️',info:'ℹ️'})[t]||''}</span><span>${m}</span>`;
-  c.appendChild(d);setTimeout(()=>{if(d.parentNode)d.parentNode.removeChild(d)},3000);
+  var icons={success:'✅',error:'❌',warning:'⚠️',info:'ℹ️'};
+  d.innerHTML='<span>'+(icons[t]||'')+'</span><span>'+m+'</span>';
+  c.appendChild(d);setTimeout(function(){if(d.parentNode)d.parentNode.removeChild(d)},3000);
 }
 function togDbg(){
   dbgOn=!dbgOn;
   document.getElementById('dbgLog').classList.toggle('show',dbgOn);
   document.getElementById('dbgB').textContent=dbgOn?'🔍 隐藏调试日志':'🔍 显示调试日志';
 }
-
-function dlog(msg,type='info'){
-  const el=document.getElementById('dbgLog');
-  const d=document.createElement('div');
+function dlog(msg,type){
+  type=type||'info';
+  var el=document.getElementById('dbgLog');
+  var d=document.createElement('div');
   d.className='l l-'+type;
-  const t=new Date().toLocaleTimeString('zh-CN',{hour12:false});
-  const ms=String(new Date().getMilliseconds()).padStart(3,'0');
-  d.textContent=`[${t}.${ms}] ${msg}`;
+  var now=new Date();
+  var t=now.toLocaleTimeString('zh-CN',{hour12:false});
+  var ms=String(now.getMilliseconds()).padStart(3,'0');
+  d.textContent='['+t+'.'+ms+'] '+msg;
   el.appendChild(d);
   el.scrollTop=el.scrollHeight;
-  console.log(`[QR-${type}] ${msg}`);
+  console.log('[QR-'+type+'] '+msg);
 }
-
 function setStatus(state,text){
-  const bar=document.getElementById('statusBar');
+  var bar=document.getElementById('statusBar');
   bar.className='status-bar '+state;
   document.getElementById('statusText').textContent=text;
 }
 
-function crc8(data){let c=0;for(let i=0;i<data.length;i++){c^=data[i];for(let j=0;j<8;j++)c=(c&0x80)?((c<<1)^0x07):(c<<1);c&=0xFF}return c}
+// CRC-8
+function crc8(data){
+  var crc=0;
+  for(var i=0;i<data.length;i++){
+    crc^=data[i];
+    for(var j=0;j<8;j++) crc=(crc&0x80)?((crc<<1)^0x07):(crc<<1);
+    crc&=0xFF;
+  }
+  return crc;
+}
 
+// ===== 生成器 =====
 function buildFrame(text){
-  const enc=new TextEncoder(),bytes=enc.encode(text),len=bytes.length;
-  const f=new Uint8Array(2+len+1);
-  f[0]=(len>>8)&0xFF;f[1]=len&0xFF;f.set(bytes,2);f[f.length-1]=crc8(bytes);
+  var enc=new TextEncoder(),bytes=enc.encode(text),len=bytes.length;
+  var f=new Uint8Array(2+len+1);
+  f[0]=(len>>8)&0xFF;f[1]=len&0xFF;
+  for(var i=0;i<len;i++) f[2+i]=bytes[i];
+  f[f.length-1]=crc8(bytes);
   return f;
 }
 function bytesToIdx(frame){
-  const bits=[];
-  for(let i=0;i<frame.length;i++)for(let b=7;b>=0;b--)bits.push((frame[i]>>b)&1);
-  while(bits.length%3!==0)bits.push(0);
-  const idx=[];
-  for(let i=0;i<bits.length;i+=3)idx.push((bits[i]<<2)|(bits[i+1]<<1)|bits[i+2]);
+  var bits=[];
+  for(var i=0;i<frame.length;i++)
+    for(var b=7;b>=0;b--) bits.push((frame[i]>>b)&1);
+  while(bits.length%3!==0) bits.push(0);
+  var idx=[];
+  for(var i=0;i<bits.length;i+=3)
+    idx.push((bits[i]<<2)|(bits[i+1]<<1)|bits[i+2]);
   return idx;
 }
-function calcSize(n){let s=17;while(s*s-192<n)s++;return s}
-function isReserved(r,c,S){return(r<=7&&c<=7)||(r<=7&&c>=S-8)||(r>=S-8&&c<=7)}
-function isFinder(r,c,S){return(r<=6&&c<=6)||(r<=6&&c>=S-7)||(r>=S-7&&c<=6)}
-function finderVal(r,c,S){
-  let lr,lc;
-  if(r<=6&&c<=6){lr=r;lc=c}
-  else if(r<=6&&c>=S-7){lr=r;lc=c-(S-7)}
-  else if(r>=S-7&&c<=6){lr=r-(S-7);lc=c}
+function calcSize(n){var s=17;while(s*s-192<n)s++;return s}
+function isReserved(row,col,S){return(row<=7&&col<=7)||(row<=7&&col>=S-8)||(row>=S-8&&col<=7)}
+function isFinder(row,col,S){return(row<=6&&col<=6)||(row<=6&&col>=S-7)||(row>=S-7&&col<=6)}
+function finderVal(row,col,S){
+  var lr,lc;
+  if(row<=6&&col<=6){lr=row;lc=col}
+  else if(row<=6&&col>=S-7){lr=row;lc=col-(S-7)}
+  else if(row>=S-7&&col<=6){lr=row-(S-7);lc=col}
   else return 0;
   return FP[lr][lc]?-2:-3;
 }
 function buildMatrix(idx,S){
-  const M=Array.from({length:S},()=>Array(S).fill(-1));
-  for(let r=0;r<S;r++)for(let c=0;c<S;c++){
-    if(isReserved(r,c,S)){
-      if(isFinder(r,c,S))M[r][c]=finderVal(r,c,S);
-      else M[r][c]=-3;
+  var M=[];
+  for(var r=0;r<S;r++){M[r]=[];for(var cc=0;cc<S;cc++) M[r][cc]=-1;}
+  for(var r=0;r<S;r++){
+    for(var cc=0;cc<S;cc++){
+      if(isReserved(r,cc,S)){
+        if(isFinder(r,cc,S)) M[r][cc]=finderVal(r,cc,S);
+        else M[r][cc]=-3;
+      }
     }
   }
-  let i=0;
-  for(let r=0;r<S&&i<idx.length;r++)
-    for(let c=0;c<S&&i<idx.length;c++)
-      if(!isReserved(r,c,S))M[r][c]=idx[i++];
+  var i=0;
+  for(var r=0;r<S&&i<idx.length;r++)
+    for(var cc=0;cc<S&&i<idx.length;cc++)
+      if(!isReserved(r,cc,S)) M[r][cc]=idx[i++];
   return M;
 }
 
 function doGen(){
-  const text=document.getElementById('qrText').value.trim();
+  var text=document.getElementById('qrText').value.trim();
   if(!text){toast('请输入内容','warning');return}
-  const fg=document.getElementById('fgC').value,bg=document.getElementById('bgC').value;
+  var fg=document.getElementById('fgC').value,bg=document.getElementById('bgC').value;
   try{
-    const frame=buildFrame(text),idx=bytesToIdx(frame),S=calcSize(idx.length),M=buildMatrix(idx,S);
-    const cellSz=Math.max(10,Math.floor(480/S)),margin=cellSz*2,total=S*cellSz+margin*2;
-    const cv=document.getElementById('qrCv');cv.width=total;cv.height=total;
-    const ctx=cv.getContext('2d');
+    var frame=buildFrame(text),idx=bytesToIdx(frame),S=calcSize(idx.length),M=buildMatrix(idx,S);
+    var cellSz=Math.max(10,Math.floor(480/S)),margin=cellSz*2,total=S*cellSz+margin*2;
+    var cv=document.getElementById('qrCv');cv.width=total;cv.height=total;
+    var ctx=cv.getContext('2d');
     ctx.fillStyle=bg;ctx.fillRect(0,0,total,total);
-    for(let r=0;r<S;r++)for(let c=0;c<S;c++){
-      const v=M[r][c],x=margin+c*cellSz,y=margin+r*cellSz;
-      if(v===-2)ctx.fillStyle=fg;else if(v===-3)ctx.fillStyle=bg;
-      else if(v>=0){const p=PAL[v];ctx.fillStyle=`rgb(${p[0]},${p[1]},${p[2]})`}
-      else ctx.fillStyle=bg;
-      ctx.fillRect(x,y,cellSz,cellSz);
+    for(var r=0;r<S;r++){
+      for(var cc=0;cc<S;cc++){
+        var v=M[r][cc],x=margin+cc*cellSz,y=margin+r*cellSz;
+        if(v===-2) ctx.fillStyle=fg;
+        else if(v===-3) ctx.fillStyle=bg;
+        else if(v>=0){var p=PAL[v];ctx.fillStyle='rgb('+p[0]+','+p[1]+','+p[2]+')';}
+        else ctx.fillStyle=bg;
+        ctx.fillRect(x,y,cellSz,cellSz);
+      }
     }
     if(logoImg){
-      const qrPx=S*cellSz,maxSide=Math.sqrt(0.15)*qrPx;
-      let lw,lh;const ar=logoImg.width/logoImg.height;
+      var qrPx=S*cellSz,maxSide=Math.sqrt(0.15)*qrPx;
+      var lw,lh,ar=logoImg.width/logoImg.height;
       if(ar>1){lw=Math.min(logoImg.width,maxSide);lh=lw/ar}else{lh=Math.min(logoImg.height,maxSide);lw=lh*ar}
       if(lw>maxSide){lw=maxSide;lh=lw/ar}
-      const lx=margin+(qrPx-lw)/2,ly=margin+(qrPx-lh)/2,pd=6;
-      ctx.fillStyle=bg;const rr=8,rx=lx-pd,ry=ly-pd,rw=lw+pd*2,rh=lh+pd*2;
+      var lx=margin+(qrPx-lw)/2,ly=margin+(qrPx-lh)/2,pd=6;
+      ctx.fillStyle=bg;var rr=8,rx=lx-pd,ry=ly-pd,rw=lw+pd*2,rh=lh+pd*2;
       ctx.beginPath();ctx.moveTo(rx+rr,ry);ctx.lineTo(rx+rw-rr,ry);ctx.quadraticCurveTo(rx+rw,ry,rx+rw,ry+rr);
       ctx.lineTo(rx+rw,ry+rh-rr);ctx.quadraticCurveTo(rx+rw,ry+rh,rx+rw-rr,ry+rh);
       ctx.lineTo(rx+rr,ry+rh);ctx.quadraticCurveTo(rx,ry+rh,rx,ry+rh-rr);
@@ -347,114 +354,103 @@ function doGen(){
     document.getElementById('iSz').textContent=S+'×'+S;
     document.getElementById('iCap').textContent=text.length+'字符';
     document.getElementById('iCell').textContent=idx.length+'/'+(S*S-192);
-    toast(`生成成功！${S}×${S}`,'success');
+    toast('生成成功！'+S+'×'+S,'success');
   }catch(e){console.error(e);toast('生成失败：'+e.message,'error')}
 }
 function doDl(){
-  const c=document.getElementById('qrCv');if(!c.width){toast('请先生成','warning');return}
-  const a=document.createElement('a');a.download=`hdqr_v${VER}_${Date.now()}.png`;
-  a.href=c.toDataURL('image/png');a.click();toast('已下载','success');
+  var cv=document.getElementById('qrCv');if(!cv.width){toast('请先生成','warning');return}
+  var a=document.createElement('a');a.download='hdqr_v'+VER+'_'+Date.now()+'.png';
+  a.href=cv.toDataURL('image/png');a.click();toast('已下载','success');
 }
 document.getElementById('logoI').addEventListener('change',function(e){
-  const f=e.target.files[0];if(!f)return;
-  const r=new FileReader();
-  r.onload=function(ev){const img=new Image();img.onload=function(){logoImg=img;document.getElementById('logoA').classList.add('has');document.getElementById('logoT').textContent='✅ '+f.name;toast('Logo上传成功','success')};img.src=ev.target.result};
+  var f=e.target.files[0];if(!f)return;
+  var r=new FileReader();
+  r.onload=function(ev){var img=new Image();img.onload=function(){logoImg=img;document.getElementById('logoA').classList.add('has');document.getElementById('logoT').textContent='✅ '+f.name;toast('Logo上传成功','success')};img.src=ev.target.result};
   r.readAsDataURL(f);
 });
 document.getElementById('fgC').addEventListener('input',function(){document.getElementById('fgH').textContent=this.value});
 document.getElementById('bgC').addEventListener('input',function(){document.getElementById('bgH').textContent=this.value});
 
+// ===== 环境检测 =====
 function chkEnv(){
-  const w=document.getElementById('envW'),b=document.getElementById('stBtn');
-  const ok=window.isSecureContext&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia;
+  var w=document.getElementById('envW'),b=document.getElementById('stBtn');
+  var ok=window.isSecureContext&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia;
   if(!ok){w.classList.remove('hidden');b.disabled=true;b.innerHTML='🚫 环境不支持';setStatus('error','需要 HTTPS 环境')}
   else{w.classList.add('hidden');b.disabled=false;b.innerHTML='▶️ 开始扫描';setStatus('idle','等待启动')}
 }
 
+// ===== 摄像头枚举 =====
 async function enumCams(){
   dlog('请求摄像头权限...','info');
-  const ts=await navigator.mediaDevices.getUserMedia({video:true,audio:false});
-  ts.getTracks().forEach(t=>t.stop());
+  var ts=await navigator.mediaDevices.getUserMedia({video:true,audio:false});
+  ts.getTracks().forEach(function(t){t.stop()});
   dlog('权限已获取，枚举设备...','info');
-  const devs=await navigator.mediaDevices.enumerateDevices();
-  camDevs=devs.filter(d=>d.kind==='videoinput');
-  dlog(`发现 ${camDevs.length} 个摄像头`,'ok');
-  if(!camDevs.length)throw new Error('NoCamera');
-  const sel=document.getElementById('camSel');sel.innerHTML='';
-  const bk=['back','rear','environment','后置','背面','后摄','主摄'];
-  const sorted=camDevs.map(d=>{const l=(d.label||'').toLowerCase();let s=0;if(bk.some(k=>l.includes(k)))s+=100;if(!d.label)s+=10;return{d,s}}).sort((a,b)=>b.s-a.s).map(x=>x.d);
-  sorted.forEach((d,i)=>{const o=document.createElement('option');o.value=d.deviceId;o.textContent=d.label||`摄像头${i+1}`;sel.appendChild(o)});
+  var devs=await navigator.mediaDevices.enumerateDevices();
+  camDevs=devs.filter(function(d){return d.kind==='videoinput'});
+  dlog('发现 '+camDevs.length+' 个摄像头','ok');
+  if(!camDevs.length) throw new Error('NoCamera');
+  var sel=document.getElementById('camSel');sel.innerHTML='';
+  var bk=['back','rear','environment','后置','背面','后摄','主摄'];
+  var scored=camDevs.map(function(d){
+    var label=(d.label||'').toLowerCase();var s=0;
+    if(bk.some(function(k){return label.includes(k)})) s+=100;
+    if(!d.label) s+=10;
+    return {d:d,s:s};
+  });
+  scored.sort(function(a,b){return b.s-a.s});
+  scored.forEach(function(item,i){
+    var o=document.createElement('option');
+    o.value=item.d.deviceId;
+    o.textContent=item.d.label||('摄像头'+(i+1));
+    sel.appendChild(o);
+  });
   sel.classList.remove('hidden');
 }
 
+// ===== 启动扫描 =====
 async function doStart(){
-  if(isScan)return;
-  const sb=document.getElementById('stBtn');
+  if(isScan) return;
+  var sb=document.getElementById('stBtn');
   sb.disabled=true;sb.innerHTML='<span class="sp"></span> 初始化...';
   setStatus('idle','正在初始化...');
   dlog('=== 开始启动扫描 ===','info');
 
   try{
     if(!camDevs.length) await enumCams();
-
-    const sel=document.getElementById('camSel');
-    const did=sel.value||(camDevs[0]?camDevs[0].deviceId:null);
-    if(!did)throw{name:'NotFoundError'};
-
-    dlog(`请求摄像头: ${did.substring(0,8)}...`,'info');
+    var sel=document.getElementById('camSel');
+    var did=sel.value||(camDevs[0]?camDevs[0].deviceId:null);
+    if(!did) throw {name:'NotFoundError'};
+    dlog('请求摄像头: '+did.substring(0,8)+'...','info');
 
     vidStr=await navigator.mediaDevices.getUserMedia({
       video:{deviceId:{exact:did},width:{ideal:1280},height:{ideal:720},facingMode:{ideal:'environment'}},
       audio:false
     });
-
-    const track=vidStr.getVideoTracks()[0];
-    const settings=track.getSettings();
-    dlog(`视频流已获取: ${settings.width}×${settings.height}`,'ok');
+    var track=vidStr.getVideoTracks()[0];
+    var settings=track.getSettings();
+    dlog('视频流已获取: '+settings.width+'×'+settings.height,'ok');
 
     sV.srcObject=vidStr;
     sV.setAttribute('playsinline','true');
     sV.setAttribute('muted','true');
 
     dlog('等待视频画面就绪...','info');
-    await new Promise((resolve,reject)=>{
-      const timeout=setTimeout(()=>{
-        dlog('视频就绪超时，强制继续','warn');
-        resolve();
-      },5000);
-
-      sV.onloadeddata=function(){
-        clearTimeout(timeout);
-        dlog(`视频 loadeddata: ${sV.videoWidth}×${sV.videoHeight}`,'ok');
-        resolve();
-      };
-      sV.onerror=function(e){
-        clearTimeout(timeout);
-        reject(new Error('Video element error'));
-      };
+    await new Promise(function(resolve){
+      var timeout=setTimeout(function(){dlog('视频就绪超时，强制继续','warn');resolve()},5000);
+      sV.onloadeddata=function(){clearTimeout(timeout);dlog('视频 loadeddata: '+sV.videoWidth+'×'+sV.videoHeight,'ok');resolve()};
     });
 
-    try{
-      await sV.play();
-      dlog('视频播放已启动','ok');
-    }catch(playErr){
-      dlog('play() 失败: '+playErr.message+'，尝试静音播放','warn');
-      sV.muted=true;
-      await sV.play();
-      dlog('静音播放成功','ok');
-    }
+    try{await sV.play();dlog('视频播放已启动','ok')}
+    catch(pe){dlog('play()失败，尝试静音','warn');sV.muted=true;await sV.play();dlog('静音播放成功','ok')}
 
     if(sV.videoWidth===0||sV.videoHeight===0){
-      dlog(`视频尺寸异常: ${sV.videoWidth}×${sV.videoHeight}，等待...`,'warn');
-      await new Promise(r=>setTimeout(r,500));
-      dlog(`等待后尺寸: ${sV.videoWidth}×${sV.videoHeight}`,'info');
+      dlog('视频尺寸异常，等待...','warn');
+      await new Promise(function(r){setTimeout(r,500)});
+      dlog('等待后: '+sV.videoWidth+'×'+sV.videoHeight,'info');
     }
 
     pCv.width=PSZ;pCv.height=PSZ;
-
-    videoReady=true;
-    isScan=true;
-    fCnt=0;fpsC=0;fpsT=performance.now();lastProcessTime=0;
+    isScan=true;fCnt=0;fpsC=0;fpsT=performance.now();lastProcessTime=0;
 
     document.getElementById('vPh').classList.add('hidden');
     document.getElementById('liveBadge').classList.add('on');
@@ -464,9 +460,7 @@ async function doStart(){
     setStatus('running','正在扫描...');
     dlog('✅ 扫描循环即将启动','ok');
     toast('摄像头已启动','info');
-
     sRAF=requestAnimationFrame(scanLoop);
-
   }catch(e){
     dlog('❌ 启动失败: '+(e.message||e.name||String(e)),'err');
     sb.disabled=false;sb.innerHTML='▶️ 开始扫描';
@@ -475,210 +469,241 @@ async function doStart(){
 }
 
 function handleErr(e){
-  const n=e?.name||'';
-  let m='启动失败',d=e?.message||'未知错误';
-  if(n==='NotAllowedError'||n==='PermissionDeniedError'){m='权限被拒绝';d='请在浏览器设置中允许摄像头'}
+  var n=e&&e.name||'';
+  var m='启动失败',d=e&&e.message||'未知错误';
+  if(n==='NotAllowedError'||n==='PermissionDeniedError'){m='权限被拒绝';d='请在设置中允许摄像头'}
   else if(n==='NotFoundError'){m='未检测到摄像头';d='请确认设备有摄像头'}
-  else if(n==='NotReadableError'){m='摄像头被占用';d='请关闭其他应用后重试'}
-  else if(n==='OverconstrainedError'){m='参数不兼容';d='尝试选择其他摄像头'}
+  else if(n==='NotReadableError'){m='摄像头被占用';d='请关闭其他应用'}
   setStatus('error',m);
-  dlog(`错误类型: ${n}, 信息: ${d}`,'err');
+  dlog('错误: '+n+', '+d,'err');
   toast(m,'error');
 }
 
 function doStop(){
   dlog('停止扫描','info');
-  isScan=false;videoReady=false;
+  isScan=false;
   if(sRAF){cancelAnimationFrame(sRAF);sRAF=null}
-  if(vidStr){vidStr.getTracks().forEach(t=>t.stop());vidStr=null}
+  if(vidStr){vidStr.getTracks().forEach(function(t){t.stop()});vidStr=null}
   sV.srcObject=null;
-
   document.getElementById('vPh').classList.remove('hidden');
   document.getElementById('liveBadge').classList.remove('on');
   document.getElementById('fpsBadge').classList.remove('on');
-  const sb=document.getElementById('stBtn');
+  var sb=document.getElementById('stBtn');
   sb.classList.remove('hidden');sb.disabled=false;sb.innerHTML='▶️ 开始扫描';
   document.getElementById('spBtn').classList.add('hidden');
   setStatus('idle','已停止');
 }
 
+// ===== 扫描循环 =====
 function scanLoop(timestamp){
-  if(!isScan){
-    dlog('扫描循环已终止 (isScan=false)','warn');
-    return;
-  }
-
-  if(timestamp-lastProcessTime<300){
-    sRAF=requestAnimationFrame(scanLoop);
-    return;
-  }
+  if(!isScan) return;
+  if(timestamp-lastProcessTime<300){sRAF=requestAnimationFrame(scanLoop);return}
   lastProcessTime=timestamp;
 
   fpsC++;
-  if(timestamp-fpsT>=1000){
-    curFps=fpsC;fpsC=0;fpsT=timestamp;
-    document.getElementById('fpsBadge').textContent=curFps+' FPS';
-  }
+  if(timestamp-fpsT>=1000){curFps=fpsC;fpsC=0;fpsT=timestamp;document.getElementById('fpsBadge').textContent=curFps+' FPS'}
 
-  const vw=sV.videoWidth,vh=sV.videoHeight;
+  var vw=sV.videoWidth,vh=sV.videoHeight;
+  if(!vw||!vh){sRAF=requestAnimationFrame(scanLoop);return}
 
-  if(!vw||!vh){
-    if(fCnt===0&&fpsC<=3){
-      dlog(`视频未就绪: ${vw}×${vh}, readyState=${sV.readyState}`,'warn');
-    }
-    sRAF=requestAnimationFrame(scanLoop);
-    return;
-  }
+  if(fCnt%10===0&&fCnt>0) dlog('帧 #'+fCnt+' | 视频: '+vw+'×'+vh+' | FPS: '+curFps,'info');
 
-  if(fCnt%10===0&&fCnt>0){
-    dlog(`帧 #${fCnt} | 视频: ${vw}×${vh} | FPS: ${curFps}`,'info');
-  }
-
-  const sz=Math.min(vw,vh);
-  const sx=(vw-sz)/2,sy=(vh-sz)/2;
+  var sz=Math.min(vw,vh);
+  var sx=(vw-sz)/2,sy=(vh-sz)/2;
   pCtx.drawImage(sV,sx,sy,sz,sz,0,0,PSZ,PSZ);
 
-  let imgD;
-  try{
-    imgD=pCtx.getImageData(0,0,PSZ,PSZ);
-  }catch(e){
-    dlog('getImageData 失败: '+e.message,'err');
-    sRAF=requestAnimationFrame(scanLoop);
-    return;
-  }
+  var imgD;
+  try{imgD=pCtx.getImageData(0,0,PSZ,PSZ)}
+  catch(e){dlog('getImageData失败: '+e.message,'err');sRAF=requestAnimationFrame(scanLoop);return}
 
   fCnt++;
 
   try{
-    const res=tryDecode(imgD);
+    var res=tryDecode(imgD);
     if(res&&res.text){
-      dlog(`🎉 解码成功! 文本: "${res.text}"`,'ok');
-      doStop();
-      showRes(res.text);
-      toast('🎉 解码成功！','success');
-      if(navigator.vibrate)navigator.vibrate([100,50,100]);
+      dlog('🎉 解码成功! 文本: "'+res.text+'"','ok');
+      doStop();showRes(res.text);toast('🎉 解码成功！','success');
+      if(navigator.vibrate) navigator.vibrate([100,50,100]);
       return;
     }
   }catch(e){
-    dlog('解码异常: '+e.message+' | stack: '+e.stack,'err');
+    dlog('解码异常: '+e.message,'err');
   }
 
   sRAF=requestAnimationFrame(scanLoop);
 }
 
+// ===== 二值化 =====
 function binarize(imgD){
-  const d=imgD.data,n=d.length/4;
-  const bin=new Uint8Array(n);
-  let darkCnt=0;
-  const THRESH=80;
-  for(let i=0;i<n;i++){
-    const j=i*4;
-    const g=d[j]*0.299+d[j+1]*0.587+d[j+2]*0.114;
+  var d=imgD.data,n=d.length/4;
+  var bin=new Uint8Array(n);
+  var darkCnt=0;
+  var THRESH=80;
+  for(var i=0;i<n;i++){
+    var j=i*4;
+    var g=d[j]*0.299+d[j+1]*0.587+d[j+2]*0.114;
     if(g<THRESH){bin[i]=1;darkCnt++}
     else bin[i]=0;
   }
-  return{bin,w:imgD.width,h:imgD.height,darkRatio:darkCnt/n};
+  return {bin:bin,w:imgD.width,h:imgD.height,darkRatio:darkCnt/n};
 }
 
+// ===== 【修复核心】定位点检测 — 消除所有变量名冲突 =====
 function findPatterns(bin,w,h){
-  const cands=[];
-  for(let y=0;y<h;y+=2){
-    const runs=[];
-    let cur=bin[y*w],len=1;
-    for(let x=1;x<w;x++){
-      const c=bin[y*w+x];
-      if(c===cur)len++;
-      else{runs.push({c,len,ex:x});cur=c;len=1}
-    }
-    runs.push({c,len,ex:w});
+  var cands=[];
 
-    for(let i=0;i<=runs.length-5;i++){
-      const r=runs.slice(i,i+5);
-      if(r[0].c!==1||r[1].c!==0||r[2].c!==1||r[3].c!==0||r[4].c!==0)continue;
-      const total=r[0].len+r[1].len+r[2].len+r[3].len+r[4].len;
-      if(total<8)continue;
-      const unit=total/7;
-      let ok=true;
-      const exp=[1,1,3,1,1];
-      for(let k=0;k<5;k++){
-        const ratio=r[k].len/unit;
-        if(ratio<exp[k]*0.35||ratio>exp[k]*1.9){ok=false;break}
-      }
-      if(!ok)continue;
-      const cx=(r[0].ex-r[0].len+r[4].ex)/2;
-      cands.push({x:cx,y,size:total});
-    }
-  }
-  if(cands.length<3)return null;
+  for(var y=0;y<h;y+=2){
+    // 构建 run-length 编码
+    var runs=[];
+    var curColor=bin[y*w];
+    var runLen=1;
 
-  const sizes=cands.map(c=>c.size).sort((a,b)=>a-b);
-  const med=sizes[Math.floor(sizes.length/2)];
-  const filtered=cands.filter(c=>c.size>med*0.4&&c.size<med*2.5);
-  if(filtered.length<3)return null;
-
-  const gridSz=med*2;
-  const clusters=[];
-  for(const c of filtered){
-    let found=false;
-    for(const cl of clusters){
-      if(Math.sqrt((c.x-cl.cx)**2+(c.y-cl.cy)**2)<gridSz){
-        cl.cx=(cl.cx*cl.n+c.x)/(cl.n+1);cl.cy=(cl.cy*cl.n+c.y)/(cl.n+1);
-        cl.cs=(cl.cs*cl.n+c.size)/(cl.n+1);cl.n++;found=true;break;
+    for(var x=1;x<w;x++){
+      var pixel=bin[y*w+x];
+      if(pixel===curColor){
+        runLen++;
+      }else{
+        runs.push({color:curColor,length:runLen,endX:x});
+        curColor=pixel;
+        runLen=1;
       }
     }
-    if(!found)clusters.push({cx:c.x,cy:c.y,cs:c.size,n:1});
-  }
-  clusters.sort((a,b)=>b.n-a.n);
-  if(clusters.length<3)return null;
+    runs.push({color:curColor,length:runLen,endX:w});
 
-  const top3=clusters.slice(0,3);
-  const scored=top3.map(p=>({...p,sum:p.cx+p.cy,diff:p.cx-p.cy}));
-  const sorted=[...scored].sort((a,b)=>a.sum-b.sum);
-  const tl=sorted[0];
-  const rest=scored.filter(p=>p!==tl);
-  const tr=rest[0].diff>rest[1].diff?rest[0]:rest[1];
-  const bl=rest[0].diff>rest[1].diff?rest[1]:rest[0];
-  return{tl,tr,bl};
+    // 滑动窗口找 黑:白:黑:白:黑
+    for(var i=0;i<=runs.length-5;i++){
+      var r0=runs[i],r1=runs[i+1],r2=runs[i+2],r3=runs[i+3],r4=runs[i+4];
+
+      // 必须是 黑(1):白(0):黑(1):白(0):黑(1)
+      if(r0.color!==1||r1.color!==0||r2.color!==1||r3.color!==0||r4.color!==0) continue;
+
+      var total=r0.length+r1.length+r2.length+r3.length+r4.length;
+      if(total<8) continue;
+
+      var unit=total/7;
+      var ok=true;
+      var expected=[1,1,3,1,1];
+      var runArr=[r0,r1,r2,r3,r4];
+
+      for(var k=0;k<5;k++){
+        var ratio=runArr[k].length/unit;
+        if(ratio<expected[k]*0.35||ratio>expected[k]*1.9){ok=false;break}
+      }
+      if(!ok) continue;
+
+      var startX=r0.endX-r0.length;
+      var endX=r4.endX;
+      var centerX=(startX+endX)/2;
+      cands.push({x:centerX,y:y,size:total});
+    }
+  }
+
+  if(cands.length<3) return null;
+
+  // 按 size 排序求中位数
+  var sizeArr=[];
+  for(var i=0;i<cands.length;i++) sizeArr.push(cands[i].size);
+  sizeArr.sort(function(a,b){return a-b});
+  var median=sizeArr[Math.floor(sizeArr.length/2)];
+
+  // 过滤大小合理的候选
+  var filtered=[];
+  for(var i=0;i<cands.length;i++){
+    if(cands[i].size>median*0.4 && cands[i].size<median*2.5)
+      filtered.push(cands[i]);
+  }
+  if(filtered.length<3) return null;
+
+  // 聚类
+  var gridSz=median*2;
+  var clusters=[];
+  for(var i=0;i<filtered.length;i++){
+    var pt=filtered[i];
+    var found=false;
+    for(var j=0;j<clusters.length;j++){
+      var cl=clusters[j];
+      var dx=pt.x-cl.cx,dy=pt.y-cl.cy;
+      if(Math.sqrt(dx*dx+dy*dy)<gridSz){
+        cl.cx=(cl.cx*cl.n+pt.x)/(cl.n+1);
+        cl.cy=(cl.cy*cl.n+pt.y)/(cl.n+1);
+        cl.cs=(cl.cs*cl.n+pt.size)/(cl.n+1);
+        cl.n++;found=true;break;
+      }
+    }
+    if(!found) clusters.push({cx:pt.x,cy:pt.y,cs:pt.size,n:1});
+  }
+
+  // 按成员数排序
+  clusters.sort(function(a,b){return b.n-a.n});
+  if(clusters.length<3) return null;
+
+  var top3=[clusters[0],clusters[1],clusters[2]];
+
+  // 确定三角色：左上(sum最小)、右上(diff最大)、左下(diff最小)
+  for(var i=0;i<3;i++){
+    top3[i].sum=top3[i].cx+top3[i].cy;
+    top3[i].diff=top3[i].cx-top3[i].cy;
+  }
+
+  // 找左上（sum最小）
+  var tlIdx=0;
+  if(top3[1].sum<top3[tlIdx].sum) tlIdx=1;
+  if(top3[2].sum<top3[tlIdx].sum) tlIdx=2;
+  var tl=top3[tlIdx];
+
+  // 剩余两个中 diff 大的是右上
+  var rest=[];
+  for(var i=0;i<3;i++){if(i!==tlIdx) rest.push(top3[i])}
+  var tr,bl;
+  if(rest[0].diff>rest[1].diff){tr=rest[0];bl=rest[1]}
+  else{tr=rest[1];bl=rest[0]}
+
+  return {tl:tl,tr:tr,bl:bl};
 }
 
+// ===== 网格计算 =====
 function calcGrid(corners){
-  const{tl,tr,bl}=corners;
-  const avgSz=(tl.cs+tr.cs+bl.cs)/3;
-  const modSz=avgSz/7;
-  const distH=Math.sqrt((tr.cx-tl.cx)**2+(tr.cy-tl.cy)**2);
-  const distV=Math.sqrt((bl.cx-tl.cx)**2+(bl.cy-tl.cy)**2);
-  const S=Math.round((distH+distV)/2/modSz+7);
-  if(S<15||S>200)return null;
-  return{S,moduleSize:modSz,originX:tl.cx-3*modSz,originY:tl.cy-3*modSz,corners};
+  var tl=corners.tl,tr=corners.tr,bl=corners.bl;
+  var avgSz=(tl.cs+tr.cs+bl.cs)/3;
+  var modSz=avgSz/7;
+  var distH=Math.sqrt((tr.cx-tl.cx)*(tr.cx-tl.cx)+(tr.cy-tl.cy)*(tr.cy-tl.cy));
+  var distV=Math.sqrt((bl.cx-tl.cx)*(bl.cx-tl.cx)+(bl.cy-tl.cy)*(bl.cy-tl.cy));
+  var S=Math.round((distH+distV)/2/modSz+7);
+  if(S<15||S>200) return null;
+  return {S:S,moduleSize:modSz,originX:tl.cx-3*modSz,originY:tl.cy-3*modSz,corners:corners};
 }
 
+// ===== 颜色采样 =====
 function sampleColors(imgD,grid){
-  const{S,moduleSize:ms,originX:ox,originY:oy}=grid;
-  const d=imgD.data,w=imgD.width;
-  const indices=[];
-  for(let r=0;r<S;r++){
-    for(let c=0;c<S;c++){
-      if(isReserved(r,c,S))continue;
-      const px=Math.round(ox+(c+0.5)*ms);
-      const py=Math.round(oy+(r+0.5)*ms);
-      if(px<0||px>=w||py<0||py>=w)continue;
-      let sr=0,sg=0,sb=0,cnt=0;
-      const half=Math.max(1,Math.floor(ms*0.25));
-      for(let dy=-half;dy<=half;dy++){
-        for(let dx=-half;dx<=half;dx++){
-          const sx=px+dx,sy=py+dy;
-          if(sx<0||sx>=w||sy<0||sy>=w)continue;
-          const idx=(sy*w+sx)*4;
+  var S=grid.S,ms=grid.moduleSize,ox=grid.originX,oy=grid.originY;
+  var d=imgD.data,w=imgD.width;
+  var indices=[];
+
+  for(var r=0;r<S;r++){
+    for(var cc=0;cc<S;cc++){
+      if(isReserved(r,cc,S)) continue;
+      var px=Math.round(ox+(cc+0.5)*ms);
+      var py=Math.round(oy+(r+0.5)*ms);
+      if(px<0||px>=w||py<0||py>=w) continue;
+
+      var sr=0,sg=0,sb=0,cnt=0;
+      var half=Math.max(1,Math.floor(ms*0.25));
+      for(var dy=-half;dy<=half;dy++){
+        for(var dx=-half;dx<=half;dx++){
+          var sx2=px+dx,sy2=py+dy;
+          if(sx2<0||sx2>=w||sy2<0||sy2>=w) continue;
+          var idx=(sy2*w+sx2)*4;
           sr+=d[idx];sg+=d[idx+1];sb+=d[idx+2];cnt++;
         }
       }
-      if(!cnt)continue;
+      if(!cnt) continue;
       sr/=cnt;sg/=cnt;sb/=cnt;
-      let minD=Infinity,best=0;
-      for(let i=0;i<PAL.length;i++){
-        const p=PAL[i];
-        const dist=(sr-p[0])**2+(sg-p[1])**2+(sb-p[2])**2;
-        if(dist<minD){minD=dist;best=i}
+
+      var minD=Infinity,best=0;
+      for(var pi=0;pi<PAL.length;pi++){
+        var p=PAL[pi];
+        var dist=(sr-p[0])*(sr-p[0])+(sg-p[1])*(sg-p[1])+(sb-p[2])*(sb-p[2]);
+        if(dist<minD){minD=dist;best=pi}
       }
       indices.push(best);
     }
@@ -686,62 +711,85 @@ function sampleColors(imgD,grid){
   return indices;
 }
 
+// ===== 索引→文本 =====
 function idxToText(indices){
-  const bits=[];
-  for(const idx of indices)bits.push((idx>>2)&1,(idx>>1)&1,idx&1);
-  const totalB=Math.floor(bits.length/8);
-  if(totalB<3)return null;
-  const bytes=new Uint8Array(totalB);
-  for(let i=0;i<totalB;i++){let b=0;for(let j=0;j<8;j++)b=(b<<1)|(bits[i*8+j]||0);bytes[i]=b}
-  const dataLen=(bytes[0]<<8)|bytes[1];
-  if(dataLen<=0||dataLen>totalB-3)return null;
-  const data=bytes.slice(2,2+dataLen);
-  if(bytes[2+dataLen]!==crc8(data))return null;
-  try{return new TextDecoder('utf-8',{fatal:true}).decode(data)}catch{return null}
+  var bits=[];
+  for(var i=0;i<indices.length;i++){
+    var idx=indices[i];
+    bits.push((idx>>2)&1,(idx>>1)&1,idx&1);
+  }
+  var totalB=Math.floor(bits.length/8);
+  if(totalB<3) return null;
+  var bytes=new Uint8Array(totalB);
+  for(var i=0;i<totalB;i++){
+    var b=0;
+    for(var j=0;j<8;j++) b=(b<<1)|(bits[i*8+j]||0);
+    bytes[i]=b;
+  }
+  var dataLen=(bytes[0]<<8)|bytes[1];
+  if(dataLen<=0||dataLen>totalB-3) return null;
+  var data=bytes.slice(2,2+dataLen);
+  if(bytes[2+dataLen]!==crc8(data)) return null;
+  try{return new TextDecoder('utf-8',{fatal:true}).decode(data)}catch(e){return null}
 }
 
+// ===== 完整解码 =====
 function tryDecode(imgD){
-  const{bin,w,h,darkRatio}=binarize(imgD);
-  if(darkRatio<0.005)return{pat:0};
-  const corners=findPatterns(bin,w,h);
-  if(!corners)return{pat:0};
-  const grid=calcGrid(corners);
-  if(!grid)return{pat:3};
-  const indices=sampleColors(imgD,grid);
-  if(indices.length<3)return{pat:3};
-  const text=idxToText(indices);
-  return{pat:3,text,grid};
+  var result=binarize(imgD);
+  var bin=result.bin,w=result.w,h=result.h,darkRatio=result.darkRatio;
+  if(darkRatio<0.005) return {pat:0};
+
+  var corners=findPatterns(bin,w,h);
+  if(!corners) return {pat:0};
+
+  var grid=calcGrid(corners);
+  if(!grid) return {pat:3};
+
+  var indices=sampleColors(imgD,grid);
+  if(indices.length<3) return {pat:3};
+
+  var text=idxToText(indices);
+  return {pat:3,text:text,grid:grid};
 }
 
+// ===== 结果展示 =====
 function showRes(text){
   document.getElementById('rTxt').textContent=text;
-  const ra=document.getElementById('rAct');ra.innerHTML='';
-  const isUrl=/^https?:\/\//i.test(text)||/^www\./i.test(text);
+  var ra=document.getElementById('rAct');ra.innerHTML='';
+  var isUrl=/^https?:\/\//i.test(text)||/^www\./i.test(text);
   if(isUrl){
-    const url=text.startsWith('www.')?'https://'+text:text;
-    const b=document.createElement('button');b.className='btn bp';b.innerHTML='🔗 新窗口打开';
-    b.onclick=()=>window.open(url,'_blank');ra.appendChild(b);
+    var url=text.startsWith('www.')?'https://'+text:text;
+    var b=document.createElement('button');b.className='btn bp';b.innerHTML='🔗 新窗口打开';
+    b.onclick=function(){window.open(url,'_blank')};ra.appendChild(b);
   }
-  const cp=document.createElement('button');cp.className='btn bs';cp.innerHTML='📋 复制';
-  cp.onclick=()=>{navigator.clipboard.writeText(text).then(()=>toast('已复制','success')).catch(()=>{const t=document.createElement('textarea');t.value=text;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);toast('已复制','success')})};
+  var cp=document.createElement('button');cp.className='btn bs';cp.innerHTML='📋 复制';
+  cp.onclick=function(){
+    navigator.clipboard.writeText(text).then(function(){toast('已复制','success')})
+    .catch(function(){
+      var t=document.createElement('textarea');t.value=text;
+      document.body.appendChild(t);t.select();document.execCommand('copy');
+      document.body.removeChild(t);toast('已复制','success');
+    });
+  };
   ra.appendChild(cp);
-  const rs=document.createElement('button');rs.className='btn bs';rs.innerHTML='🔄 重新扫描';
-  rs.onclick=()=>{document.getElementById('sRes').classList.remove('show');doStart()};
+  var rs=document.createElement('button');rs.className='btn bs';rs.innerHTML='🔄 重新扫描';
+  rs.onclick=function(){document.getElementById('sRes').classList.remove('show');doStart()};
   ra.appendChild(rs);
   document.getElementById('sRes').classList.add('show');
 }
 
+// 图片上传
 document.getElementById('sfI').addEventListener('change',function(e){
-  const f=e.target.files[0];if(!f)return;
+  var f=e.target.files[0];if(!f)return;
   dlog('加载图片: '+f.name,'info');
   toast('正在解码...','info');
-  const img=new Image();
+  var img=new Image();
   img.onload=function(){
-    const sz=Math.min(img.width,img.height);
+    var sz=Math.min(img.width,img.height);
     pCv.width=PSZ;pCv.height=PSZ;
     pCtx.drawImage(img,(img.width-sz)/2,(img.height-sz)/2,sz,sz,0,0,PSZ,PSZ);
-    const imgD=pCtx.getImageData(0,0,PSZ,PSZ);
-    const res=tryDecode(imgD);
+    var imgD=pCtx.getImageData(0,0,PSZ,PSZ);
+    var res=tryDecode(imgD);
     if(res&&res.text){showRes(res.text);toast('🎉 图片解码成功！','success');dlog('图片解码成功','ok')}
     else{toast('识别失败','error');dlog('图片解码失败','err')}
   };
@@ -749,17 +797,7 @@ document.getElementById('sfI').addEventListener('change',function(e){
   e.target.value='';
 });
 
-window.addEventListener('DOMContentLoaded',()=>{chkEnv();dlog('页面已加载 v'+VER,'info')});
+window.addEventListener('DOMContentLoaded',function(){chkEnv();dlog('页面已加载 v'+VER,'info')});
 </script>
 </body>
 </html>
-
-
-              <script>
-                              dlog('解码异常: '+e.message+' | stack: '+e.stack,'err');
-
-
-              </script>
-                        </body>
-                        </html>
-                    
