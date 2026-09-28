@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>低频噪音检测助手</title>
+<title>全频段噪音检测 · 低频侦探</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -13,28 +13,20 @@
     line-height: 1.6;
     padding: 16px;
     min-height: 100vh;
+    -webkit-tap-highlight-color: transparent;
   }
-  .container { max-width: 720px; margin: 0 auto; }
-  h1 {
-    font-size: 1.6rem;
-    margin-bottom: 6px;
-    color: #00ff88;
-    letter-spacing: 0.5px;
-  }
-  .subtitle {
-    color: #777;
-    font-size: 0.9rem;
-    margin-bottom: 24px;
-  }
+  .container { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin-bottom: 4px; color: #00ff88; letter-spacing: .5px; }
+  .subtitle { color: #666; font-size: .85rem; margin-bottom: 20px; }
   .card {
     background: #12121a;
     border: 1px solid #1e1e2e;
     border-radius: 14px;
-    padding: 20px;
-    margin-bottom: 16px;
+    padding: 18px;
+    margin-bottom: 14px;
   }
   h2 {
-    font-size: 1.1rem;
+    font-size: 1.05rem;
     margin-bottom: 6px;
     color: #00ff88;
     display: flex;
@@ -45,99 +37,109 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     background: #00ff88;
     color: #0a0a0f;
     border-radius: 50%;
-    font-size: 0.85rem;
+    font-size: .8rem;
     font-weight: 700;
     flex-shrink: 0;
   }
-  .hint {
-    color: #888;
-    font-size: 0.85rem;
-    margin-bottom: 16px;
-    line-height: 1.6;
-  }
-  .button-row {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 16px;
-  }
+  .hint { color: #777; font-size: .83rem; margin-bottom: 12px; line-height: 1.6; }
+  .button-row { display: flex; gap: 10px; margin-bottom: 14px; }
   button {
-    padding: 12px 24px;
+    padding: 12px 22px;
     border: none;
     border-radius: 10px;
-    font-size: 0.95rem;
+    font-size: .95rem;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all .2s;
     font-family: inherit;
-    -webkit-tap-highlight-color: transparent;
   }
-  button.primary {
-    background: #00ff88;
-    color: #0a0a0f;
-    flex: 1;
-  }
+  button.primary { background: #00ff88; color: #0a0a0f; flex: 1; }
   button.primary:hover:not(:disabled) { background: #00cc6a; }
-  button.primary:active:not(:disabled) { transform: scale(0.97); }
-  button.primary:disabled {
-    background: #1e1e2e;
-    color: #555;
-    cursor: not-allowed;
-  }
-  button.secondary {
-    background: #1e1e2e;
-    color: #ccc;
-    flex: 1;
-  }
+  button.primary:active:not(:disabled) { transform: scale(.97); }
+  button.primary:disabled { background: #1e1e2e; color: #555; cursor: not-allowed; }
+  button.secondary { background: #1e1e2e; color: #ccc; flex: 1; }
   button.secondary:hover:not(:disabled) { background: #2a2a3e; }
-  button.secondary:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.secondary:disabled { opacity: .4; cursor: not-allowed; }
   canvas {
     width: 100%;
-    height: auto;
+    display: block;
     background: #0a0a0f;
     border-radius: 10px;
     border: 1px solid #1a1a2e;
-    display: block;
   }
-  .peaks-display {
-    margin-top: 12px;
+  .status-text {
+    font-size: .8rem;
+    color: #666;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .status-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #555;
+    transition: background .3s;
+    flex-shrink: 0;
+  }
+  .status-dot.active {
+    background: #00ff88;
+    box-shadow: 0 0 8px #00ff88;
+    animation: blink 1.2s infinite;
+  }
+  @keyframes blink {
+    0%,100% { opacity: 1; }
+    50% { opacity: .35; }
+  }
+  .timer {
+    font-family: 'SF Mono', 'Consolas', monospace;
+    color: #00ff88;
+    font-weight: 700;
+    font-size: .9rem;
+  }
+  .live-peaks {
+    margin-top: 10px;
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    min-height: 30px;
+    gap: 6px;
+    min-height: 28px;
     align-items: center;
   }
-  .peak-tag {
-    background: #ff3366;
-    color: #fff;
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 0.8rem;
+  .live-tag {
+    background: #1a1a2e;
+    border: 1px solid #2a2a4e;
+    color: #00ff88;
+    padding: 4px 10px;
+    border-radius: 16px;
+    font-size: .75rem;
     font-family: 'SF Mono', monospace;
     font-weight: 600;
-    animation: pulse 0.6s ease;
+    transition: all .3s;
   }
-  @keyframes pulse {
-    0% { transform: scale(0.9); opacity: 0.7; }
-    100% { transform: scale(1); opacity: 1; }
+  .live-tag.hot {
+    background: #ff3366;
+    border-color: #ff3366;
+    color: #fff;
   }
   .input-row {
     display: flex;
-    gap: 12px;
-    margin-bottom: 16px;
+    gap: 10px;
+    margin-bottom: 12px;
     flex-wrap: wrap;
   }
   .input-row label {
     flex: 1;
-    min-width: 90px;
+    min-width: 80px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    font-size: 0.85rem;
+    gap: 5px;
+    font-size: .8rem;
     color: #888;
     font-weight: 500;
   }
@@ -150,114 +152,156 @@
     font-size: 1rem;
     font-family: inherit;
     width: 100%;
-    transition: border-color 0.2s;
+    transition: border-color .2s;
   }
-  .input-row input:focus {
-    outline: none;
-    border-color: #00ff88;
-  }
+  .input-row input:focus { outline: none; border-color: #00ff88; }
   .input-row input::placeholder { color: #444; }
-  .result-title {
-    font-size: 1.15rem;
-    font-weight: 700;
-    color: #ffaa00;
-    margin-bottom: 10px;
-    line-height: 1.4;
+  .report-header {
+    font-size: .85rem;
+    color: #888;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #1a1a2e;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px;
   }
-  .result-desc {
-    color: #bbb;
-    margin-bottom: 16px;
-    line-height: 1.7;
-    font-size: 0.92rem;
-  }
-  .match-box {
-    margin: 16px 0;
+  .peak-item {
     padding: 14px;
+    background: #0f0f17;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #1a1a2e;
+    transition: border-color .2s;
+  }
+  .peak-item:last-child { margin-bottom: 0; }
+  .peak-item.critical { border-color: #ff3366; }
+  .peak-item.warn { border-color: #ffaa00; }
+  .peak-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .peak-freq {
+    font-size: 1.3rem;
+    font-weight: 800;
+    font-family: 'SF Mono', monospace;
+    color: #ff3366;
+  }
+  .peak-freq.warn { color: #ffaa00; }
+  .peak-freq.info { color: #00aaff; }
+  .peak-db {
+    font-size: .78rem;
+    color: #888;
+    font-family: 'SF Mono', monospace;
+  }
+  .persist-bar {
+    height: 8px;
+    background: #1a1a2e;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .persist-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width .5s ease;
+  }
+  .peak-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .meta-chip {
+    font-size: .72rem;
+    padding: 3px 8px;
+    border-radius: 10px;
+    background: #1a1a2e;
+    color: #aaa;
+  }
+  .meta-chip.ok { color: #00ff88; }
+  .meta-chip.warn { color: #ffaa00; }
+  .peak-source {
+    font-size: .82rem;
+    color: #bbb;
+    margin-bottom: 4px;
+    line-height: 1.5;
+  }
+  .peak-source strong { color: #ddd; }
+  .peak-advice {
+    font-size: .8rem;
+    color: #777;
+    line-height: 1.5;
+    padding-left: 10px;
+    border-left: 2px solid #2a2a4e;
+  }
+  .modal-grid {
+    margin-top: 12px;
+    padding: 12px;
     background: #0a0a0f;
     border-radius: 10px;
     border: 1px solid #1a1a2e;
   }
-  .match-box-title {
-    font-size: 0.8rem;
+  .modal-title {
+    font-size: .75rem;
     color: #666;
-    margin-bottom: 10px;
     text-transform: uppercase;
     letter-spacing: 1px;
+    margin-bottom: 8px;
   }
-  .match-detail {
-    font-size: 0.85rem;
-    color: #aaa;
-    padding: 6px 0;
-    border-bottom: 1px solid #15151f;
-    line-height: 1.5;
-  }
-  .match-detail:last-child { border-bottom: none; }
-  .match-detail .freq {
-    color: #ff3366;
-    font-family: 'SF Mono', monospace;
-    font-weight: 700;
-  }
-  .match-detail .ok { color: #00ff88; }
-  .match-detail .no { color: #ffaa00; }
-  .suggestions {
-    list-style: none;
-    padding: 0;
-    margin: 8px 0 0 0;
-  }
-  .suggestions li {
-    padding: 10px 0;
-    border-bottom: 1px solid #1a1a2e;
-    color: #ccc;
-    font-size: 0.9rem;
-    line-height: 1.6;
+  .modal-row {
     display: flex;
-    gap: 8px;
+    justify-content: space-between;
+    font-size: .82rem;
+    padding: 5px 0;
+    border-bottom: 1px solid #15151f;
+    font-family: 'SF Mono', monospace;
   }
-  .suggestions li:last-child { border-bottom: none; }
-  .suggestions li::before {
-    content: '→';
-    color: #00ff88;
-    font-weight: 700;
-    flex-shrink: 0;
-  }
+  .modal-row:last-child { border-bottom: none; }
+  .modal-row .axis { color: #888; }
+  .modal-row .val { color: #00ff88; }
+  .modal-row .val.match { color: #ff3366; font-weight: 700; }
   .disclaimer {
-    font-size: 0.78rem;
+    font-size: .75rem;
     color: #555;
-    margin-top: 20px;
-    padding-top: 14px;
+    margin-top: 16px;
+    padding-top: 12px;
     border-top: 1px solid #1a1a2e;
     line-height: 1.6;
   }
-  .status-dot {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #555;
-    margin-right: 6px;
-    transition: background 0.3s;
+  .empty {
+    color: #555;
+    font-size: .85rem;
+    text-align: center;
+    padding: 20px 0;
   }
-  .status-dot.active {
-    background: #00ff88;
-    box-shadow: 0 0 8px #00ff88;
-    animation: blink 1.2s infinite;
-  }
-  @keyframes blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-  }
-  .status-text {
-    font-size: 0.8rem;
-    color: #666;
+  .badge-row {
     display: flex;
-    align-items: center;
-    margin-bottom: 12px;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
   }
+  .badge {
+    font-size: .7rem;
+    padding: 3px 9px;
+    border-radius: 10px;
+    font-weight: 600;
+  }
+  .badge.red { background: rgba(255,51,102,.15); color: #ff3366; }
+  .badge.orange { background: rgba(255,170,0,.15); color: #ffaa00; }
+  .badge.blue { background: rgba(0,170,255,.15); color: #00aaff; }
+  .badge.green { background: rgba(0,255,136,.12); color: #00ff88; }
   @media (max-width: 480px) {
-    body { padding: 12px; }
-    h1 { font-size: 1.35rem; }
-    .card { padding: 16px; }
-    button { padding: 11px 18px; font-size: 0.9rem; }
+    body { padding: 10px; }
+    h1 { font-size: 1.3rem; }
+    .card { padding: 14px; }
+    button { padding: 11px 16px; font-size: .9rem; }
+    .peak-freq { font-size: 1.15rem; }
     .input-row label { min-width: 70px; }
   }
 </style>
@@ -265,43 +309,45 @@
 <body>
 <div class="container">
 
-  <h1>🔊 低频噪音检测助手</h1>
-  <p class="subtitle">用手机检测房间低频嗡鸣，结合房间尺寸找出问题源头</p>
+  <h1>🔊 全频段噪音检测</h1>
+  <p class="subtitle">手机可检测范围内全频段分析 · 持续性追踪 · 声源推测</p>
 
-  <!-- 步骤 1：检测 -->
+  <!-- 步骤 1 -->
   <section class="card">
-    <h2><span class="num">1</span>检测低频噪音</h2>
-    <p class="hint">将手机放在你听到嗡鸣声的位置（比如床头），保持安静，点击开始检测。等待 10–20 秒让数据稳定。</p>
+    <h2><span class="num">1</span>检测环境声音</h2>
+    <p class="hint">将手机放在你听到噪音的位置（如床头），保持环境相对安静，点击开始。建议检测 20 秒以上，让工具记录完整的声音变化。</p>
     <div class="status-text">
       <span class="status-dot" id="statusDot"></span>
       <span id="statusText">未开始检测</span>
+      <span class="timer" id="timerDisplay" style="margin-left:auto">00:00</span>
     </div>
     <div class="button-row">
       <button id="startBtn" class="primary">开始检测</button>
-      <button id="stopBtn" class="secondary" disabled>停止</button>
+      <button id="stopBtn" class="secondary" disabled>停止并总结</button>
     </div>
-    <canvas id="spectrum" width="800" height="300"></canvas>
-    <div id="peaksDisplay" class="peaks-display">
-      <span style="color:#555;font-size:0.85rem">等待检测…</span>
+    <canvas id="spectrum"></canvas>
+    <div class="live-peaks" id="livePeaks">
+      <span style="color:#555;font-size:.8rem">等待检测…</span>
     </div>
   </section>
 
-  <!-- 步骤 2：房间尺寸 -->
-  <section class="card">
-    <h2><span class="num">2</span>输入房间尺寸</h2>
-    <p class="hint">用卷尺测量房间的长、宽、高（单位：米）。这是计算驻波的关键。</p>
+  <!-- 步骤 2：总结报告 -->
+  <section class="card" id="reportCard" style="display:none;">
+    <h2><span class="num">2</span>检测总结报告</h2>
+    <div id="reportContent"></div>
+  </section>
+
+  <!-- 步骤 3：房间分析 -->
+  <section class="card" id="roomCard" style="display:none;">
+    <h2><span class="num">3</span>房间驻波分析（可选）</h2>
+    <p class="hint">输入房间尺寸，工具会计算房间自身容易放大的低频频率，并与检测结果比对。</p>
     <div class="input-row">
-      <label>长（米）<input type="number" id="roomLength" step="0.01" min="1" max="30" placeholder="例如 3.65"></label>
-      <label>宽（米）<input type="number" id="roomWidth" step="0.01" min="1" max="30" placeholder="例如 4.20"></label>
-      <label>高（米）<input type="number" id="roomHeight" step="0.01" min="1" max="10" placeholder="例如 3.10"></label>
+      <label>长（米）<input type="number" id="roomLength" step="0.01" min="1" max="30" placeholder="3.65"></label>
+      <label>宽（米）<input type="number" id="roomWidth" step="0.01" min="1" max="30" placeholder="4.20"></label>
+      <label>高（米）<input type="number" id="roomHeight" step="0.01" min="1" max="10" placeholder="3.10"></label>
     </div>
-    <button id="analyzeBtn" class="primary" disabled>分析</button>
-  </section>
-
-  <!-- 步骤 3：结果 -->
-  <section class="card" id="resultCard" style="display:none;">
-    <h2><span class="num">3</span>分析结果</h2>
-    <div id="resultContent"></div>
+    <button id="analyzeBtn" class="primary" disabled>分析房间驻波</button>
+    <div id="roomResult"></div>
   </section>
 
 </div>
@@ -310,42 +356,80 @@
 (function() {
   'use strict';
 
-  // ========== DOM ==========
+  // ==================== 常量 ====================
+  var MIN_FREQ = 20;
+  var MAX_FREQ = 20000;
+  var LOG_MIN = Math.log10(MIN_FREQ);
+  var LOG_MAX = Math.log10(MAX_FREQ);
+  var ANALYSIS_INTERVAL = 50;   // ms，每 50ms 分析一帧
+  var PEAK_DISPLAY_INTERVAL = 250; // ms，实时标签更新间隔
+
+  // ==================== DOM ====================
   var startBtn = document.getElementById('startBtn');
   var stopBtn = document.getElementById('stopBtn');
   var analyzeBtn = document.getElementById('analyzeBtn');
-  var peaksDisplay = document.getElementById('peaksDisplay');
   var canvas = document.getElementById('spectrum');
   var ctx = canvas.getContext('2d');
   var statusDot = document.getElementById('statusDot');
   var statusText = document.getElementById('statusText');
+  var timerDisplay = document.getElementById('timerDisplay');
+  var livePeaks = document.getElementById('livePeaks');
+  var reportCard = document.getElementById('reportCard');
+  var reportContent = document.getElementById('reportContent');
+  var roomCard = document.getElementById('roomCard');
+  var roomResult = document.getElementById('roomResult');
 
-  // ========== 状态 ==========
+  // ==================== 状态 ====================
   var audioContext = null;
   var analyser = null;
   var source = null;
   var stream = null;
   var isRunning = false;
-  var currentPeaks = [];
-  var savedPeaks = [];
-  var savedSampleRate = 0;
-  var savedFftSize = 0;
   var animationId = null;
-  var lastPeakUpdate = 0;
+  var timerInterval = null;
+  var detectionStartTime = 0;
 
-  // 频率范围（Hz）
-  var MIN_FREQ = 20;
-  var MAX_FREQ = 200;
+  var latestSpectrum = null;
+  var latestSampleRate = 0;
+  var latestFftSize = 0;
+  var latestPeaks = [];
 
-  // ========== 事件 ==========
+  // 跨帧追踪的峰值
+  var trackedPeaks = [];
+  var totalFrames = 0;
+
+  var lastAnalysisTime = 0;
+  var lastPeakDisplayTime = 0;
+
+  var canvasW = 0, canvasH = 0;
+
+  // ==================== 事件 ====================
   startBtn.addEventListener('click', startDetection);
   stopBtn.addEventListener('click', stopDetection);
-  analyzeBtn.addEventListener('click', analyze);
+  analyzeBtn.addEventListener('click', analyzeRoom);
   ['roomLength', 'roomWidth', 'roomHeight'].forEach(function(id) {
-    document.getElementById(id).addEventListener('input', updateAnalyzeButton);
+    document.getElementById(id).addEventListener('input', updateAnalyzeBtn);
   });
+  window.addEventListener('resize', resizeCanvas);
 
-  // ========== 开始检测 ==========
+  // ==================== 画布尺寸 ====================
+  function resizeCanvas() {
+    var rect = canvas.parentElement.getBoundingClientRect();
+    var dpr = window.devicePixelRatio || 1;
+    var w = Math.floor(rect.width - 36); // 减去卡片 padding
+    if (w < 100) w = 300;
+    var h = 260;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    canvasW = w;
+    canvasH = h;
+  }
+  resizeCanvas();
+
+  // ==================== 开始检测 ====================
   async function startDetection() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       alert('您的浏览器不支持麦克风访问。\n\n请使用最新版 Chrome / Edge / Safari，并确保通过 HTTPS 访问。');
@@ -367,164 +451,220 @@
       source = audioContext.createMediaStreamSource(stream);
       analyser = audioContext.createAnalyser();
       analyser.fftSize = 32768;
-      analyser.smoothingTimeConstant = 0.8;
+      analyser.smoothingTimeConstant = 0.75;
       source.connect(analyser);
 
-      savedSampleRate = audioContext.sampleRate;
-      savedFftSize = analyser.fftSize;
+      // 重置状态
+      trackedPeaks = [];
+      totalFrames = 0;
+      latestSpectrum = null;
+      latestPeaks = [];
+      reportCard.style.display = 'none';
+      roomCard.style.display = 'none';
+      roomResult.innerHTML = '';
 
       isRunning = true;
       startBtn.disabled = true;
       stopBtn.disabled = false;
       analyzeBtn.disabled = true;
-
       statusDot.classList.add('active');
-      statusText.textContent = '检测中… 请保持安静';
+      statusText.textContent = '检测中… 请保持环境安静';
+      timerDisplay.textContent = '00:00';
 
-      draw();
+      detectionStartTime = performance.now();
+      lastAnalysisTime = 0;
+      lastPeakDisplayTime = 0;
+
+      timerInterval = setInterval(function() {
+        var elapsed = (performance.now() - detectionStartTime) / 1000;
+        var m = Math.floor(elapsed / 60);
+        var s = Math.floor(elapsed % 60);
+        timerDisplay.textContent = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+      }, 250);
+
+      loop(performance.now());
     } catch (err) {
       var msg = err.message || '未知错误';
       alert('无法访问麦克风：' + msg + '\n\n请确保：\n1. 使用 HTTPS 访问\n2. 允许浏览器麦克风权限');
     }
   }
 
-  // ========== 停止检测 ==========
-  function stopDetection() {
-    isRunning = false;
+  // ==================== 主循环 ====================
+  function loop(timestamp) {
+    if (!isRunning) return;
 
-    if (animationId) {
-      cancelAnimationFrame(animationId);
-      animationId = null;
-    }
-    if (stream) {
-      stream.getTracks().forEach(function(t) { t.stop(); });
-      stream = null;
-    }
-    if (audioContext) {
-      audioContext.close();
-      audioContext = null;
+    if (timestamp - lastAnalysisTime > ANALYSIS_INTERVAL) {
+      analyzeFrame();
+      lastAnalysisTime = timestamp;
     }
 
-    savedPeaks = currentPeaks.slice();
+    if (timestamp - lastPeakDisplayTime > PEAK_DISPLAY_INTERVAL) {
+      updateLivePeakDisplay();
+      lastPeakDisplayTime = timestamp;
+    }
 
-    startBtn.disabled = false;
-    stopBtn.disabled = true;
-    statusDot.classList.remove('active');
-    statusText.textContent = savedPeaks.length > 0
-      ? '检测已停止，检测到 ' + savedPeaks.length + ' 个低频峰值'
-      : '检测已停止，未检测到明显峰值';
-
-    updateAnalyzeButton();
+    drawSpectrum();
+    animationId = requestAnimationFrame(loop);
   }
 
-  // ========== 绘制循环 ==========
-  function draw() {
-    if (!isRunning || !analyser) return;
+  // ==================== 单帧分析 ====================
+  function analyzeFrame() {
+    if (!analyser || !audioContext) return;
 
     var data = new Float32Array(analyser.frequencyBinCount);
     analyser.getFloatFrequencyData(data);
 
-    var peaks = detectPeaks(data, savedSampleRate, savedFftSize);
-    currentPeaks = peaks;
+    latestSpectrum = data;
+    latestSampleRate = audioContext.sampleRate;
+    latestFftSize = analyser.fftSize;
 
-    drawSpectrum(data, savedSampleRate, savedFftSize, peaks);
+    var peaks = detectPeaks(data, latestSampleRate, latestFftSize);
+    latestPeaks = peaks;
+    totalFrames++;
+    trackPeaks(peaks, totalFrames);
 
-    var now = performance.now();
-    if (now - lastPeakUpdate > 120) {
-      updatePeaksDisplay(peaks);
-      lastPeakUpdate = now;
+    // 定期清理长期未出现的峰值
+    if (totalFrames % 400 === 0) {
+      trackedPeaks = trackedPeaks.filter(function(t) {
+        return totalFrames - t.lastSeen < 150;
+      });
     }
-
-    animationId = requestAnimationFrame(draw);
   }
 
-  // ========== 峰值检测 ==========
+  // ==================== 峰值检测 ====================
   function detectPeaks(data, sampleRate, fftSize) {
     var freqPerBin = sampleRate / fftSize;
     var minBin = Math.max(1, Math.floor(MIN_FREQ / freqPerBin));
     var maxBin = Math.min(data.length - 2, Math.ceil(MAX_FREQ / freqPerBin));
 
-    var values = [];
+    if (maxBin <= minBin) return [];
+
+    // 用平均值估算噪声底
+    var sum = 0, count = 0;
     for (var i = minBin; i <= maxBin; i++) {
-      var db = data[i];
-      if (isFinite(db)) {
-        values.push({ bin: i, freq: i * freqPerBin, db: db });
-      }
+      if (isFinite(data[i])) { sum += data[i]; count++; }
     }
-
-    if (values.length < 5) return [];
-
-    // 中位数作为噪声底
-    var sortedDb = values.map(function(v) { return v.db; }).sort(function(a, b) { return a - b; });
-    var median = sortedDb[Math.floor(sortedDb.length / 2)];
-    var threshold = median + 6; // 高于噪声底 6dB
+    if (count === 0) return [];
+    var mean = sum / count;
+    var threshold = mean + 7;
 
     var peaks = [];
-    for (var j = 1; j < values.length - 1; j++) {
-      var prev = values[j - 1].db;
-      var curr = values[j].db;
-      var next = values[j + 1].db;
+    for (var j = minBin + 1; j < maxBin; j++) {
+      var prev = data[j - 1];
+      var curr = data[j];
+      var next = data[j + 1];
+      if (!isFinite(prev) || !isFinite(curr) || !isFinite(next)) continue;
 
       if (curr > prev && curr > next && curr > threshold) {
-        // 抛物线插值，提高频率精度
+        // 抛物线插值提高频率精度
         var denom = prev - 2 * curr + next;
         var delta = denom !== 0 ? 0.5 * (prev - next) / denom : 0;
-        var freq = (values[j].bin + delta) * freqPerBin;
-
-        peaks.push({
-          freq: Math.max(MIN_FREQ, Math.min(MAX_FREQ, freq)),
-          level: curr,
-          prominence: curr - median
-        });
+        var freq = (j + delta) * freqPerBin;
+        if (freq >= MIN_FREQ && freq <= MAX_FREQ) {
+          peaks.push({ freq: freq, level: curr });
+        }
       }
     }
 
-    // 按强度排序，取前 5 个
-    return peaks.sort(function(a, b) { return b.level - a.level; }).slice(0, 5);
+    // 按强度取前 8 个
+    return peaks.sort(function(a, b) { return b.level - a.level; }).slice(0, 8);
   }
 
-  // ========== 绘制频谱 ==========
-  function drawSpectrum(data, sampleRate, fftSize, peaks) {
-    var W = canvas.width;
-    var H = canvas.height;
-    var freqPerBin = sampleRate / fftSize;
-    var minBin = Math.floor(MIN_FREQ / freqPerBin);
-    var maxBin = Math.ceil(MAX_FREQ / freqPerBin);
+  // ==================== 跨帧峰值追踪 ====================
+  function trackPeaks(peaks, frameIndex) {
+    peaks.forEach(function(p) {
+      var merged = false;
+      for (var i = 0; i < trackedPeaks.length; i++) {
+        var t = trackedPeaks[i];
+        // 对数距离 < 0.02 视为同一频率（约 2% 偏差）
+        if (Math.abs(Math.log(p.freq / t.freq)) < 0.02) {
+          t.count++;
+          t.totalLevel += p.level;
+          if (p.level > t.maxLevel) t.maxLevel = p.level;
+          t.lastSeen = frameIndex;
+          t.freq = (t.freq * (t.count - 1) + p.freq) / t.count;
+          merged = true;
+          break;
+        }
+      }
+      if (!merged) {
+        trackedPeaks.push({
+          freq: p.freq,
+          count: 1,
+          totalLevel: p.level,
+          maxLevel: p.level,
+          firstSeen: frameIndex,
+          lastSeen: frameIndex
+        });
+      }
+    });
+  }
 
-    // 计算 dB 范围
-    var minDb = Infinity, maxDb = -Infinity;
+  // ==================== 实时峰值显示 ====================
+  function updateLivePeakDisplay() {
+    if (latestPeaks.length === 0) {
+      livePeaks.innerHTML = '<span style="color:#555;font-size:.8rem">未检测到明显峰值…</span>';
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < Math.min(4, latestPeaks.length); i++) {
+      var p = latestPeaks[i];
+      var cls = i === 0 ? 'live-tag hot' : 'live-tag';
+      html += '<span class="' + cls + '">' + p.freq.toFixed(1) + ' Hz</span>';
+    }
+    livePeaks.innerHTML = html;
+  }
+
+  // ==================== 绘制频谱 ====================
+  function drawSpectrum() {
+    if (!latestSpectrum || !canvasW) return;
+
+    var W = canvasW;
+    var H = canvasH;
+    var data = latestSpectrum;
+    var sampleRate = latestSampleRate;
+    var fftSize = latestFftSize;
+    var freqPerBin = sampleRate / fftSize;
+    var minBin = Math.max(1, Math.floor(MIN_FREQ / freqPerBin));
+    var maxBin = Math.min(data.length - 1, Math.ceil(MAX_FREQ / freqPerBin));
+
+    // 确定 dB 显示范围
+    var maxDb = -Infinity;
+    var minDb = Infinity;
     for (var i = minBin; i <= maxBin; i++) {
-      var db = data[i];
-      if (isFinite(db)) {
-        if (db > maxDb) maxDb = db;
-        if (db < minDb) minDb = db;
+      var d = data[i];
+      if (isFinite(d)) {
+        if (d > maxDb) maxDb = d;
+        if (d < minDb) minDb = d;
       }
     }
-    if (!isFinite(minDb)) { minDb = -100; maxDb = -20; }
+    if (!isFinite(maxDb)) { maxDb = -20; minDb = -100; }
+    var dbRange = Math.max(maxDb - minDb, 40);
+    var topDb = maxDb + 5;
+    var bottomDb = topDb - dbRange;
 
-    var dbRange = Math.max(maxDb - minDb, 30);
-    minDb = maxDb - dbRange;
-
-    // 清空
+    // 背景
     ctx.fillStyle = '#0a0a0f';
     ctx.fillRect(0, 0, W, H);
 
-    // 网格
+    // 频率网格（对数）
+    var gridFreqs = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000];
     ctx.strokeStyle = '#15151f';
     ctx.lineWidth = 1;
-    ctx.font = '10px monospace';
+    ctx.font = '9px monospace';
     ctx.fillStyle = '#444';
     ctx.textAlign = 'center';
 
-    for (var f = 20; f <= 200; f += 20) {
-      var x = ((f - MIN_FREQ) / (MAX_FREQ - MIN_FREQ)) * W;
+    for (var g = 0; g < gridFreqs.length; g++) {
+      var f = gridFreqs[g];
+      var x = ((Math.log10(f) - LOG_MIN) / (LOG_MAX - LOG_MIN)) * W;
       ctx.beginPath();
       ctx.moveTo(x, 0);
-      ctx.lineTo(x, H - 18);
+      ctx.lineTo(x, H - 16);
       ctx.stroke();
-      ctx.fillText(f + '', x, H - 5);
+      var label = f >= 1000 ? (f / 1000) + 'k' : f + '';
+      ctx.fillText(label, x, H - 4);
     }
-    ctx.fillText('Hz', W - 15, H - 5);
 
     // 频谱曲线
     ctx.beginPath();
@@ -534,221 +674,337 @@
 
     var started = false;
     for (var k = minBin; k <= maxBin; k++) {
-      var d = data[k];
-      if (!isFinite(d)) continue;
-      var px = ((k * freqPerBin - MIN_FREQ) / (MAX_FREQ - MIN_FREQ)) * W;
-      var py = H - 18 - ((d - minDb) / dbRange) * (H - 18);
+      var db = data[k];
+      if (!isFinite(db)) continue;
+      var freq = k * freqPerBin;
+      if (freq < MIN_FREQ) continue;
+      var px = ((Math.log10(freq) - LOG_MIN) / (LOG_MAX - LOG_MIN)) * W;
+      var py = (H - 16) - ((db - bottomDb) / dbRange) * (H - 16);
       if (!started) { ctx.moveTo(px, py); started = true; }
       else { ctx.lineTo(px, py); }
     }
     ctx.stroke();
 
-    // 峰值标记
-    for (var p = 0; p < peaks.length; p++) {
-      var pk = peaks[p];
-      var mx = ((pk.freq - MIN_FREQ) / (MAX_FREQ - MIN_FREQ)) * W;
-      var my = H - 18 - ((pk.level - minDb) / dbRange) * (H - 18);
+    // 曲线下方渐变填充
+    ctx.lineTo(W, H - 16);
+    ctx.lineTo(0, H - 16);
+    ctx.closePath();
+    var grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, 'rgba(0,255,136,0.12)');
+    grad.addColorStop(1, 'rgba(0,255,136,0)');
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // 标记当前帧的前 3 个峰值
+    for (var m = 0; m < Math.min(3, latestPeaks.length); m++) {
+      var pk = latestPeaks[m];
+      var mx = ((Math.log10(pk.freq) - LOG_MIN) / (LOG_MAX - LOG_MIN)) * W;
+      var my = (H - 16) - ((pk.level - bottomDb) / dbRange) * (H - 16);
 
       ctx.beginPath();
-      ctx.arc(mx, my, 5, 0, Math.PI * 2);
-      ctx.fillStyle = '#ff3366';
+      ctx.arc(mx, my, 4.5, 0, Math.PI * 2);
+      ctx.fillStyle = m === 0 ? '#ff3366' : '#ffaa00';
       ctx.fill();
       ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 1.2;
       ctx.stroke();
 
-      var label = pk.freq.toFixed(1) + 'Hz';
-      ctx.fillStyle = '#ff3366';
-      ctx.font = 'bold 11px monospace';
+      var label = pk.freq.toFixed(pk.freq < 100 ? 1 : 0) + 'Hz';
+      ctx.fillStyle = m === 0 ? '#ff3366' : '#ffaa00';
+      ctx.font = 'bold 10px monospace';
       ctx.textAlign = 'left';
-      var labelX = Math.min(mx + 8, W - 60);
-      ctx.fillText(label, labelX, my - 8);
+      var lx = Math.min(mx + 7, W - 55);
+      ctx.fillText(label, lx, my - 7);
     }
     ctx.textAlign = 'left';
   }
 
-  // ========== 更新峰值标签 ==========
-  function updatePeaksDisplay(peaks) {
-    if (peaks.length === 0) {
-      peaksDisplay.innerHTML = '<span style="color:#555;font-size:0.85rem">未检测到明显峰值，请保持安静…</span>';
-      return;
-    }
-    var html = '';
-    for (var i = 0; i < peaks.length; i++) {
-      html += '<span class="peak-tag">' + peaks[i].freq.toFixed(1) + ' Hz</span>';
-    }
-    peaksDisplay.innerHTML = html;
+  // ==================== 停止检测 & 生成报告 ====================
+  function stopDetection() {
+    isRunning = false;
+
+    if (animationId) { cancelAnimationFrame(animationId); animationId = null; }
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    if (stream) { stream.getTracks().forEach(function(t) { t.stop(); }); stream = null; }
+    if (audioContext) { audioContext.close(); audioContext = null; analyser = null; }
+
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+    statusDot.classList.remove('active');
+
+    var elapsed = (performance.now() - detectionStartTime) / 1000;
+    statusText.textContent = '检测结束';
+
+    // 生成总结报告
+    var summarized = summarizePeaks(totalFrames);
+    renderReport(summarized, elapsed);
+
+    reportCard.style.display = 'block';
+    roomCard.style.display = 'block';
+
+    // 滚动到报告
+    setTimeout(function() {
+      reportCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   }
 
-  // ========== 分析按钮状态 ==========
-  function updateAnalyzeButton() {
-    var L = parseFloat(document.getElementById('roomLength').value);
-    var W = parseFloat(document.getElementById('roomWidth').value);
-    var H = parseFloat(document.getElementById('roomHeight').value);
-    var peaks = isRunning ? currentPeaks : savedPeaks;
-    var hasPeaks = peaks.length > 0;
-    var hasDims = L > 0 && W > 0 && H > 0;
-    analyzeBtn.disabled = !(hasPeaks && hasDims);
+  // ==================== 峰值总结 ====================
+  function summarizePeaks(total) {
+    if (total === 0) return [];
+
+    return trackedPeaks
+      .filter(function(t) {
+        // 持续性 >= 5% 或出现次数 >= 5
+        return t.count >= total * 0.05 || t.count >= 5;
+      })
+      .map(function(t) {
+        return {
+          freq: t.freq,
+          persistence: t.count / total,
+          avgLevel: t.totalLevel / t.count,
+          maxLevel: t.maxLevel,
+          count: t.count
+        };
+      })
+      .sort(function(a, b) {
+        // 综合得分：持续性权重高，强度辅助
+        var scoreA = a.persistence * 2 + (a.avgLevel + 100) / 100;
+        var scoreB = b.persistence * 2 + (b.avgLevel + 100) / 100;
+        return scoreB - scoreA;
+      })
+      .slice(0, 6);
   }
 
-  // ========== 分析 ==========
-  function analyze() {
-    var L = parseFloat(document.getElementById('roomLength').value);
-    var W = parseFloat(document.getElementById('roomWidth').value);
-    var H = parseFloat(document.getElementById('roomHeight').value);
-    var peaks = isRunning ? currentPeaks : savedPeaks;
-
-    if (!L || !W || !H || !peaks.length) {
-      alert('请先完成检测并输入房间尺寸');
-      return;
-    }
-
-    var modes = calcRoomModes(L, W, H);
-    var matched = matchPeaks(peaks, modes);
-    var diagnosis = diagnose(matched);
-
-    displayResult(matched, modes, diagnosis, L, W, H);
-  }
-
-  // ========== 计算房间驻波 ==========
-  function calcRoomModes(L, W, H) {
-    var c = 343; // 声速 m/s
-    var modes = [];
-
-    for (var n = 1; n <= 5; n++) {
-      var fL = n * c / (2 * L);
-      var fW = n * c / (2 * W);
-      var fH = n * c / (2 * H);
-
-      if (fL <= MAX_FREQ) modes.push({ freq: fL, axis: '长', dim: L, n: n });
-      if (fW <= MAX_FREQ) modes.push({ freq: fW, axis: '宽', dim: W, n: n });
-      if (fH <= MAX_FREQ) modes.push({ freq: fH, axis: '高', dim: H, n: n });
-    }
-
-    return modes.sort(function(a, b) { return a.freq - b.freq; });
-  }
-
-  // ========== 匹配峰值与驻波 ==========
-  function matchPeaks(peaks, modes) {
-    return peaks.map(function(peak) {
-      var best = null;
-      var bestDiff = Infinity;
-
-      for (var i = 0; i < modes.length; i++) {
-        var diff = Math.abs(peak.freq - modes[i].freq);
-        if (diff < bestDiff) {
-          bestDiff = diff;
-          best = modes[i];
-        }
-      }
-
-      return {
-        freq: peak.freq,
-        level: peak.level,
-        match: bestDiff < 2 ? best : null,
-        diff: bestDiff
-      };
-    });
-  }
-
-  // ========== 诊断 ==========
-  function diagnose(matched) {
-    var matchedList = matched.filter(function(p) { return p.match; });
-    var unmatchedList = matched.filter(function(p) { return !p.match; });
-
-    if (matchedList.length === 0 && unmatchedList.length === 0) {
-      return {
-        title: '未检测到明显低频',
-        description: '当前没有检测到突出的低频峰值。请在听到嗡鸣声的位置重新检测。',
-        suggestions: [
-          '确保在听到噪音的位置、安静时段检测',
-          '检测时保持环境安静，避免说话和走动',
-          '可以尝试夜间复测，外部噪音更少'
-        ]
-      };
-    }
-
-    if (matchedList.length > 0 && unmatchedList.length > 0) {
-      var mf = matchedList.map(function(p) { return p.freq.toFixed(1) + 'Hz'; }).join('、');
-      var uf = unmatchedList.map(function(p) { return p.freq.toFixed(1) + 'Hz'; }).join('、');
-      return {
-        title: '🔊 室内驻波 + 外部声源',
-        description: '检测到 ' + mf + ' 与房间驻波吻合，' + uf + ' 可能来自外部。两者可能叠加，导致问题更严重。建议先排查外部声源，再处理房间声学。',
-        suggestions: [
-          '拿着手机往不同方向走动，观察哪个方向低频变强',
-          '排查自家设备：关总闸、关水泵、关空调，逐项复测',
-          '将床头移离墙面 30–50cm，再在原来位置复测',
-          '在床尾墙面放置书架、衣柜或厚织物，打散声波反射'
-        ]
-      };
-    }
-
-    if (matchedList.length > 0) {
-      var freqs = matchedList.map(function(p) { return p.freq.toFixed(1) + 'Hz'; }).join('、');
-      return {
-        title: '🔊 疑似室内驻波放大',
-        description: '检测到 ' + freqs + ' 与房间尺寸产生的驻波频率吻合。驻波是声波在两面墙之间来回反射、叠加增强的现象，会导致房间某些位置声音特别大（比如贴墙的床头），换个位置就减弱。',
-        suggestions: [
-          '将床头移离墙面 30–50cm，再在原来位置复测，看峰值是否下降',
-          '在床尾墙面放置书架、衣柜或厚织物，打散声波反射',
-          '如果问题持续，考虑在墙角放置针对 50Hz 以下的低频陷阱',
-          '换到其他房间复测，确认是否为该房间的声学问题'
-        ]
-      };
-    }
-
-    var ufreqs = unmatchedList.map(function(p) { return p.freq.toFixed(1) + 'Hz'; }).join('、');
+  // ==================== 声源推测 ====================
+  function getSourceInfo(freq) {
+    if (freq < 25) return {
+      category: '次声 / 极低频',
+      color: 'blue',
+      possible: ['大型工业设备', '地震活动', '极端天气', '远处爆炸'],
+      advice: '普通人难以控制，建议专业检测'
+    };
+    if (freq < 40) return {
+      category: '超低频',
+      color: 'blue',
+      possible: ['工厂重型机械', '大型压缩机', '远处空调主机', '地铁/铁路'],
+      advice: '穿透力极强，需专业隔声处理'
+    };
+    if (freq < 60) return {
+      category: '低频嗡鸣',
+      color: 'red',
+      possible: ['变压器', '水泵', '电梯', '工厂设备', '房间驻波放大'],
+      advice: '常见于变压器/水泵，也可能是房间驻波。先排查设备，再测房间尺寸'
+    };
+    if (freq < 100) return {
+      category: '低频',
+      color: 'orange',
+      possible: ['空调外机', '冰箱', '风扇', '水泵', '汽车发动机'],
+      advice: '常见家电频率。关闭可疑设备逐个排查'
+    };
+    if (freq < 200) return {
+      category: '中低频',
+      color: 'orange',
+      possible: ['空调', '风扇', '电机', '管道共振', '低音音箱'],
+      advice: '检查空调、风扇、管道固定情况'
+    };
+    if (freq < 500) return {
+      category: '中频',
+      color: 'green',
+      possible: ['家电', '风扇', '电机', '人声基频', '环境噪音'],
+      advice: '一般环境噪音，注意是否持续'
+    };
+    if (freq < 2000) return {
+      category: '中高频',
+      color: 'green',
+      possible: ['说话声', '电视', '一般环境噪声', '乐器'],
+      advice: '通常是正常生活声音'
+    };
+    if (freq < 6000) return {
+      category: '高频',
+      color: 'blue',
+      possible: ['电子设备', '报警器', '开关电源', '蚊虫', '金属摩擦'],
+      advice: '检查附近电子设备'
+    };
     return {
-      title: '📡 疑似外部低频声源',
-      description: '检测到 ' + ufreqs + '，与当前房间尺寸的驻波频率不吻合。这可能是外部设备（如工厂、水泵、变压器、光伏逆变器）传来的低频。',
-      suggestions: [
-        '拿着手机往不同方向走动，观察哪个方向声音变强',
-        '排查自家设备：关总闸、关水泵、关空调，逐项复测',
-        '如果确认是外部声源，可向环保部门投诉或要求第三方检测',
-        '窗户加装隔音层，但低频需要专业方案，普通隔音棉效果有限'
-      ]
+      category: '超高频',
+      color: 'blue',
+      possible: ['超声波设备', '电子干扰', '开关电源啸叫', '驱鼠器'],
+      advice: '可能来自驱鼠器、开关电源等，检查电子设备'
     };
   }
 
-  // ========== 展示结果 ==========
-  function displayResult(matched, modes, diagnosis, L, W, H) {
-    var resultCard = document.getElementById('resultCard');
-    var content = document.getElementById('resultContent');
+  // ==================== 渲染报告 ====================
+  function renderReport(peaks, elapsed) {
+    if (peaks.length === 0) {
+      reportContent.innerHTML =
+        '<div class="empty">未检测到持续性的明显峰值。<br>请确认在听到噪音的位置重新检测，并保持环境安静。</div>';
+      return;
+    }
 
-    var peakDetails = matched.map(function(p) {
-      if (p.match) {
-        return '<div class="match-detail">' +
-          '<span class="freq">● ' + p.freq.toFixed(1) + ' Hz</span> ' +
-          '<span class="ok">匹配：' + p.match.axis + '度驻波</span> ' +
-          '（' + p.match.n + '次，' + p.match.dim.toFixed(2) + 'm → ' + p.match.freq.toFixed(1) + 'Hz）' +
-          '</div>';
-      } else {
-        return '<div class="match-detail">' +
-          '<span class="freq">● ' + p.freq.toFixed(1) + ' Hz</span> ' +
-          '<span class="no">未匹配到房间驻波</span>，可能是外部声源' +
-          '</div>';
-      }
-    }).join('');
+    var html = '';
+    html += '<div class="report-header">';
+    html += '<span>检测时长：<strong style="color:#00ff88">' + elapsed.toFixed(1) + ' 秒</strong></span>';
+    html += '<span>有效分析帧：<strong style="color:#00ff88">' + totalFrames + '</strong></span>';
+    html += '</div>';
 
-    var suggestionsHtml = diagnosis.suggestions.map(function(s) {
-      return '<li>' + s + '</li>';
-    }).join('');
+    for (var i = 0; i < peaks.length; i++) {
+      var p = peaks[i];
+      var info = getSourceInfo(p.freq);
+      var persistPct = Math.round(p.persistence * 100);
 
-    content.innerHTML =
-      '<div class="result-title">' + diagnosis.title + '</div>' +
-      '<div class="result-desc">' + diagnosis.description + '</div>' +
-      '<div class="match-box">' +
-        '<div class="match-box-title">峰值匹配详情</div>' +
-        peakDetails +
-      '</div>' +
-      '<div style="font-size:0.85rem;color:#888;margin-bottom:6px;">建议</div>' +
-      '<ul class="suggestions">' + suggestionsHtml + '</ul>' +
-      '<div class="disclaimer">' +
-        '⚠️ 本工具仅供初步排查参考。手机麦克风在 50Hz 以下衰减严重，结果不能替代专业声级计。如需法律用途，请委托专业机构检测。' +
+      // 根据持续性决定样式
+      var itemClass = 'peak-item';
+      var freqClass = 'peak-freq';
+      if (persistPct >= 70) { itemClass += ' critical'; freqClass = 'peak-freq'; }
+      else if (persistPct >= 35) { itemClass += ' warn'; freqClass = 'peak-freq warn'; }
+      else { freqClass = 'peak-freq info'; }
+
+      // 持续性条颜色
+      var barColor = persistPct >= 70 ? '#ff3366' : (persistPct >= 35 ? '#ffaa00' : '#00aaff');
+      var freqLabel = p.freq < 100 ? p.freq.toFixed(1) : p.freq.toFixed(0);
+
+      html += '<div class="' + itemClass + '">';
+      html += '<div class="peak-top">';
+      html += '<span class="' + freqClass + '">' + freqLabel + ' Hz</span>';
+      html += '<span class="peak-db">平均 ' + p.avgLevel.toFixed(1) + ' dB · 峰值 ' + p.maxLevel.toFixed(1) + ' dB</span>';
+      html += '</div>';
+
+      // 持续性条
+      html += '<div class="persist-bar"><div class="persist-fill" style="width:' + persistPct + '%;background:' + barColor + '"></div></div>';
+
+      // 标签
+      html += '<div class="peak-meta">';
+      html += '<span class="meta-chip ' + (persistPct >= 70 ? 'warn' : 'ok') + '">持续性 ' + persistPct + '%</span>';
+      html += '<span class="meta-chip ' + info.color + '">' + info.category + '</span>';
+      html += '<span class="meta-chip">出现 ' + p.count + ' 次</span>';
+      html += '</div>';
+
+      // 可能声源
+      html += '<div class="peak-source"><strong>可能声源：</strong>' + info.possible.join('、') + '</div>';
+      html += '<div class="peak-advice">' + info.advice + '</div>';
+      html += '</div>';
+    }
+
+    html += '<div class="disclaimer">' +
+      '⚠️ 本工具仅供初步排查参考。手机麦克风在 50Hz 以下衰减严重，结果不能替代专业声级计。' +
+      '如需法律用途，请委托专业机构检测。' +
       '</div>';
 
-    resultCard.style.display = 'block';
-    resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    reportContent.innerHTML = html;
+  }
+
+  // ==================== 房间驻波分析 ====================
+  function updateAnalyzeBtn() {
+    var L = parseFloat(document.getElementById('roomLength').value);
+    var W = parseFloat(document.getElementById('roomWidth').value);
+    var H = parseFloat(document.getElementById('roomHeight').value);
+    analyzeBtn.disabled = !(L > 0 && W > 0 && H > 0 && trackedPeaks.length > 0);
+  }
+
+  function calcRoomModes(L, W, H) {
+    var c = 343;
+    var modes = [];
+    for (var n = 1; n <= 6; n++) {
+      var fL = n * c / (2 * L);
+      var fW = n * c / (2 * W);
+      var fH = n * c / (2 * H);
+      if (fL <= 200) modes.push({ freq: fL, axis: '长', dim: L, n: n });
+      if (fW <= 200) modes.push({ freq: fW, axis: '宽', dim: W, n: n });
+      if (fH <= 200) modes.push({ freq: fH, axis: '高', dim: H, n: n });
+    }
+    return modes.sort(function(a, b) { return a.freq - b.freq; });
+  }
+
+  function analyzeRoom() {
+    var L = parseFloat(document.getElementById('roomLength').value);
+    var W = parseFloat(document.getElementById('roomWidth').value);
+    var H = parseFloat(document.getElementById('roomHeight').value);
+    if (!L || !W || !H) return;
+
+    var modes = calcRoomModes(L, W, H);
+
+    // 只取 20-200Hz 的持续峰值用于驻波匹配
+    var lowPeaks = trackedPeaks
+      .filter(function(t) {
+        return t.freq >= 20 && t.freq <= 200 &&
+               (t.count >= totalFrames * 0.05 || t.count >= 5);
+      })
+      .map(function(t) {
+        return {
+          freq: t.freq,
+          persistence: t.count / totalFrames,
+          avgLevel: t.totalLevel / t.count
+        };
+      })
+      .sort(function(a, b) { return b.persistence - a.persistence; })
+      .slice(0, 4);
+
+    if (lowPeaks.length === 0) {
+      roomResult.innerHTML = '<div class="empty">未检测到 20-200Hz 的持续低频峰值，无法与房间驻波匹配。</div>';
+      return;
+    }
+
+    var html = '<div class="modal-grid">';
+    html += '<div class="modal-title">房间尺寸与驻波频率</div>';
+    html += '<div class="modal-row"><span class="axis">长度 ' + L.toFixed(2) + ' m</span><span class="val">' +
+      modes.filter(function(m) { return m.axis === '长'; }).map(function(m) { return m.freq.toFixed(1) + 'Hz(' + m.n + '次)'; }).join(' / ') +
+      '</span></div>';
+    html += '<div class="modal-row"><span class="axis">宽度 ' + W.toFixed(2) + ' m</span><span class="val">' +
+      modes.filter(function(m) { return m.axis === '宽'; }).map(function(m) { return m.freq.toFixed(1) + 'Hz(' + m.n + '次)'; }).join(' / ') +
+      '</span></div>';
+    html += '<div class="modal-row"><span class="axis">高度 ' + H.toFixed(2) + ' m</span><span class="val">' +
+      modes.filter(function(m) { return m.axis === '高'; }).map(function(m) { return m.freq.toFixed(1) + 'Hz(' + m.n + '次)'; }).join(' / ') +
+      '</span></div>';
+    html += '</div>';
+
+    // 匹配检测到的低频峰值
+    html += '<div class="modal-grid" style="margin-top:10px;">';
+    html += '<div class="modal-title">检测峰值与驻波匹配</div>';
+
+    for (var i = 0; i < lowPeaks.length; i++) {
+      var p = lowPeaks[i];
+      var best = null;
+      var bestDiff = Infinity;
+      for (var j = 0; j < modes.length; j++) {
+        var diff = Math.abs(p.freq - modes[j].freq);
+        if (diff < bestDiff) { bestDiff = diff; best = modes[j]; }
+      }
+      var isMatch = bestDiff < 2.5;
+      var matchText = isMatch
+        ? '✅ 匹配 ' + best.axis + '度 ' + best.n + '次驻波（' + best.freq.toFixed(1) + 'Hz）'
+        : '❌ 未匹配到房间驻波，可能来自外部声源';
+
+      html += '<div class="modal-row">';
+      html += '<span class="axis">' + p.freq.toFixed(1) + ' Hz（持续性 ' + Math.round(p.persistence * 100) + '%）</span>';
+      html += '<span class="val' + (isMatch ? ' match' : '') + '">' + matchText + '</span>';
+      html += '</div>';
+    }
+
+    html += '</div>';
+
+    // 结论
+    var matchedCount = lowPeaks.filter(function(p) {
+      var bestDiff = Infinity;
+      for (var j = 0; j < modes.length; j++) {
+        var diff = Math.abs(p.freq - modes[j].freq);
+        if (diff < bestDiff) bestDiff = diff;
+      }
+      return bestDiff < 2.5;
+    }).length;
+
+    if (matchedCount > 0) {
+      html += '<div style="margin-top:12px;padding:12px;background:rgba(255,51,102,.08);border-radius:10px;border:1px solid rgba(255,51,102,.2);">';
+      html += '<div style="color:#ff3366;font-weight:700;font-size:.85rem;margin-bottom:4px;">🔊 房间驻波可能正在放大声音</div>';
+      html += '<div style="font-size:.82rem;color:#bbb;line-height:1.6;">检测到的低频峰值与房间尺寸产生的驻波频率吻合。驻波是声波在两面墙之间来回反射、叠加增强的现象，会导致房间某些位置声音特别大（比如贴墙的床头），换个位置就减弱。</div>';
+      html += '</div>';
+    } else {
+      html += '<div style="margin-top:12px;padding:12px;background:rgba(0,170,255,.08);border-radius:10px;border:1px solid rgba(0,170,255,.2);">';
+      html += '<div style="color:#00aaff;font-weight:700;font-size:.85rem;margin-bottom:4px;">📡 峰值与房间驻波不吻合</div>';
+      html += '<div style="font-size:.82rem;color:#bbb;line-height:1.6;">检测到的低频峰值与当前房间尺寸的驻波频率不匹配。声音更可能来自外部声源，建议拿着手机往不同方向走动，观察哪个方向声音变强。</div>';
+      html += '</div>';
+    }
+
+    roomResult.innerHTML = html;
   }
 
 })();
