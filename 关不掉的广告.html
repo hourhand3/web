@@ -1,0 +1,1601 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>关不掉的广告 · 长辈模式</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2323272F'/%3E%3Crect x='10' y='18' width='44' height='30' rx='5' fill='%23FFD60A'/%3E%3Cpath d='M22 30h20M22 38h12' stroke='%23FF3B30' stroke-width='4' stroke-linecap='round'/%3E%3Ccircle cx='46' cy='14' r='7' fill='%23FF3B30'/%3E%3C/svg%3E">
+<style>
+/* ============ 基础 ============ */
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  font-family:"PingFang SC","HarmonyOS Sans SC","Microsoft YaHei","Segoe UI",sans-serif;
+  background:#23272F;color:#EDEAE3;overflow:hidden;
+  user-select:none;-webkit-user-select:none;
+}
+button{font-family:inherit;border:none;background:none;cursor:pointer;color:inherit}
+button:focus{outline:none}
+.no-click{pointer-events:none}
+
+/* ============ 舞台布局 ============ */
+.stage{display:flex;align-items:center;justify-content:center;gap:56px;height:100vh;padding:24px;position:relative}
+.stage .glow{position:fixed;left:12%;top:8%;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(255,214,10,.08),transparent 65%);pointer-events:none}
+.panel{width:340px;color:#C9CDD6;position:relative;z-index:2}
+.panel .kicker{font-size:12px;letter-spacing:4px;color:#8B93A3;margin-bottom:14px}
+.panel h1{font-size:44px;line-height:1.15;color:#F5F1EA;font-weight:800;letter-spacing:2px;margin-bottom:8px}
+.panel h1 em{font-style:normal;color:#FFD60A}
+.panel .sub{font-size:15px;color:#A7ADB8;margin-bottom:26px;line-height:1.7}
+.panel .rules{background:#2A2F3A;border:1px solid #363C4A;border-radius:14px;padding:16px 18px;font-size:13.5px;line-height:1.85;color:#B9BEC9}
+.panel .rules b{color:#FFD60A;font-weight:600}
+.panel .rule-note{margin-top:14px;font-size:12.5px;color:#79808F;line-height:1.8}
+.panel .rule-note i{font-style:normal;color:#FF9F43}
+
+/* ============ 手机外壳 ============ */
+.phone{width:392px;height:790px;position:relative;z-index:2;flex:0 0 auto}
+.phone-frame{
+  width:100%;height:100%;border-radius:52px;padding:14px;
+  background:linear-gradient(160deg,#3A3F4C,#262A33 55%,#20242C);
+  box-shadow:0 40px 90px rgba(0,0,0,.55),inset 0 0 0 2px rgba(255,255,255,.05),0 0 0 1px #15181F;
+  position:relative;
+}
+.phone-frame::before{content:"";position:absolute;left:50%;top:22px;transform:translateX(-50%);width:118px;height:26px;background:#15181F;border-radius:14px;z-index:60}
+.screen{
+  width:100%;height:100%;border-radius:38px;overflow:hidden;position:relative;
+  background:#F5F1EA;display:flex;flex-direction:column;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.12);
+}
+
+/* ============ 状态栏 ============ */
+.statusbar{
+  height:46px;flex:0 0 46px;padding:14px 22px 0;display:flex;align-items:center;justify-content:space-between;
+  background:#1C1E24;color:#EDEAE3;font-size:13px;font-weight:600;position:relative;z-index:40;
+}
+.statusbar .sb-right{display:flex;align-items:center;gap:6px}
+.statusbar svg{display:block}
+.sb-notis{position:absolute;left:0;right:0;top:46px;z-index:45;display:none;flex-direction:column}
+.sb-notis.open{display:flex}
+.sb-noti{
+  background:#2A2E37;color:#EDEAE3;padding:10px 14px;font-size:12px;border-bottom:1px solid #20242C;
+  display:flex;align-items:center;gap:8px;animation:notiDrop .25s ease both;
+}
+.sb-noti b{flex:1;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-noti .nt{color:#FFD60A;font-weight:700;font-size:11px}
+.sb-noti.tap{background:#3A3F4C}
+
+/* ============ HUD ============ */
+.hud{
+  flex:0 0 auto;padding:10px 14px 8px;background:#F5F1EA;border-bottom:1px solid #E4DED2;
+  display:flex;flex-direction:column;gap:7px;position:relative;z-index:20;
+}
+.hud .goal{display:flex;align-items:center;gap:8px;font-size:13.5px;color:#4A4238;font-weight:600}
+.hud .goal .g-ico{width:22px;height:22px;border-radius:7px;background:#E8A87C;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;flex:0 0 auto}
+.hud .goal .g-txt{flex:1}
+.hud .bars{display:flex;gap:10px}
+.hud .bar{flex:1;display:flex;flex-direction:column;gap:3px}
+.hud .bar .lbl{font-size:10.5px;color:#8A8276;display:flex;justify-content:space-between}
+.hud .bar .track{height:7px;background:#E5DFD3;border-radius:4px;overflow:hidden}
+.hud .bar .fill{height:100%;border-radius:4px;transition:width .18s linear;background:#7BC47F}
+.hud .bar.time .fill{background:linear-gradient(90deg,#FF9F43,#FF3B30)}
+.hud .bar.pat .fill{background:linear-gradient(90deg,#7BC47F,#FFD60A)}
+.hud .bar.time.low .fill{animation:blinkBar .5s steps(2) infinite}
+@keyframes blinkBar{50%{opacity:.45}}
+@keyframes notiDrop{from{transform:translateY(-14px);opacity:0}}
+
+/* ============ App 内容区 ============ */
+.app{flex:1;position:relative;overflow:hidden;background:#F5F1EA}
+.app-inner{position:absolute;inset:0;display:flex;flex-direction:column}
+.screen-title{flex:0 0 auto;padding:12px 16px 8px;font-size:16px;font-weight:700;color:#4A4238}
+.screen-title small{display:block;font-size:11px;color:#9A9184;font-weight:400;margin-top:2px}
+.screen-hint{flex:0 0 auto;margin:0 14px 8px;padding:8px 12px;background:#FFF6E3;border:1px solid #F0DEB4;border-radius:10px;font-size:12.5px;color:#7A6A44;line-height:1.6}
+.screen-hint b{color:#B7791F}
+
+/* ============ 通用按钮 ============ */
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:8px;border-radius:14px;
+  font-size:16px;font-weight:700;padding:14px 20px;transition:transform .08s;
+}
+.btn:active{transform:scale(.96)}
+.btn-primary{background:#E86F51;color:#fff;box-shadow:0 4px 0 #C25236}
+.btn-primary:active{box-shadow:0 1px 0 #C25236;transform:translateY(3px)}
+.btn-ghost{background:#EDE7DB;color:#6B6354;border:1px solid #D8D0C0}
+.btn-dark{background:#1C1E24;color:#F5F1EA}
+.btn-block{width:100%}
+.btn[disabled]{opacity:.45;pointer-events:none}
+
+/* 开关 */
+.switch{width:50px;height:30px;border-radius:15px;background:#D9D2C4;position:relative;flex:0 0 auto;transition:background .2s}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .2s}
+.switch.on{background:#7BC47F}
+.switch.on::after{left:23px}
+
+/* ============ 广告通用 ============ */
+.adlayer{position:absolute;inset:0;z-index:50;pointer-events:none}
+.ad{pointer-events:auto;position:absolute;font-weight:700;overflow:hidden}
+.ad *{box-sizing:border-box}
+.ad-flash{animation:adPulse .7s steps(2) infinite}
+@keyframes adPulse{50%{filter:brightness(1.35)}}
+.ad .ad-x{
+  position:absolute;top:8px;right:8px;width:30px;height:30px;border-radius:50%;
+  background:#FF3B30;color:#fff;font-size:16px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px rgba(255,59,48,.25);
+}
+.ad .ad-x.fake{background:#FFD60A;color:#7A2E00;animation:fakePulse .5s steps(2) infinite}
+@keyframes fakePulse{50%{transform:scale(1.18)}}
+.ad .ad-skip{
+  position:absolute;bottom:8px;right:8px;padding:4px 10px;font-size:11px;font-weight:500;
+  color:#E4E4E4;background:rgba(20,20,20,.28);border-radius:6px;letter-spacing:1px;
+}
+.ad .ad-skip.ready{color:#fff;background:rgba(20,20,20,.55);animation:skipIn .3s ease}
+@keyframes skipIn{from{transform:scale(1.4);opacity:0}}
+.ad-cta{
+  display:inline-flex;align-items:center;justify-content:center;border-radius:999px;
+  color:#fff;font-weight:800;box-shadow:0 3px 0 rgba(0,0,0,.22);
+}
+.ad-cta:active{transform:scale(.95)}
+.ad-count{
+  position:absolute;top:10px;left:50%;transform:translateX(-50%);font-size:13px;color:#fff;
+  background:rgba(0,0,0,.35);padding:2px 12px;border-radius:999px;letter-spacing:1px;
+}
+
+/* 开屏广告 */
+.ad-full{position:absolute;inset:0;z-index:80;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
+.ad-full.bg-red{background:linear-gradient(160deg,#FF3B30,#C6281C)}
+.ad-full.bg-gold{background:linear-gradient(160deg,#FFD60A,#F59E0B)}
+.ad-full.bg-blue{background:linear-gradient(160deg,#0A84FF,#0552C8)}
+.ad-full.bg-purple{background:linear-gradient(160deg,#AF52DE,#6C2BB0)}
+.ad-full.bg-green{background:linear-gradient(160deg,#22B573,#0E7B4A)}
+.ad-full.bg-dark{background:#1C1E24}
+.ad-full .ad-logo{font-size:34px;font-weight:900;letter-spacing:1px}
+.ad-full .ad-slogan{font-size:15px;font-weight:600;opacity:.92;text-align:center;padding:0 26px;line-height:1.6}
+.ad-full .ad-ico{font-size:52px;line-height:1}
+.ad-full .ad-count{color:#fff}
+
+/* 横幅 */
+.ad-banner{left:0;right:0;height:54px;display:flex;align-items:center;padding:0 12px;gap:10px;z-index:70}
+.ad-banner.top{top:0}
+.ad-banner.bottom{bottom:0}
+.ad-banner.bg-red{background:#FF3B30}.ad-banner.bg-gold{background:#FFD60A;color:#6B2E00}.ad-banner.bg-blue{background:#0A84FF}.ad-banner.bg-purple{background:#AF52DE}
+.ad-banner .ad-b-title{font-size:15px;font-weight:900;white-space:nowrap}
+.ad-banner .ad-b-sub{font-size:11px;font-weight:600;opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ad-banner .ad-x{position:static;flex:0 0 auto}
+
+/* 弹窗广告 */
+.ad-pop{left:50%;top:50%;transform:translate(-50%,-50%);width:86%;max-width:320px;background:#fff;border-radius:20px;box-shadow:0 24px 60px rgba(0,0,0,.35);padding:20px 18px 18px;display:flex;flex-direction:column;align-items:center;gap:10px;z-index:75;text-align:center}
+.ad-pop .ad-p-ico{font-size:44px;line-height:1}
+.ad-pop .ad-p-title{font-size:18px;font-weight:900;color:#1C1E24}
+.ad-pop .ad-p-sub{font-size:12.5px;color:#7A7F8C;font-weight:500;line-height:1.6}
+.ad-pop .ad-p-cta-row{display:flex;gap:8px;width:100%;margin-top:2px}
+.ad-pop .ad-cta{flex:1;padding:11px 0;font-size:14px}
+.ad-pop .ad-p-no{flex:1;padding:11px 0;font-size:14px;font-weight:600;color:#7A7F8C;background:#F0F1F4;border-radius:999px}
+.ad-pop .ad-p-no:active{transform:scale(.96)}
+
+/* 悬浮球 */
+.ad-ball{
+  width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:30px;z-index:78;box-shadow:0 8px 20px rgba(0,0,0,.35);touch-action:none;
+}
+.ad-ball.bg-red{background:#FF3B30}.ad-ball.bg-gold{background:#FFD60A}.ad-ball.bg-blue{background:#0A84FF}.ad-ball.bg-purple{background:#AF52DE}
+.ad-ball .ad-x{width:22px;height:22px;font-size:12px;top:2px;right:2px}
+
+/* 摇一摇全屏 */
+.ad-shake{position:absolute;inset:0;z-index:82;background:rgba(28,30,36,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#fff}
+.ad-shake.shaking{animation:shakeAll .3s linear infinite}
+@keyframes shakeAll{0%{transform:translate(0,0)}25%{transform:translate(-5px,3px)}50%{transform:translate(4px,-3px)}75%{transform:translate(-3px,-2px)}100%{transform:translate(0,0)}}
+.ad-shake .sh-ico{font-size:52px;animation:shakeIco .35s linear infinite}
+@keyframes shakeIco{0%{transform:rotate(-18deg)}50%{transform:rotate(18deg)}100%{transform:rotate(-18deg)}}
+.ad-shake .sh-t{font-size:17px;font-weight:800}
+.ad-shake .sh-s{font-size:12.5px;color:#A7ADB8;font-weight:500}
+
+/* 红包 */
+.ad-coin{position:absolute;font-size:20px;animation:coinSpin 1.2s linear infinite;pointer-events:none}
+@keyframes coinSpin{50%{transform:rotate(20deg) scale(1.2)}}
+
+/* 误触反馈 */
+.mis-flash{position:absolute;inset:0;z-index:90;background:rgba(255,59,48,.28);pointer-events:none;animation:misF .35s ease}
+@keyframes misF{from{opacity:1}to{opacity:0}}
+.floatmoney{
+  position:absolute;z-index:95;color:#FF3B30;font-size:15px;font-weight:900;
+  text-shadow:0 1px 0 rgba(255,255,255,.6);animation:floatUp 1s ease both;pointer-events:none;
+}
+@keyframes floatUp{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-46px)}}
+.hit-slow{animation:hitSlow .5s ease}
+@keyframes hitSlow{25%{transform:scale(1.03)}50%{transform:scale(.99)}}
+
+/* ============ App：相机 ============ */
+.cam{position:absolute;inset:0;background:#22314A;display:flex;flex-direction:column}
+.cam .cam-scene{flex:1;position:relative;overflow:hidden}
+.cam .sun{position:absolute;border-radius:50%;background:radial-gradient(circle at 40% 40%,#FFF3B0,#FFB84D 60%,#FF7A3C);box-shadow:0 0 60px 18px rgba(255,170,70,.45)}
+.cam .sea{position:absolute;left:0;right:0;height:38%;background:linear-gradient(180deg,#3D6E8E,#2A4D6B);bottom:0}
+.cam .sea::before{content:"";position:absolute;top:-3px;left:0;right:0;height:8px;background:rgba(255,220,160,.5);border-radius:50%}
+.cam .hill{position:absolute;left:0;right:0;bottom:38%;height:16%;background:linear-gradient(180deg,#2E5A3E,#1E4030)}
+.cam .boy{position:absolute;left:50%;bottom:30%;width:54px;height:90px;transform:translateX(-50%);filter:drop-shadow(0 6px 4px rgba(0,0,0,.4))}
+.cam .boy .head{width:40px;height:40px;background:#F6C89F;border-radius:50%;margin:0 auto;position:relative}
+.cam .boy .body{width:44px;height:52px;background:#E86F51;border-radius:14px 14px 8px 8px;margin:2px auto 0}
+.cam .boy .arm{position:absolute;width:14px;height:34px;background:#E86F51;border-radius:7px;top:38px}
+.cam .boy .arm.l{left:2px;transform:rotate(24deg)}
+.cam .boy .arm.r{right:2px;transform:rotate(-24deg)}
+.cam .cam-ui{flex:0 0 auto;height:92px;background:rgba(14,18,26,.92);display:flex;align-items:center;justify-content:space-around;padding:0 22px;position:relative;z-index:5}
+.cam .shutter{
+  width:64px;height:64px;border-radius:50%;background:#F5F1EA;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 3px 0 rgba(0,0,0,.4);
+}
+.cam .shutter::after{content:"";width:52px;height:52px;border-radius:50%;border:3px solid #E86F51}
+.cam .shutter:active{transform:scale(.94)}
+.cam .cam-side{width:40px;text-align:center;color:#B9C2CF;font-size:12px}
+.cam .skybg{position:absolute;inset:0;transition:background 1.2s linear}
+.photo-flash{position:absolute;inset:0;background:#fff;z-index:8;opacity:0;pointer-events:none}
+.photo-flash.go{animation:photoFlash .5s ease}
+@keyframes photoFlash{0%{opacity:0}12%{opacity:1}100%{opacity:0}}
+
+/* ============ App：拨号盘 ============ */
+.dial{position:absolute;inset:0;display:flex;flex-direction:column;background:#F5F1EA;padding-top:84px}
+.dial .dial-num{flex:0 0 auto;text-align:center;font-size:34px;font-weight:700;color:#1C1E24;letter-spacing:4px;padding:22px 0 6px;min-height:70px}
+.dial .dial-sub{flex:0 0 auto;text-align:center;font-size:12px;color:#9A9184;min-height:20px}
+.dial .dial-pad{flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:16px 26px;align-content:center}
+.dial .d-key{
+  height:56px;border-radius:50%;background:#EDE7DB;color:#1C1E24;font-size:23px;font-weight:600;
+  display:flex;align-items:center;justify-content:center;box-shadow:0 2px 0 #D8D0C0;
+}
+.dial .d-key small{display:block;font-size:10px;font-weight:400;color:#9A9184}
+.dial .d-key:active{transform:scale(.94)}
+.dial .d-key.blank{background:none;box-shadow:none}
+.dial .d-key.del{font-size:18px;color:#6B6354}
+.dial .dial-call{flex:0 0 auto;padding:10px 40px 24px;display:flex;gap:14px;align-items:center;justify-content:center}
+.dial .call-btn{
+  width:64px;height:64px;border-radius:50%;background:#22B573;color:#fff;font-size:26px;
+  display:flex;align-items:center;justify-content:center;box-shadow:0 3px 0 #178A57;
+}
+.dial .call-btn:active{transform:scale(.94)}
+.dial .call-btn.red{background:#FF3B30;box-shadow:0 3px 0 #C6281C}
+
+/* ============ App：导航 ============ */
+.nav{position:absolute;inset:0;background:#E8F0F5;display:flex;flex-direction:column;color:#22314A;padding-top:84px}
+.nav .nav-top{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:12px 14px;background:#fff;border-bottom:1px solid #D8E0E8;font-size:15px;font-weight:700}
+.nav .nav-top .n-miles{flex:1;text-align:right;font-size:20px;font-weight:800;color:#0A84FF}
+.nav .nav-top .n-miles small{display:block;font-size:11px;color:#7A7F8C;font-weight:500}
+.nav .nav-road{flex:1;position:relative;overflow:hidden}
+.nav .road{position:absolute;left:50%;top:-6%;bottom:-6%;transform:translateX(-50%);width:56%;background:#4B5563;border-radius:14px}
+.nav .road::after{content:"";position:absolute;left:50%;top:0;bottom:0;width:6px;transform:translateX(-50%);background:#F5F1EA;animation:roadMove 1s linear infinite;opacity:.9}
+@keyframes roadMove{from{background-position:0 0}to{}}
+.nav .road-lines{position:absolute;left:50%;top:0;bottom:0;width:4px;transform:translateX(-50%);background:repeating-linear-gradient(180deg,#F5F1EA 0 26px,transparent 26px 52px);animation:roadDash .6s linear infinite}
+@keyframes roadDash{from{transform:translateX(-50%) translateY(0)}to{transform:translateX(-50%) translateY(52px)}}
+.nav .car{position:absolute;left:50%;bottom:16%;width:32px;height:56px;transform:translateX(-50%);background:#0A84FF;border-radius:9px 9px 12px 12px;box-shadow:0 4px 0 #0552C8;z-index:2}
+.nav .car::before{content:"";position:absolute;top:6px;left:5px;right:5px;height:15px;background:rgba(255,255,255,.88);border-radius:6px 6px 4px 4px}
+.nav .car::after{content:"";position:absolute;top:2px;left:5px;width:8px;height:3px;background:#FFD60A;border-radius:2px;box-shadow:14px 0 0 #FFD60A}
+.nav .nav-exit{position:absolute;right:6%;top:26%;width:88px;padding:10px 6px;background:#22B573;color:#fff;border-radius:10px;font-size:12px;font-weight:700;text-align:center;z-index:2}
+.nav .nav-exit b{display:block;font-size:18px}
+.nav .nav-progress{flex:0 0 auto;padding:12px 16px 16px;display:flex;flex-direction:column;gap:6px;background:#fff}
+.nav .np-track{height:8px;background:#E0E6EC;border-radius:4px;overflow:hidden}
+.nav .np-fill{height:100%;background:#22B573;border-radius:4px;transition:width .4s linear}
+.nav .np-lbl{font-size:12px;color:#7A7F8C;display:flex;justify-content:space-between}
+
+/* ============ App：挂号 ============ */
+.hosp{position:absolute;inset:0;background:#F5F1EA;display:flex;flex-direction:column;padding-top:84px}
+.hosp .h-list{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.hosp .h-card{background:#fff;border:1px solid #E4DED2;border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:12px}
+.hosp .h-avatar{width:44px;height:44px;border-radius:50%;background:#E8F0F5;color:#0A84FF;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.hosp .h-info{flex:1}
+.hosp .h-name{font-size:15px;font-weight:700;color:#1C1E24}
+.hosp .h-dept{font-size:11.5px;color:#9A9184;margin-top:2px}
+.hosp .h-left{font-size:12px;color:#E86F51;font-weight:700;margin-top:3px}
+.hosp .h-left.low{animation:blinkText .5s steps(2) infinite}
+@keyframes blinkText{50%{opacity:.4}}
+.hosp .h-btn{font-size:13px;font-weight:700;color:#fff;background:#E86F51;padding:9px 14px;border-radius:10px;box-shadow:0 2px 0 #C25236}
+.hosp .h-btn:active{transform:scale(.95)}
+.hosp .h-btn.got{background:#7BC47F;box-shadow:0 2px 0 #4C9E55}
+.hosp .h-count{flex:0 0 auto;padding:8px 16px;font-size:12.5px;color:#8A8276;background:#F0EBDF;border-top:1px solid #E4DED2}
+
+/* ============ App：通话/通知 ============ */
+.callbg{position:absolute;inset:0;background:linear-gradient(170deg,#2A4D6B,#1C3A55);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:5}
+.callbg .c-ava{width:88px;height:88px;border-radius:50%;background:#F6C89F;display:flex;align-items:center;justify-content:center;font-size:36px;box-shadow:0 0 0 4px rgba(255,255,255,.2)}
+.callbg .c-name{font-size:20px;font-weight:700}
+.callbg .c-state{font-size:13px;color:#B9C2CF}
+.callbg .c-actions{display:flex;gap:28px;margin-top:16px}
+.callbg .c-act{width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px}
+.callbg .c-act.accept{background:#22B573}
+.callbg .c-act.reject{background:#FF3B30}
+.callbg .c-ring{position:absolute;inset:0;border:3px solid rgba(255,255,255,.14);border-radius:50%;animation:ringPulse 1.6s ease-out infinite;pointer-events:none}
+@keyframes ringPulse{from{transform:scale(.5);opacity:1}to{transform:scale(1.6);opacity:0}}
+.noti-list{position:absolute;inset:0;background:#2A2E37;padding-top:88px;overflow:hidden;z-index:4}
+.noti-item{
+  background:#3A3F4C;margin:0 12px 8px;border-radius:14px;padding:12px 14px;display:flex;gap:10px;align-items:center;color:#EDEAE3;
+}
+.noti-item .ni-ico{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;flex:0 0 auto}
+.noti-item .ni-body{flex:1}
+.noti-item .ni-title{font-size:13.5px;font-weight:700}
+.noti-item .ni-sub{font-size:11.5px;color:#9AA1B0;margin-top:2px}
+.noti-item.call{background:#1C5A3C;border:2px solid #22B573;animation:callGlow 1s steps(2) infinite}
+@keyframes callGlow{50%{border-color:#7BC47F}}
+.noti-item .ni-btn{font-size:12px;font-weight:700;padding:7px 12px;border-radius:8px;flex:0 0 auto}
+.noti-item .ni-btn.g{background:#22B573;color:#fff}
+.noti-item .ni-btn.r{background:#FF3B30;color:#fff}
+.noti-item .ni-btn.slide{background:#22B573;color:#fff}
+.noti-clear{position:absolute;top:10px;right:14px;font-size:11px;color:#8B93A3;z-index:6;padding:4px 8px}
+.noti-clear:active{opacity:.6}
+
+/* ============ App：付款码 ============ */
+.pay{position:absolute;inset:0;background:#fff;display:flex;flex-direction:column;align-items:center;padding-top:96px;gap:8px;color:#1C1E24}
+.pay .pay-title{font-size:16px;font-weight:800}
+.pay .pay-qr{width:196px;height:196px;background:#fff;border:1px solid #E4DED2;border-radius:14px;display:flex;align-items:center;justify-content:center;position:relative;margin-top:8px}
+.pay .pay-qr svg{display:block}
+.pay .pay-name{font-size:13px;color:#6B6354}
+.pay .pay-amount{font-size:24px;font-weight:800;color:#E86F51;margin-top:4px}
+.pay .pay-ok{flex:0 0 auto;margin-top:auto;padding:12px 0 22px;width:100%;display:flex;justify-content:center}
+.pay .queue{position:absolute;top:12px;right:14px;font-size:11.5px;color:#9A9184;display:flex;align-items:center;gap:4px}
+.pay .queue .qdot{width:8px;height:8px;border-radius:50%;background:#FF9F43;animation:blinkBar .6s steps(2) infinite}
+
+/* ============ App：系统设置 ============ */
+.settings{position:absolute;inset:0;background:#F0EBDF;display:flex;flex-direction:column;padding-top:84px}
+.settings .s-head{flex:0 0 auto;padding:12px 16px 10px;display:flex;align-items:center;gap:8px;background:#F5F1EA;border-bottom:1px solid #E4DED2}
+.settings .s-head .back{font-size:16px;color:#6B6354}
+.settings .s-title{font-size:16px;font-weight:700;color:#1C1E24;flex:1;text-align:center}
+.settings .s-list{flex:1;overflow:auto;padding:10px 14px;display:flex;flex-direction:column;gap:10px}
+.settings .s-item{
+  background:#fff;border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:12px;
+  box-shadow:0 1px 0 rgba(0,0,0,.04);
+}
+.settings .s-item.done{opacity:.55}
+.settings .s-ico{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex:0 0 auto}
+.settings .s-info{flex:1}
+.settings .s-name{font-size:14px;font-weight:700;color:#1C1E24}
+.settings .s-desc{font-size:11px;color:#8A8276;margin-top:2px;line-height:1.5}
+.settings .s-count{flex:0 0 auto;padding:8px 16px;font-size:12px;color:#8A8276;background:#E7E0D2;text-align:center}
+
+/* ============ 菜单 ============ */
+.menu{position:absolute;inset:0;background:linear-gradient(175deg,#2B3345,#1E2330);color:#EDEAE3;display:flex;flex-direction:column;padding:56px 26px 24px;z-index:10}
+.menu .m-logo{font-size:13px;letter-spacing:5px;color:#8B93A3;margin-bottom:10px}
+.menu h2{font-size:34px;font-weight:800;line-height:1.2;letter-spacing:1px}
+.menu h2 em{font-style:normal;color:#FFD60A}
+.menu .m-sub{font-size:13px;color:#A7ADB8;margin-top:10px;line-height:1.7}
+.menu .m-quote{
+  margin:26px 0 20px;padding:14px 16px;background:#2A2F3A;border-left:3px solid #FFD60A;
+  border-radius:0 12px 12px 0;font-size:13.5px;color:#C9CDD6;line-height:1.8;
+}
+.menu .m-quote b{color:#FFD60A}
+.menu .m-btns{display:flex;flex-direction:column;gap:12px;margin-top:auto}
+.menu .m-btn{
+  width:100%;padding:16px;border-radius:16px;font-size:17px;font-weight:800;letter-spacing:3px;
+  display:flex;align-items:center;justify-content:center;gap:10px;transition:transform .1s;
+}
+.m-btn:active{transform:scale(.97)}
+.m-btn.play{background:#E86F51;color:#fff;box-shadow:0 5px 0 #C25236}
+.m-btn.play:active{box-shadow:0 1px 0 #C25236;transform:translateY(4px)}
+.m-btn.ghost{background:#2A2F3A;color:#C9CDD6;border:1px solid #3A3F4C}
+.m-footer{margin-top:18px;text-align:center;font-size:11px;color:#6E7583}
+
+/* ============ 结算报表 ============ */
+.report{
+  position:absolute;inset:0;background:#F5F1EA;z-index:95;overflow:auto;padding:0;
+  animation:reportIn .35s ease;
+}
+@keyframes reportIn{from{transform:translateY(30px);opacity:0}}
+.report .r-head{padding:26px 20px 20px;background:#1C1E24;color:#EDEAE3;position:relative}
+.report .r-head .r-tag{font-size:11px;letter-spacing:3px;color:#8B93A3}
+.report .r-head h3{font-size:22px;font-weight:800;margin-top:6px}
+.report .r-grade{
+  position:absolute;right:20px;top:22px;width:64px;height:64px;border-radius:16px;
+  display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:900;color:#fff;
+}
+.report .r-grade.S{background:linear-gradient(160deg,#FFD60A,#F59E0B);color:#6B2E00}
+.report .r-grade.A{background:#7BC47F}
+.report .r-grade.B{background:#0A84FF}
+.report .r-grade.C{background:#FF9F43}
+.report .r-grade.D{background:#FF3B30}
+.report .r-body{padding:18px 20px;display:flex;flex-direction:column;gap:12px}
+.report .r-card{background:#fff;border:1px solid #E4DED2;border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:9px}
+.report .r-row{display:flex;justify-content:space-between;font-size:13.5px;color:#4A4238}
+.report .r-row b{font-weight:700;color:#1C1E24}
+.report .r-row.money b{color:#FF3B30;font-size:15px}
+.report .r-row.hl b{color:#E86F51}
+.report .r-quote{
+  background:#FFF6E3;border:1px solid #F0DEB4;border-radius:14px;padding:14px 16px;
+  font-size:14px;color:#7A6A44;line-height:1.8;
+}
+.report .r-quote b{color:#B7791F}
+.report .r-safety{
+  background:#E8F0F5;border:1px solid #C8DAE8;border-radius:14px;padding:13px 16px;
+  font-size:12px;color:#3E5A75;line-height:1.8;
+}
+.report .r-safety b{color:#0A84FF}
+.report .r-actions{padding:6px 20px 26px;display:flex;flex-direction:column;gap:10px}
+.report .r-actions .btn{padding:15px}
+.report .r-ads{margin-top:4px;display:flex;flex-wrap:wrap;gap:6px}
+.report .r-ads span{font-size:10.5px;background:#EDE7DB;color:#6B6354;border-radius:999px;padding:3px 9px}
+.report .r-new-ach{margin-top:4px;font-size:12px;color:#B7791F;font-weight:700}
+
+/* ============ 图鉴 / 成就 ============ */
+.codex-page{position:absolute;inset:0;background:#F5F1EA;z-index:96;overflow:auto}
+.codex-page .cp-head{position:sticky;top:0;background:#F5F1EA;padding:14px 16px 10px;border-bottom:1px solid #E4DED2;display:flex;align-items:center;gap:10px;z-index:3}
+.codex-page .cp-head .back{font-size:17px;color:#6B6354;padding:6px}
+.codex-page .cp-title{font-size:17px;font-weight:800;color:#1C1E24;flex:1}
+.codex-page .cp-count{font-size:12px;color:#8A8276}
+.codex-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:14px}
+.codex-card{background:#fff;border:1px solid #E4DED2;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:6px}
+.codex-card.locked{opacity:.5;filter:grayscale(.7)}
+.codex-card .cx-top{display:flex;align-items:center;gap:8px}
+.codex-card .cx-id{font-size:10px;font-weight:800;color:#8A8276;letter-spacing:1px;background:#F0EBDF;border-radius:6px;padding:2px 6px}
+.codex-card .cx-tag{font-size:10px;font-weight:700;color:#fff;border-radius:6px;padding:2px 6px}
+.codex-card .cx-name{font-size:13.5px;font-weight:800;color:#1C1E24;margin-top:2px}
+.codex-card .cx-desc{font-size:11px;color:#8A8276;line-height:1.6;font-weight:500}
+.codex-card .cx-how{font-size:11px;color:#B7791F;line-height:1.6;font-weight:600}
+.ach-card{display:flex;gap:12px;align-items:center;background:#fff;border:1px solid #E4DED2;border-radius:14px;padding:13px 14px;margin:0 14px 10px}
+.ach-card.locked{opacity:.55}
+.ach-card .a-ico{width:42px;height:42px;border-radius:12px;background:#F0EBDF;display:flex;align-items:center;justify-content:center;font-size:20px;flex:0 0 auto}
+.ach-card.got .a-ico{background:#FFF6E3}
+.ach-card .a-info{flex:1}
+.ach-card .a-name{font-size:14px;font-weight:800;color:#1C1E24}
+.ach-card .a-desc{font-size:11.5px;color:#8A8276;margin-top:2px;line-height:1.5}
+.ach-card .a-state{font-size:11px;color:#7BC47F;font-weight:700}
+.ach-card.locked .a-state{color:#9A9184}
+
+/* ============ 结局 ============ */
+.ending{position:absolute;inset:0;background:#1C1E24;z-index:98;overflow:auto;color:#EDEAE3;animation:reportIn .4s ease}
+.ending .e-inner{padding:44px 24px 30px;display:flex;flex-direction:column;gap:16px}
+.ending .e-tag{font-size:11px;letter-spacing:4px;color:#8B93A3}
+.ending h3{font-size:26px;font-weight:800;line-height:1.35}
+.ending .e-scene{background:#2A2F3A;border:1px solid #3A3F4C;border-radius:16px;padding:18px;font-size:14px;line-height:2;color:#C9CDD6}
+.ending .e-scene .av{display:inline-flex;width:34px;height:34px;border-radius:50%;background:#F6C89F;align-items:center;justify-content:center;font-size:16px;vertical-align:middle;margin-right:8px}
+.ending .e-scene .av.g{background:#E8A87C}
+.ending .e-big{text-align:center;font-size:16px;color:#FFD60A;font-weight:800;letter-spacing:2px;margin-top:6px}
+.ending .e-ads{text-align:center;font-size:12.5px;color:#8B93A3;line-height:1.9}
+.ending .e-btn{margin-top:8px}
+
+/* ============ Toast ============ */
+.toast{
+  position:absolute;left:50%;top:60px;transform:translateX(-50%);z-index:120;
+  background:rgba(28,30,36,.94);color:#F5F1EA;font-size:13px;font-weight:600;
+  padding:10px 18px;border-radius:999px;box-shadow:0 8px 24px rgba(0,0,0,.35);
+  display:flex;align-items:center;gap:8px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:88%;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(4px)}
+.toast.warn{background:rgba(198,40,28,.95)}
+.toast .t-ico{font-size:15px}
+
+/* ============ 教学遮罩 ============ */
+.tut{position:absolute;inset:0;z-index:110;background:rgba(0,0,0,.42);pointer-events:none;animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0}}
+.tut .t-bubble{
+  position:absolute;background:#fff;color:#1C1E24;font-size:13.5px;font-weight:600;line-height:1.7;
+  padding:12px 16px;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.3);max-width:82%;
+}
+.tut .t-bubble b{color:#E86F51}
+.tut .t-bubble::after{content:"";position:absolute;width:12px;height:12px;background:#fff;transform:rotate(45deg)}
+.tut .t-bubble.tb-bottom::after{bottom:-6px;left:26px}
+.tut .t-bubble.tb-top::after{top:-6px;left:26px}
+
+/* ============ 响应式 ============ */
+@media (max-width:1024px){
+  .panel{display:none}
+  .stage{gap:0;padding:14px}
+}
+@media (max-width:440px){
+  .stage{padding:6px}
+  .phone{height:100vh}
+  .phone-frame{border-radius:0;padding:0}
+  .phone-frame::before{display:none}
+  .screen{border-radius:0}
+  .statusbar{padding-top:16px}
+}
+@media (max-height:820px){
+  .phone{transform:scale(min(1,(100vh - 28px)/790px));transform-origin:center center}
+  .stage{height:100vh;overflow:hidden}
+}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="glow"></div>
+  <aside class="panel">
+    <div class="kicker">ADAPTIVE PHONE · SATIRE SIM</div>
+    <h1>关不掉的<em>广告</em></h1>
+    <div class="sub">长辈模式 · The Unskippable<br>你帮长辈操作手机，在广告围剿中完成任务</div>
+    <div class="rules">
+      <b>游戏规则</b><br>
+      识别目标 → 找到<b>真关闭按钮</b> → 避免误触 → 完成任务。<br>
+      真关闭通常<b>又小又灰</b>；假关闭又大又鲜艳。<br>
+      误触会让<b>广告更猖狂</b>，耐心也会下降。<br>
+      <div class="rule-note">
+        不是老人笨，<i>是广告太会伪装</i>。<br>
+        本游戏所有广告品牌均为虚构。<br>
+        <i>本游戏无广告，请放心。</i>
+      </div>
+    </div>
+  </aside>
+
+  <div class="phone" id="phone">
+    <div class="phone-frame">
+      <div class="screen" id="screen">
+        <div class="statusbar" id="statusbar">
+          <span id="sbTime">09:41</span>
+          <div class="sb-right" id="sbRight"></div>
+        </div>
+        <div class="sb-notis" id="sbNotis"></div>
+        <div class="app" id="app"></div>
+        <div class="adlayer" id="adlayer"></div>
+        <div id="toastBox"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================= 工具 ================= */
+const $=id=>document.getElementById(id);
+function el(tag,cls,html){const d=document.createElement(tag);if(cls)d.className=cls;if(html!=null)d.innerHTML=html;return d}
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const rand=(a,b)=>a+Math.random()*(b-a);
+const rint=(a,b)=>Math.floor(rand(a,b+1));
+const pick=arr=>arr[Math.floor(Math.random()*arr.length)];
+const fmtT=s=>{s=Math.max(0,Math.ceil(s));return Math.floor(s/60)+":"+String(s%60).padStart(2,"0")};
+const money=m=>"¥"+m.toFixed(2);
+const ESC=t=>{const d=document.createElement("div");d.textContent=t;return d.innerHTML};
+
+/* ================= 音效（WebAudio，轻量） ================= */
+const Sfx={
+  ctx:null, muted:false,
+  init(){if(this.ctx){if(this.ctx.state==="suspended")this.ctx.resume();return}try{this.ctx=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}},
+  tone(f,dur,type,vol,delay){
+    if(this.muted||!this.ctx)return;
+    const t=this.ctx.currentTime+(delay||0),o=this.ctx.createOscillator(),g=this.ctx.createGain();
+    o.type=type||"sine";o.frequency.value=f;
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(vol||0.12,t+0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+(dur||0.2));
+    o.connect(g);g.connect(this.ctx.destination);o.start(t);o.stop(t+(dur||0.2)+0.05);
+  },
+  click(){this.tone(660,0.06,"square",0.05)},
+  close(){this.tone(880,0.09,"sine",0.10);setTimeout(()=>this.tone(1320,0.12,"sine",0.09),70)},
+  mis(){this.tone(180,0.22,"sawtooth",0.12);setTimeout(()=>this.tone(120,0.26,"sawtooth",0.10),90)},
+  win(){[523,659,784,1047].forEach((f,i)=>this.tone(f,0.16,"triangle",0.11,i*0.12))},
+  fail(){[330,262,196].forEach((f,i)=>this.tone(f,0.22,"triangle",0.10,i*0.14))},
+  ding(){this.tone(1200,0.07,"sine",0.08)}
+};
+
+/* ================= 存档 ================= */
+const SAVE_KEY="unskippable_v1";
+const save={
+  codex:[],        // 已见广告 id
+  ach:[],          // 已解锁成就 id
+  unlocked:1,      // 已解锁关卡数
+  cleared:[],      // 已通关关卡
+  best:{},         // 关卡最佳评级
+  load(){try{const s=JSON.parse(localStorage.getItem(SAVE_KEY));if(s)Object.assign(this,s)}catch(e){}return this},
+  persist(){try{localStorage.setItem(SAVE_KEY,JSON.stringify({codex:this.codex,ach:this.ach,unlocked:this.unlocked,cleared:this.cleared,best:this.best}))}catch(e){}}
+}.load();
+function noteCodex(id){if(!save.codex.includes(id)){save.codex.push(id);persistSoft()}}
+function unlockAch(id){if(!save.ach.includes(id)){save.ach.push(id);persistSoft();return true}return false}
+function persistSoft(){save.persist()}
+
+/* ================= 广告图鉴配置 ================= */
+const AD_CATALOG={
+  "A01":{id:"A01",name:"开屏广告",tag:"开屏",color:"#0A84FF",desc:"倒计时最后 1 秒才出现关闭按钮。",how:"等倒计时结束，点右下角小字「跳过」",bg:"bg-blue",ico:"⏱",full:true},
+  "A02":{id:"A02",name:"假关闭",tag:"骗点",color:"#FFD60A",desc:"大红 X 其实是下载按钮，点它就上当。",how:"不要点大 X，找左下角小灰字",bg:"bg-gold",ico:"❌",pop:true},
+  "A03":{id:"A03",name:"摇一摇跳转",tag:"摇一摇",color:"#AF52DE",desc:"手机轻轻一晃，就跳去购物 APP。",how:"倒计时内点「已开勿扰」拦截",bg:"bg-purple",ico:"📳",full:true},
+  "A04":{id:"A04",name:"透明层",tag:"套路",color:"#22B573",desc:"全屏透明，点哪里都算点广告。",how:"只点屏幕边缘的真返回",bg:"bg-green",ico:"🎭",full:true},
+  "A05":{id:"A05",name:"连环弹窗",tag:"连弹",color:"#FF3B30",desc:"关掉一个，0.2 秒后又弹一个。",how:"快速连续点真关闭",bg:"bg-red",ico:"📦",pop:true},
+  "A06":{id:"A06",name:"红包提现",tag:"红包",color:"#FF3B30",desc:"99.9 元红包，只差 1 位好友。",how:"别点，等「不感兴趣」出现",bg:"bg-red",ico:"🧧",full:true},
+  "A07":{id:"A07",name:"通知轰炸",tag:"轰炸",color:"#FF9F43",desc:"状态栏被广告通知刷屏。",how:"点「全部清除」，或精准找来电",bg:"bg-gold",ico:"🔔",full:true},
+  "A08":{id:"A08",name:"悬浮球",tag:"悬浮球",color:"#FF3B30",desc:"飘在屏幕上的小球，专挡关键按钮。",how:"按住拖走，或点小 X 关闭",bg:"bg-red",ico:"🔮",ball:true},
+  "A09":{id:"A09",name:"系统伪装",tag:"伪装",color:"#1C1E24",desc:"「内存不足！立即清理」其实是广告。",how:"点左下角小字「以后再说」",bg:"bg-dark",ico:"⚙",pop:true},
+  "A10":{id:"A10",name:"长辈模式广告",tag:"大字",color:"#22B573",desc:"字体变大，广告也变大。",how:"点右上角小字「关闭」",bg:"bg-green",ico:"🔍",full:true},
+  "A11":{id:"A11",name:"语音劫持",tag:"劫持",color:"#AF52DE",desc:"导航被强行跳到购物 APP，返回键失灵。",how:"点购物页角落的「返回导航」",bg:"bg-purple",ico:"🗺",full:true},
+  "A12":{id:"A12",name:"充电广告",tag:"充电",color:"#0A84FF",desc:"刚插上电，全屏广告就弹出来。",how:"点「关闭充电广告」",bg:"bg-blue",ico:"🔋",full:true},
+  "A13":{id:"A13",name:"锁屏广告",tag:"锁屏",color:"#FF9F43",desc:"解锁手机，迎面一张全屏广告。",how:"点「跳过锁屏广告」",bg:"bg-gold",ico:"🔒",full:true},
+  "A14":{id:"A14",name:"后台唤醒",tag:"唤醒",color:"#8B5CF6",desc:"按返回键，广告又从后台弹回来。",how:"别按返回，直接点「关闭」",bg:"bg-purple",ico:"🔄",full:true}
+};
+const AD_ORDER=["A01","A02","A03","A04","A05","A06","A07","A08","A09","A10","A11","A12","A13","A14"];
+
+/* ================= 关卡配置 ================= */
+const LEVELS=[
+  {
+    id:"teach",name:"教学关 · 给孙子拍照",icon:"📷",goal:"拍下一张清晰照片",time:25,patience:100,
+    intro:"孙子想看奶奶拍的风景照。手机刚打开，广告就来了——先学会找真关闭按钮。",
+    ads:[{id:"A01",delay:1.2,repeat:1}],
+    safety:"本关教你看穿「假关闭」：大 X 多是骗人的，小灰字才是真出口。",
+    quotes:["奶奶笑：原来要等它自己没啊。","孙子：奶奶，这张拍得真好。"]
+  },
+  {
+    id:"sunset",name:"第 1 关 · 景区日落",icon:"🌅",goal:"太阳落山前拍下日落",time:32,patience:100,
+    intro:"景区的大爷想拍日落。太阳正在落，广告却一波接一波——半分钟拍不到，就错过了。",
+    ads:[{id:"A06",delay:1.5,repeat:1},{id:"A01",delay:9,repeat:1},{id:"A03",delay:18,repeat:1}],
+    safety:"现实提示：出门前可以先打开相机，减少关键瞬间被广告耽误。",
+    quotes:["大爷叹气：就半分钟，被广告控了。","大爷：这日落，我自己看过了，不用拍了。"]
+  },
+  {
+    id:"fire",name:"第 2 关 · 火警",icon:"🚒",goal:"60 秒内拨通 119",time:60,patience:100,
+    intro:"楼道里起了火。奶奶要报警，可连环弹窗和假关闭按钮一个接一个——紧急时刻，别被广告拖住。",
+    ads:[{id:"A05",delay:2,repeat:1},{id:"A05",delay:8,repeat:1},{id:"A02",delay:14,repeat:1},{id:"A05",delay:24,repeat:1},{id:"A02",delay:38,repeat:1}],
+    safety:"现实提示：紧急情况先拨报警电话，不要先拍视频。",
+    quotes:["奶奶：火警电话怎么按不出去？","邻居：还好你先报了警。"]
+  },
+  {
+    id:"nav",name:"第 3 关 · 高速导航",icon:"🛣",goal:"抵达高速出口",time:40,patience:100,
+    intro:"儿子在开车，奶奶坐副驾举着手机导航。路一颠，导航就被摇一摇广告劫持到购物 APP——出口要错过了。",
+    ads:[{id:"A11",delay:7,repeat:1},{id:"A11",delay:17,repeat:1},{id:"A04",delay:24,repeat:1}],
+    safety:"现实提示：驾驶中不要操作手机，出发前设好导航、开勿扰、把手机固定好。",
+    quotes:["儿子：导航怎么又跳了？","奶奶：我不点它，它自己就跳。"]
+  },
+  {
+    id:"hosp",name:"第 4 关 · 医院挂号",icon:"🏥",goal:"抢到专家号",time:45,patience:100,
+    intro:"专家号只剩几个了。养生 APP、贷款广告、假挂号弹窗轮番轰炸——老太太的手一抖，就可能下载一堆没用的东西。",
+    ads:[{id:"A09",delay:2,repeat:1},{id:"A02",delay:14,repeat:1},{id:"A06",delay:26,repeat:1},{id:"A09",delay:34,repeat:1}],
+    safety:"现实提示：帮长辈提前装好医院官方 APP，关闭未知来源安装。",
+    quotes:["奶奶：这手机是不是坏了？","奶奶：我弄不明白，你帮我弄一下吧。"]
+  },
+  {
+    id:"call",name:"第 5 关 · 视频通话",icon:"📞",goal:"接起孙子的视频来电",time:50,patience:100,
+    intro:"孙子的视频来电被埋在通知轰炸里，锁屏广告还盖了一层——再找不到，电话就挂了。",
+    ads:[{id:"A07",delay:2,repeat:0},{id:"A13",delay:8,repeat:1},{id:"A07",delay:22,repeat:0}],
+    safety:"现实提示：帮长辈把家人的视频 App 通知设为「重要」，别的通知可以关掉。",
+    quotes:["孙子：奶奶你终于接电话啦！","奶奶：我还以为手机坏了呢。"]
+  },
+  {
+    id:"pay",name:"第 6 关 · 扫码买菜",icon:"🥬",goal:"出示付款二维码",time:35,patience:100,
+    intro:"菜市场排队结账，后面的人等着呢。悬浮球正好挡住了付款码，贷款广告又弹了出来——阿姨快急坏了。",
+    ads:[{id:"A08",delay:2,repeat:1},{id:"A02",delay:12,repeat:1},{id:"A08",delay:24,repeat:1}],
+    safety:"现实提示：付款前可以提前打开付款码，减少排队时的操作。",
+    quotes:["阿姨：后面的人都在催我。","收银员：不着急阿姨，慢慢来。"]
+  },
+  {
+    id:"boss",name:"最终 Boss · 广告联盟",icon:"👹",goal:"用系统设置削弱广告",time:0,patience:150,
+    intro:"所有广告背后的「广告联盟」现身了。只有进入系统设置，一项项关掉它们的权限，才能让手机清净下来。",
+    ads:[],  // Boss 特殊调度
+    safety:"现实提示：帮长辈设置手机时，优先关闭通知、后台刷新、未知来源安装。",
+    quotes:["广告联盟：别关！我们还要靠你赚钱！","奶奶：这下清净多了。"]
+  }
+];
+
+/* ================= 游戏状态 ================= */
+const G={
+  view:"menu",        // menu|level|result|codex|ach|ending
+  lvl:0, started:0, t0:0,
+  timeLeft:0, timeMax:0, patience:0, patienceMax:100,
+  mis:0, earn:0, blocked:0, pressure:1,
+  ads:[], spawnQueue:[], nextSpawnAt:0,
+  running:false, win:false, failed:false,
+  result:null, settings:{noti:false,bg:false,unknown:false,ads:false,uninstall:false,elder:false,track:false,shake:false},
+  sunProgress:0, sunDone:false,
+  navProgress:0, callId:null, qrClear:false,
+  bossClosed:0, chainCount:0,
+  lastTick:0, clock:null
+};
+const settingsDefs=[
+  {k:"noti",ico:"🔔",name:"通知权限",desc:"关掉大部分 App 的通知轰炸"},
+  {k:"bg",ico:"🔄",name:"后台刷新",desc:"禁止 App 在后台偷偷弹广告"},
+  {k:"unknown",ico:"📦",name:"未知来源安装",desc:"禁止安装来路不明的应用"},
+  {k:"ads",ico:"🎯",name:"个性化广告",desc:"关闭「猜你喜欢」式广告跟踪"},
+  {k:"uninstall",ico:"🗑",name:"卸载流氓 APP",desc:"卸载「清理大师」「走路赚钱」"},
+  {k:"track",ico:"🕵",name:"限制广告跟踪",desc:"限制广告商追踪手机行为"},
+  {k:"shake",ico:"📳",name:"摇一摇权限",desc:"关闭摇一摇跳转的传感器权限"},
+  {k:"elder",ico:"👵",name:"开启真正长辈模式",desc:"系统级防广告的简单界面"}
+];
+
+/* ================= 广告系统 ================= */
+const adLayer=$("adlayer");
+let adSeq=0;
+
+function genAdToken(){return "ad_"+(++adSeq)}
+
+function pressurePace(){ // 每两次广告生成之间的间隔（秒）
+  const base=(LEVELS[G.lvl].id==="boss"?4.5:6.5) - G.bossClosed*0.55;
+  return Math.max(2.4, base / Math.max(1, G.pressure));
+}
+
+function queueAds(plan){
+  G.spawnQueue=[];
+  plan.forEach(a=>{
+    for(let i=0;i<(a.repeat||1);i++){
+      G.spawnQueue.push({id:a.id,delay:a.delay + (a.jitter?rand(0,a.jitter):0),used:false});
+    }
+  });
+  G.spawnQueue.sort((a,b)=>a.delay-b.delay);
+}
+
+function nextPlannedAd(){ // 找下一个到期广告
+  const t=G.started?((Date.now()-G.t0)/1000):0;
+  const hit=G.spawnQueue.find(a=>!a.used && a.delay<=t);
+  if(hit){hit.used=true;return hit.id}
+  return null;
+}
+
+function adBusyCount(){
+  return G.ads.filter(a=>!a.dead).length;
+}
+
+function spawnAd(id,opts){
+  const def=AD_CATALOG[id]; if(!def)return;
+  noteCodex(id);
+  const a={id,token:genAdToken(),dead:false,state:"showing",def,closeAt:0,closed:false,mis:false,
+    birth:Date.now(),els:[],timer:null,opts:opts||{}};
+  if(id==="A08"&&LEVELS[G.lvl].id==="pay")G.qrClear=false;
+  if(id==="A05"&&opts.count)G.chainCount=opts.count;
+  G.ads.push(a);
+  buildAdDom(a);
+  return a;
+}
+
+function buildAdDom(a){
+  const def=a.def, box=el("div","ad");
+  box.dataset.ad=a.token;
+
+  /* 特殊形态：语音劫持（跳到购物页） */
+  if(a.opts.kind==="hijack"){
+    G.navHijack=true;G.navEverHijacked=true;
+    box.className="ad ad-full ad-flash bg-gold";
+    box.innerHTML='<div class="ad-ico">🛒</div><div class="ad-logo">限时抢购 1 折</div><div class="ad-slogan">你刚才想看的东西，这里都有！</div>';
+    const cta=el("div","ad-cta","立即抢购");
+    cta.style.cssText="padding:14px 44px;font-size:16px;background:#FF3B30;margin-top:6px";
+    cta.addEventListener("pointerdown",e=>{e.stopPropagation();misclick(a,e)});
+    box.append(cta);
+    box.append(adSkip(a,"返回导航",true));
+    const warn=el("div","ad-slogan","系统返回键已被劫持，只能从这里返回");
+    warn.style.cssText="font-size:11px;opacity:.6;position:absolute;bottom:60px;color:#fff";
+    box.append(warn);
+    a.cleanup=()=>{G.navHijack=false};
+    a.box=box;
+    adLayer.appendChild(box);
+    return;
+  }
+  /* 特殊形态：通知轰炸（状态栏下拉） */
+  if(a.opts.kind==="noti"){
+    const sb=$("sbNotis");sb.classList.add("open");
+    const titles=["走路赚钱","清理大师","红包到账","贷款秒批","免费测速","0 元购","今日特惠"];
+    a._notis=[];
+    for(let i=0;i<5;i++){
+      const t=titles[Math.floor(Math.random()*titles.length)];
+      const item=el("div","sb-noti",'<span class="nt">广告</span><b>'+t+'</b><span class="nt">✕</span>');
+      item.addEventListener("pointerdown",()=>{if(a.dead)return;misclick(a,null)});
+      sb.appendChild(item);a._notis.push(item);
+    }
+    const cb=el("div","noti-clear","全部清除 ✕");
+    cb.addEventListener("pointerdown",e=>{e.stopPropagation();closeAd(a)});
+    sb.appendChild(cb);a._clearBtn=cb;
+    a.cleanup=()=>{a._notis.forEach(n=>n.remove());a._clearBtn.remove();sb.classList.remove("open")};
+    a.box=box;
+    adLayer.appendChild(box);
+    return;
+  }
+
+  const R=()=>{ // 移除
+    if(a.dead)return; a.dead=true;
+    box.remove(); clearTimeout(a.timer);
+    const i=G.ads.indexOf(a); if(i>-1)G.ads.splice(i,1);
+    afterAdGone(a);
+  };
+  a.remove=R; a.box=box;
+
+  if(def.full){
+    box.className="ad ad-full ad-flash "+def.bg;
+    const ico=el("div","ad-ico",def.ico);
+    const logo=el("div","ad-logo",pick(["满减大促","极速抢购","今日特惠","尊享会员","限时福利"])||"今日特惠");
+    const sl=el("div","ad-slogan",a.slogan||def.desc.replace(/[。！]/g,"！")+"！");
+    box.append(ico,logo,sl);
+    coinSprinkle(box,6);
+  } else if(def.pop){
+    box.className="ad ad-pop ad-flash";
+    const ico=el("div","ad-p-ico",def.ico);
+    const t=el("div","ad-p-title",a.title||pick(["恭喜中奖","立即清理","免费领取","健康课堂"])||"今日特惠");
+    const s=el("div","ad-p-sub",a.sub||def.desc);
+    box.append(ico,t,s);
+  } else if(def.ball){
+    box.className="ad ad-ball "+def.bg+" ad-flash";
+    box.innerHTML="🧧";
+    box.style.left=(a.opts.pos&&a.opts.pos.left)||"72%";
+    box.style.top=(a.opts.pos&&a.opts.pos.top)||"34%";
+    box.append(adX(a,"fake",{small:true}));
+    makeDraggable(box,a);
+  }
+
+  // 关闭出口
+  if(a.opts.kind==="fake"){
+    box.append(adX(a,"fake"));
+    if(!def.ball) box.append(adSkip(a,"跳过",true));
+  } else if(a.opts.kind==="sys"){
+    box.append(adX(a,"fake"));
+    box.append(adSkip(a,"以后再说",true));
+  } else if(a.opts.kind==="shake"){
+    box.className="ad ad-shake";
+    box.innerHTML='<div class="sh-ico">📳</div><div class="sh-t">检测到晃动！即将跳转购物 APP</div><div class="sh-s">点下方按钮「已开勿扰」可拦截</div>';
+    box.append(adSkip(a,"已开勿扰 · 拦截",false,"big"));
+    a.timer=setTimeout(()=>{if(!a.dead&&!G.failed&&!G.win)misclick(a,null)},4500);
+  } else if(a.opts.kind==="redpack"){
+    box.append(adX(a,"fake"));
+    box.append(adSkip(a,"不感兴趣",true));
+  } else if(a.opts.kind==="overlay"){
+    box.className="ad ad-full bg-dark"; box.classList.remove("ad-flash");
+    box.style.background="rgba(20,22,28,.86)";
+    box.innerHTML='<div class="ad-ico" style="font-size:40px">👻</div><div class="ad-slogan" style="opacity:.5">透明广告层：点哪里都算点广告</div>';
+    box.append(adSkip(a,"返回",false));
+  } else {
+    // 开屏：倒计时后出现跳过
+    const cd=a.opts.countdown==null?5:a.opts.countdown;
+    const ready=el("div","ad-count","广告 "+cd+"s");
+    box.appendChild(ready);
+    a.closeAt=Date.now()+cd*1000;
+    a.timer=setTimeout(()=>{
+      ready.remove();
+      const skip=adSkip(a,"跳过",false);
+      box.append(skip);
+    },cd*1000);
+  }
+
+  // 点广告主体 = 误触（透明层除外，透明层任何点击都误触）
+  box.addEventListener("pointerdown",e=>{
+    if(a.dead)return;
+    if(a.opts.kind==="overlay"){misclick(a,e);return}
+    if(e.target.closest(".ad-skip,.ad-x"))return; // 出口按钮单独处理
+    misclick(a,e);
+  });
+
+  if(def.ball){ // 悬浮球：短按=误触，拖动=正确应对
+    box.addEventListener("pointerdown",e=>{
+      if(a.dead||e.target.closest(".ad-x"))return;
+      a._moved=false;
+      clearTimeout(a._t);
+      a._t=setTimeout(()=>{if(!a.dead&&!a._moved)misclick(a,e)},280);
+    },true);
+  }
+
+  adLayer.appendChild(box);
+  if(a.opts.pos){ // 自定义位置
+    if(a.opts.pos.top!=null)box.style.top=a.opts.pos.top;
+    if(a.opts.pos.bottom!=null)box.style.bottom=a.opts.pos.bottom;
+  }
+}
+
+function adX(a,kind,opt){
+  const x=el("div","ad-x"+(kind==="fake"?" fake":""),kind==="fake"?"✕":"✕");
+  x.addEventListener("pointerdown",e=>{
+    e.stopPropagation();
+    if(a.dead)return;
+    if(kind==="fake"){ misclick(a,e,{at:x}); }
+    else closeAd(a);
+  });
+  return x;
+}
+
+function adSkip(a,txt,small,big){
+  const s=el("div","ad-skip"+(small?"":" ready"),txt);
+  if(big){s.style.fontSize="13px";s.style.padding="9px 16px";s.style.background="rgba(255,255,255,.16)";s.style.color="#fff"}
+  s.addEventListener("pointerdown",e=>{e.stopPropagation();if(a.dead)return;closeAd(a)});
+  return s;
+}
+
+function coinSprinkle(box,n){
+  for(let i=0;i<n;i++){
+    const c=el("div","ad-coin",pick(["💰","🪙","🎁","🧧"]));
+    c.style.left=rand(4,92)+"%"; c.style.top=rand(8,70)+"%";
+    box.appendChild(c);
+  }
+}
+
+function makeDraggable(box,a){
+  let sx=0,sy=0,dx=0,dy=0,drag=false;
+  box.addEventListener("pointerdown",e=>{
+    if(e.target.closest(".ad-x"))return;
+    drag=true;sx=e.clientX;sy=e.clientY;
+    const r=box.getBoundingClientRect();dx=r.left;dy=r.top;
+    box.setPointerCapture(e.pointerId);
+  });
+  box.addEventListener("pointermove",e=>{
+    if(!drag)return;
+    a._moved=true;
+    const nx=dx+(e.clientX-sx),ny=dy+(e.clientY-sy);
+    box.style.left=nx+"px";box.style.top=ny+"px";
+  });
+  box.addEventListener("pointerup",e=>{drag=false});
+}
+
+/* 误触 */
+function misclick(a,e,opt){
+  if(G.failed||G.win)return;
+  a.mis=true;
+  G.mis++; G.earn+=rand(0.13,0.28); G.pressure+=0.3;
+  G.patience=clamp(G.patience-(a.def.id==="A02"||a.def.id==="A06"?8:5),0,G.patienceMax);
+  Sfx.mis();
+  flashMis(e?e.clientX:0,e?e.clientY:0);
+  floatMoney(e);
+  shakeScreen();
+  toast("误触广告：为广告商赚了 "+money(rand(0.13,0.28)),"warn");
+  if(G.patience<=0) failLevel();
+  removeAd(a,true);
+  if(G.view==="level") updateHud();
+}
+
+function flashMis(){
+  const f=el("div","mis-flash");adLayer.appendChild(f);setTimeout(()=>f.remove(),380);
+}
+function floatMoney(e){
+  const m=el("div","floatmoney","+"+money(rand(0.13,0.28)));
+  const host=e&&e.clientX?$("screen"):$("screen");
+  const r=host.getBoundingClientRect();
+  m.style.left=Math.max(8,Math.min(r.width-60,(e?e.clientX-r.left:r.width/2)))+"px";
+  m.style.top=Math.max(8,(e?e.clientY-r.top:70))+"px";
+  adLayer.appendChild(m);setTimeout(()=>m.remove(),1050);
+}
+function shakeScreen(){
+  const sc=$("screen");sc.classList.remove("hit-slow");void sc.offsetWidth;sc.classList.add("hit-slow");
+}
+
+function closeAd(a){
+  if(a.dead||G.failed||G.win)return;
+  if(G._tut){G._tut.remove();G._tut=null}
+  G.blocked++;
+  G.pressure=Math.max(0.8,G.pressure-0.22);
+  G.patience=clamp(G.patience+1,0,G.patienceMax);
+  Sfx.close();
+  toast("已关闭广告 +"+a.def.id+"","");
+  removeAd(a,false);
+  if(G.view==="level")updateHud();
+}
+
+function removeAd(a,wasMis){
+  if(a.dead)return;
+  a.dead=true;
+  G.adWasted=(G.adWasted||0)+(Date.now()-a.birth)/1000;
+  a.box?.remove();
+  clearTimeout(a.timer);clearTimeout(a._t);
+  a.cleanup&&a.cleanup();
+  const i=G.ads.indexOf(a);if(i>-1)G.ads.splice(i,1);
+  afterAdGone(a);
+}
+
+function afterAdGone(a){
+  if(G.view!=="level")return;
+  const id=a.def.id;
+  if(id==="A08"&&LEVELS[G.lvl].id==="pay"){
+    G.qrClear=true;updatePayQr();
+  }
+  if(id==="A05"){ // 连环弹窗：0.25s 后再弹
+    G.chainCount--;
+    if(G.chainCount>0){setTimeout(()=>spawnAd("A05",{kind:"fake",title:"继续清理？还有 0 个广告",sub:defText()}),250)}
+  }
+  if(id==="A11"||a.opts&&a.opts.returnTo){ // 劫持返回
+    if(!a.mis){ G.navHijack=false; toast("已返回导航",""); }
+  }
+  if(id==="A03"){ G.shakeHappening=false; }
+}
+function defText(){return "点击「跳过」，0.25 秒后还有一个"}
+
+/* ================= HUD ================= */
+function updateHud(){
+  const t=$("hudTime"),p=$("hudPat"),g=$("hudGoal");
+  if(!t)return;
+  t.style.width=(G.timeMax?G.timeLeft/G.timeMax*100:100)+"%";
+  p.style.width=(G.patience/G.patienceMax*100)+"%";
+  if(g){g.textContent=G.timeMax?fmtT(G.timeLeft):"";}
+  $("hudTimeLbl").textContent="剩余 "+(G.timeMax>0?fmtT(G.timeLeft):"--");
+  $("hudPatLbl").textContent="耐心 "+Math.round(G.patience);
+  const tb=$("hudTimeWrap");if(tb){tb.classList.toggle("low",G.timeLeft<=6&&G.timeMax>0)}
+}
+
+/* ================= 主循环 ================= */
+function loop(now){
+  if(!G.running){return}
+  const dt=Math.min(0.1,(now-G.lastTick)/1000);G.lastTick=now;
+  if(G.view==="level"&&!G.failed&&!G.win){
+    const t=(Date.now()-G.t0)/1000;
+    if(G.timeMax>0)G.timeLeft=Math.max(0,G.timeMax-t);
+    // 耐心：在场广告越多掉越快
+    const n=adBusyCount();
+    G.patience=clamp(G.patience - dt*(0.35+n*0.55),0,G.patienceMax);
+    updateHud();
+    // 关卡自定义更新（可能触发通关/失败，如导航到达出口）
+    const lv=LEVELS[G.lvl];
+    if(lv&&lv.tick)lv.tick(dt,t);
+    if(G.win||G.failed)return;
+    if(G.timeMax>0&&G.timeLeft<=0){failLevel();return}
+    if(G.patience<=0){failLevel();return}
+    // 广告调度
+    const next=nextPlannedAd();
+    if(next){spawnAd(next,adOptsFor(next,G.lvl))}
+    if(G.spawnQueue.every(a=>a.used)&&adBusyCount()<2){
+      // 持续骚扰（压力驱动）
+      if(t>G.nextSpawnAt){
+        const lv=LEVELS[G.lvl];
+        if(lv.ambient&&lv.ambient.length){
+          const id=pick(lv.ambient);
+          spawnAd(id,adOptsFor(id,G.lvl));
+          G.nextSpawnAt=t+pressurePace();
+        }
+      }
+    }
+  }
+  requestAnimationFrame(loop);
+}
+
+function adOptsFor(id,lvl){
+  const L=LEVELS[lvl];
+  const map={
+    "A01":{countdown:L&&L.id==="teach"?6:5},
+    "A02":{kind:"fake",title:pick(["恭喜中奖","立即清理","免费领取","走路赚钱"])||"今日特惠",sub:"点击右上角 ✕ 领取"+(L&&L.id==="hosp"?"「走路赚钱」":"" )},
+    "A03":{kind:"shake"},
+    "A04":{kind:"overlay"},
+    "A05":{kind:"fake",title:"还有优惠待领取",sub:"关闭后 0.2 秒还有新的"},
+    "A06":{kind:"redpack",title:"恭喜获得 99.9 元红包",sub:"还差 1 位好友即可提现"},
+    "A09":{kind:"sys",title:"内存不足！",sub:"手机存储已满，立即清理 12.8 GB 垃圾"},
+    "A10":{kind:"fake",title:"老年朋友 免费领鸡蛋",sub:"填个手机号就行，真的不要钱"},
+    "A11":{kind:"hijack",title:"限时抢购 1 折",sub:"你刚才想看的东西，这里都有"},
+    "A12":{kind:"fake",title:"充电加速神器",sub:"插电广告：点 ✕ 无效"},
+    "A13":{kind:"fake",title:"锁屏广告",sub:"解锁前先看完这条"},
+    "A14":{kind:"fake",title:"后台唤醒广告",sub:"返回键也关不掉我"}
+  };
+  if(L&&L.id==="pay"&&id==="A08")return {pos:{left:"calc(50% - 34px)",top:"26%"}};
+  if(L&&L.id==="call"&&(id==="A07"))return {kind:"noti"};
+  if(L&&id==="A05")return {kind:"fake",title:"还有优惠待领取",sub:"关闭后 0.2 秒还有新的",count:3};
+  if(L&&id==="A11")return {kind:"hijack"};
+  return map[id]||{};
+}
+
+/* ===== 视图切换与渲染 ===== */
+function clearScreen(){
+  $("app").innerHTML="";
+  $("adlayer").innerHTML="";
+  $("sbNotis").classList.remove("open");
+  $("sbNotis").innerHTML="";
+  G.ads.forEach(a=>{clearTimeout(a.timer)});G.ads=[];
+  G.spawnQueue=[];
+}
+
+/* ================= Toast ================= */
+let toastTimer=null;
+function toast(msg,type){
+  const tb=$("toastBox");tb.innerHTML="";
+  const t=el("div","toast"+(type==="warn"?" warn":""),(type==="warn"?"⚠ ":"✓ ")+ESC(msg));
+  tb.appendChild(t);requestAnimationFrame(()=>t.classList.add("show"));
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>{t.classList.remove("show");setTimeout(()=>t.remove(),240)},1800);
+}
+
+/* ================= 状态栏 ================= */
+function renderStatusbar(){
+  const right=$("sbRight");
+  right.innerHTML='<span>5G</span><svg width="18" height="12" viewBox="0 0 18 12"><rect x="0" y="7" width="3" height="5" rx="1" fill="#fff"/><rect x="5" y="4" width="3" height="8" rx="1" fill="#fff"/><rect x="10" y="1" width="3" height="11" rx="1" fill="#fff" opacity=".5"/><rect x="15" y="0" width="3" height="12" rx="1" fill="#fff" opacity=".3"/></svg><svg width="26" height="12" viewBox="0 0 26 12"><rect x="0" y="0" width="22" height="10" rx="3" stroke="#fff" fill="none"/><rect x="2" y="2" width="14" height="6" rx="1.5" fill="#fff"/><rect x="23" y="3" width="3" height="4" rx="1" fill="#fff"/></svg>';
+  updateClock();setInterval(updateClock,15000);
+}
+function updateClock(){
+  const d=new Date();
+  const t=String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+  $("sbTime").textContent=t;
+}
+
+/* ================= HUD ================= */
+function buildHud(lv){
+  const hud=el("div","hud");
+  const tm=G.timeMax>0?fmtT(G.timeMax):"--";
+  hud.innerHTML=`<div class="goal"><span class="g-ico">${lv.icon}</span><span class="g-txt">${lv.goal}</span></div>
+  <div class="bars">
+    <div class="bar time" id="hudTimeWrap"><div class="lbl"><span id="hudTimeLbl">剩余 ${tm}</span></div><div class="track"><div class="fill" id="hudTime"></div></div></div>
+    <div class="bar pat"><div class="lbl"><span id="hudPatLbl">耐心 ${G.patienceMax}</span></div><div class="track"><div class="fill" id="hudPat"></div></div></div>
+  </div>`;
+  return hud;
+}
+
+/* ================= App 渲染分派 ================= */
+function renderApp(){
+  const lv=LEVELS[G.lvl];
+  switch(lv.id){
+    case "teach": case "sunset": return renderCam();
+    case "fire": return renderDial();
+    case "nav": return renderNav();
+    case "hosp": return renderHosp();
+    case "call": return renderCall();
+    case "pay": return renderPay();
+    case "boss": return renderSettings();
+  }
+}
+
+/* ============ 相机（教学关 / 景区日落） ============ */
+function renderCam(){
+  const isSunset=LEVELS[G.lvl].id==="sunset";
+  const box=el("div","cam");
+  const scene=el("div","cam-scene");
+  const sky=el("div","skybg");
+  sky.style.background="linear-gradient(180deg,#9CCBE8,#E8F4F8)";
+  const dim=el("div","skybg");dim.style.background="#1B2735";dim.style.opacity="0";
+  const warm=el("div","skybg");warm.style.background="linear-gradient(180deg,transparent,#FF8A3C)";warm.style.opacity="0";
+  scene.append(sky,dim,warm);
+  const sun=el("div","sun");
+  sun.style.width="74px";sun.style.height="74px";
+  sun.style.left=isSunset?"16%":"66%";sun.style.top=isSunset?"20%":"24%";
+  scene.append(sun);
+  scene.append(el("div","hill"),el("div","sea"));
+  if(!isSunset){
+    scene.append(el("div","boy",'<div class="head"></div><div class="body"></div><div class="arm l"></div><div class="arm r"></div>'));
+  }
+  const ui=el("div","cam-ui");
+  ui.innerHTML='<div class="cam-side">HDR</div><div class="shutter" id="shutter"></div><div class="cam-side">🎞</div>';
+  ui.querySelector("#shutter").addEventListener("pointerdown",doPhoto);
+  box.append(scene,ui);
+  G._sun=sun;G._dim=dim;G._warm=warm;
+  if(isSunset){
+    LEVELS[1].tick=(dt,t)=>{
+      if(G.win||G.failed)return;
+      const p=clamp(t/G.timeMax,0,1);
+      if(p>=1){failLevel("太阳落山了，照片没拍到");return}
+      G._sun.style.left=(16+p*64)+"%";
+      G._sun.style.top=(20+p*50)+"%";
+      G._dim.style.opacity=p*0.82;
+      G._warm.style.opacity=p;
+    };
+  }
+  return box;
+}
+function doPhoto(){
+  if(G.failed||G.win)return;
+  if(adBusyCount()>0){toast("屏幕上有广告，先关掉再拍","warn");Sfx.mis();return}
+  const fl=el("div","photo-flash go");$("app").append(fl);
+  Sfx.win();
+  setTimeout(()=>winLevel(),480);
+}
+
+/* ============ 拨号盘（火警） ============ */
+function renderDial(){
+  const box=el("div","dial");
+  const num=el("div","dial-num"," ");num.id="dialNum";num.style.opacity=".35";
+  const sub=el("div","dial-sub","请拨 119 · 广告会来捣乱");
+  box.append(num,sub);
+  const pad=el("div","dial-pad");
+  ["1","2","3","4","5","6","7","8","9","*","0","#"].forEach(k=>{
+    const b=el("div","d-key",k);
+    b.addEventListener("pointerdown",()=>{
+      if(G.failed||G.win)return;
+      if(G._num.length>=11)return;
+      G._num+=k;renderNum();Sfx.click();
+    });
+    pad.append(b);
+  });
+  box.append(pad);
+  const row=el("div","dial-call");
+  const vid=el("div","call-btn red","📹");
+  vid.addEventListener("pointerdown",misVideo);
+  const call=el("div","call-btn","📞");
+  call.addEventListener("pointerdown",callNow);
+  const del=el("div","d-key del","⌫");
+  del.addEventListener("pointerdown",()=>{G._num=G._num.slice(0,-1);renderNum()});
+  row.append(vid,call,del);
+  box.append(row);
+  G._num="";G._numEl=num;
+  return box;
+}
+function renderNum(){
+  G._numEl.textContent=G._num||" ";
+  G._numEl.style.opacity=G._num?"1":".35";
+}
+function callNow(){
+  if(G.failed||G.win)return;
+  if(G._num==="119"){Sfx.win();toast("正在呼叫 119…");setTimeout(winLevel,650)}
+  else{toast("号码不对，紧急时刻要拨 119","warn");G._num="";renderNum()}
+}
+function misVideo(){
+  if(G.failed||G.win)return;
+  G.mis++;G.earn+=rand(0.13,0.28);G.pressure+=0.3;
+  G.patience=clamp(G.patience-6,0,G.patienceMax);
+  Sfx.mis();flashMis();floatMoney(null);
+  toast("别拍视频！先拨 119","warn");
+  updateHud();
+  if(G.patience<=0)failLevel("只顾拍视频，火更大了");
+}
+
+/* ============ 导航（高速） ============ */
+function renderNav(){
+  const box=el("div","nav");
+  box.innerHTML=`<div class="nav-top"><span>🛣 高速 · G30</span><div class="n-miles"><small>距离出口</small><span id="navMilesNum">2.0</span> km</div></div>
+  <div class="nav-road"><div class="road-lines"></div><div class="car"></div><div class="nav-exit"><b>出口</b>15</div></div>
+  <div class="nav-progress"><div class="np-lbl"><span>任务进度</span><span id="navLbl">0%</span></div><div class="np-track"><div class="np-fill" id="navFill"></div></div></div>`;
+  G._navFill=box.querySelector("#navFill");G._navLbl=box.querySelector("#navLbl");G._navMiles=box.querySelector("#navMilesNum");
+  G.navProgress=0;
+  LEVELS[3].tick=(dt,t)=>{
+    if(G.win||G.failed)return;
+    G.navProgress=clamp(G.navProgress+dt/40,0,1);
+    G._navFill.style.width=(G.navProgress*100)+"%";
+    G._navLbl.textContent=Math.round(G.navProgress*100)+"%";
+    G._navMiles.textContent=(2.0*(1-G.navProgress)).toFixed(1);
+    if(G.navProgress>=1||t>=G.timeMax){
+      if(G.navHijack)failLevel("正被购物页困住，错过了出口");
+      else winLevel();
+    }
+  };
+  return box;
+}
+
+/* ============ 挂号（医院） ============ */
+function renderHosp(){
+  const box=el("div","hosp");
+  const list=el("div","h-list");
+  const mk=(name,dept,left,expert)=>{
+    const c=el("div","h-card");
+    c.innerHTML=`<div class="h-avatar">${expert?"王":"医"}</div><div class="h-info"><div class="h-name">${name}</div><div class="h-dept">${dept}</div><div class="h-left" ${expert?'id="hLeft"':""}>剩余 ${left} 个号</div></div>`;
+    const b=el("div","h-btn",expert?"立即挂号":"预约");
+    if(expert){
+      b.addEventListener("pointerdown",()=>{
+        if(G.failed||G.win)return;
+        b.classList.add("got");b.textContent="✓ 挂上了";Sfx.win();
+        setTimeout(winLevel,650);
+      });
+    } else {
+      b.addEventListener("pointerdown",()=>toast("专家号更合适，号不多了","warn"));
+    }
+    c.append(b);return c;
+  };
+  list.append(mk("王主任","心血管内科 · 专家号",5,true));
+  list.append(mk("李医生","心血管内科 · 普通号",12,false));
+  list.append(mk("赵医生","内分泌科 · 普通号",8,false));
+  box.append(list);
+  const cnt=el("div","h-count","专家号剩余 <b id='hLeftNum'>5</b> 个 · 每 6 秒被抢 1 个");
+  box.append(cnt);
+  G._hLeft=5;G._hLeftEl=box.querySelector("#hLeft");G._hLeftNum=box.querySelector("#hLeftNum");
+  LEVELS[4].tick=(dt,t)=>{
+    if(G.win||G.failed)return;
+    const left=5-Math.floor(t/6);
+    if(left!==G._hLeft){
+      G._hLeft=left;
+      if(G._hLeftEl){G._hLeftEl.textContent="剩余 "+left+" 个号";G._hLeftEl.classList.toggle("low",left<=2)}
+      if(G._hLeftNum)G._hLeftNum.textContent=Math.max(0,left);
+      if(left<=0&&!G.win)failLevel("专家号被抢完了");
+    }
+  };
+  return box;
+}
+
+/* ============ 视频通话（通知轰炸） ============ */
+function renderCall(){
+  const box=el("div","noti-list");
+  const adsPool=[["走路赚钱","今日步数 0，快去提现","#FFD60A"],["清理大师","手机垃圾 12.8G","#FF9F43"],["红包到账","您有一个 88 元红包","#FF3B30"],["贷款秒批","额度 20 万已到账","#0A84FF"],["免费测速","网速慢？点我提速","#AF52DE"],["0 元购","新人专享 0 元","#22B573"]];
+  G._callAds=[];
+  for(let i=0;i<5;i++){
+    const ad=pick(adsPool);
+    const it=el("div","noti-item");
+    it.innerHTML=`<div class="ni-ico" style="background:${ad[2]}">📢</div><div class="ni-body"><div class="ni-title">${ad[0]}</div><div class="ni-sub">${ad[1]}</div></div><div class="ni-btn r">✕</div>`;
+    it.querySelector(".ni-btn").addEventListener("pointerdown",e=>{e.stopPropagation();it.remove()});
+    box.append(it);G._callAds.push(it);
+  }
+  const callN=el("div","noti-item call");
+  callN.innerHTML='<div class="ni-ico" style="background:#22B573">📹</div><div class="ni-body"><div class="ni-title">孙子 · 视频通话邀请</div><div class="ni-sub" id="callSub">来自 微信 · 还有 18 秒</div></div>';
+  const accept=el("div","ni-btn g","接听");
+  accept.addEventListener("pointerdown",()=>winLevel());
+  const reject=el("div","ni-btn r","挂断");
+  reject.addEventListener("pointerdown",()=>failLevel("你亲手挂断了孙子的电话"));
+  callN.append(accept,reject);
+  box.prepend(callN);
+  G._callItem=callN;G._callSub=callN.querySelector(".ni-sub");
+  G._callLeft=18;
+  LEVELS[5].tick=(dt,t)=>{
+    if(G.win||G.failed)return;
+    G._callLeft-=dt;
+    if(G._callSub)G._callSub.textContent="来自 微信 · 还有 "+Math.max(0,Math.ceil(G._callLeft))+" 秒";
+    if(G._callLeft<=0)failLevel("孙子等不到你，挂断了");
+  };
+  return box;
+}
+
+/* ============ 付款码（买菜） ============ */
+function renderPay(){
+  const box=el("div","pay");
+  box.innerHTML=`<div class="pay-title">收付款 · 向商家付款</div>
+  <div class="queue"><span class="qdot"></span>排队中 · 后面还有 3 人</div>
+  <div class="pay-qr" id="payQr"></div>
+  <div class="pay-name">张阿姨 · 买菜</div>
+  <div class="pay-amount">¥23.50</div>
+  <div class="pay-ok"><div class="btn btn-primary btn-block" id="payBtn">出示付款码</div></div>`;
+  G.qrClear=false;
+  paintQr(box.querySelector("#payQr"));
+  box.querySelector("#payBtn").addEventListener("pointerdown",()=>{
+    if(G.failed||G.win)return;
+    if(G.qrClear)winLevel();else toast("二维码被挡住了，把悬浮球拖走","warn");
+  });
+  return box;
+}
+function qrSvg(){
+  let s='<svg width="150" height="150" viewBox="0 0 29 29">';
+  const cells=new Set();
+  while(cells.size<72)cells.add(Math.floor(Math.random()*29*29));
+  cells.forEach(c=>{const x=c%29,y=Math.floor(c/29);s+=`<rect x="${x}" y="${y}" width="2" height="2" fill="#1C1E24"/>`});
+  for(let i=0;i<3;i++){s+=`<rect x="${i*9+3}" y="${i*9+3}" width="6" height="6" fill="#1C1E24"/>`}
+  s+='</svg>';return s;
+}
+function updatePayQr(){
+  const qr=$("payQr");if(!qr)return;
+  paintQr(qr);
+}
+function paintQr(qr){
+  if(G.qrClear){
+    qr.innerHTML=qrSvg();
+    qr.style.background="#fff";qr.style.border="1px solid #E4DED2";
+  } else {
+    qr.innerHTML='<div style="color:#9A9184;font-size:13px;font-weight:600">二维码被悬浮球挡住</div><div style="color:#C9C4B8;font-size:11px;margin-top:6px">把红色小球拖走或关掉</div>';
+    qr.style.background="#EFEAE0";
+  }
+}
+
+/* ============ 系统设置（最终 Boss） ============ */
+function renderSettings(){
+  const box=el("div","settings");
+  const head=el("div","s-head",'<span class="back" id="setBack">‹ 返回</span><div class="s-title">系统设置</div>');
+  head.querySelector("#setBack").addEventListener("pointerdown",()=>{
+    if(G.bossClosed>=8)toast("广告已被削弱，还差最后一步长辈模式","warn");
+    else toast("返回键被广告劫持了！继续关设置","warn");
+  });
+  box.append(head);
+  const list=el("div","s-list");
+  settingsDefs.forEach(s=>{
+    const item=el("div","s-item");
+    item.innerHTML=`<div class="s-ico" style="background:#E8F0F5;color:#0A84FF">${s.ico}</div><div class="s-info"><div class="s-name">${s.name}</div><div class="s-desc">${s.desc}</div></div>`;
+    const sw=el("div","switch");
+    sw.addEventListener("pointerdown",()=>{
+      if(G.settings[s.k]||G.failed||G.win)return;
+      G.settings[s.k]=true;G.bossClosed++;
+      sw.classList.add("on");item.classList.add("done");
+      Sfx.ding();toast("已关闭「"+s.name+"」，广告变弱了","");
+      updateBossCount();
+      if(G.bossClosed>=8)askElderMode();
+    });
+    item.append(sw);list.append(item);
+  });
+  box.append(list);
+  const cnt=el("div","s-count","已关闭 0/8 项 · 广告还在骚扰你");
+  box.append(cnt);
+  G._bossCount=cnt;
+  LEVELS[7].ambient=["A01","A04","A05","A06","A09","A10","A12","A13","A14"];
+  return box;
+}
+function updateBossCount(){
+  if(G._bossCount)G._bossCount.textContent="已关闭 "+G.bossClosed+"/8 项 · 广告"+(G.bossClosed>4?"已经老实很多了":"还在骚扰你");
+}
+function askElderMode(){
+  if(G._elderAsked)return;G._elderAsked=true;
+  const m=el("div","ad ad-pop");
+  m.style.zIndex=200;
+  m.innerHTML='<div class="ad-p-ico">👵</div><div class="ad-p-title">是否开启长辈模式？</div><div class="ad-p-sub">将减少广告，但部分功能受限。<br>这是手机自带的设置，不是广告。</div>';
+  const row=el("div","ad-p-cta-row");
+  const yes=el("div","ad-cta","开启长辈模式");yes.style.background="#22B573";
+  yes.addEventListener("pointerdown",()=>{m.remove();winLevel()});
+  const no=el("div","ad-p-no","再想想");
+  no.addEventListener("pointerdown",()=>{m.remove();toast("广告联盟松了一口气","warn")});
+  row.append(yes,no);m.append(row);
+  $("adlayer").append(m);
+}
+
+/* ================= 关卡控制 ================= */
+function loadLevel(i){
+  const lv=LEVELS[i];
+  G.lvl=i;G.view="level";
+  G.timeMax=lv.time;G.timeLeft=lv.time;G.patienceMax=lv.patience;G.patience=lv.patience;
+  G.mis=0;G.earn=0;G.blocked=0;G.pressure=1;G.adWasted=0;
+  G.win=false;G.failed=false;G.navHijack=false;G.navEverHijacked=false;G.shakeHappening=false;
+  G.sunProgress=0;G.navProgress=0;G.qrClear=false;G.bossClosed=0;G.chainCount=0;
+  G._callLeft=18;G._hLeft=5;G._num="";G._elderAsked=false;G._tut=null;
+  G.running=true;G.started=true;G.t0=Date.now();G.lastTick=performance.now();
+  G.nextSpawnAt=3;
+  clearScreen();
+  queueAds(lv.ads);
+  const app=$("app");
+  app.append(buildHud(lv));
+  app.append(renderApp());
+  if(lv.id==="boss"){G.timeMax=0;G.timeLeft=0;updateHud()}
+  if(lv.id==="teach")showTeachTut();
+  requestAnimationFrame(loop);
+}
+function showTeachTut(){
+  G._tut=el("div","tut");
+  const b=el("div","t-bubble tb-bottom","等广告倒计时走完，点右下角<b>小灰字「跳过」</b>。<br>千万别点红色大 ✕——那是假关闭。");
+  b.style.cssText="right:10px;top:130px";
+  G._tut.append(b);$("app").append(G._tut);
+}
+function winLevel(){
+  if(G.win||G.failed)return;
+  G.win=true;G.running=false;
+  Sfx.win();
+  if(LEVELS[G.lvl].id==="boss"){recordResult(true);setTimeout(showEnding,900);return}
+  setTimeout(()=>showResult(true),750);
+}
+function failLevel(msg){
+  if(G.win||G.failed)return;
+  G.failed=true;G.running=false;
+  G.failMsg=msg;
+  if(msg)toast(msg,"warn");
+  Sfx.fail();
+  setTimeout(()=>showResult(false),850);
+}
+
+/* ================= 成就定义 ================= */
+const ACH={
+  ach_photo:{ico:"📷",name:"我就想拍个照",desc:"完成「景区日落」"},
+  ach_fire:{ico:"🚒",name:"火警先锋",desc:"完成「火警」且误触不超过 1 次"},
+  ach_zero:{ico:"✨",name:"不误触大师",desc:"任意一关零误触通关"},
+  ach_nav:{ico:"🛣",name:"导航终结者",desc:"完成「高速导航」且从未被劫持"},
+  ach_boss:{ico:"👹",name:"广告联盟终结者",desc:"通关最终 Boss"},
+  ach_clean:{ico:"🛡",name:"本游戏无广告",desc:"看完结局彩蛋"},
+  ach_collect:{ico:"📖",name:"广告图鉴收藏家",desc:"收集 8 种以上广告"}
+};
+
+/* ================= 结算系统 ================= */
+function gradeRank(g){return["D","C","B","A","S"].indexOf(g)}
+function gradeOf(ok){
+  if(!ok)return "D";
+  if(G.mis===0&&G.blocked>=1)return "S";
+  if(G.mis<=1)return "A";
+  if(G.mis<=3)return "B";
+  if(G.mis<=6)return "C";
+  return "D";
+}
+function recordResult(ok){
+  const lv=LEVELS[G.lvl],id=lv.id;
+  const grade=gradeOf(ok);
+  const unlocked=[];
+  if(ok){
+    if(!save.cleared.includes(id))save.cleared.push(id);
+    save.unlocked=Math.max(save.unlocked,G.lvl+2);
+    if(!save.best[id]||gradeRank(grade)<gradeRank(save.best[id]))save.best[id]=grade;
+    if(id==="sunset"&&unlockAch("ach_photo"))unlocked.push("ach_photo");
+    if(id==="fire"&&G.mis<=1&&unlockAch("ach_fire"))unlocked.push("ach_fire");
+    if(G.mis===0&&unlockAch("ach_zero"))unlocked.push("ach_zero");
+    if(id==="nav"&&!G.navEverHijacked&&unlockAch("ach_nav"))unlocked.push("ach_nav");
+    if(id==="boss"&&unlockAch("ach_boss"))unlocked.push("ach_boss");
+  }
+  if(save.codex.length>=8&&unlockAch("ach_collect"))unlocked.push("ach_collect");
+  save.persist();
+  return {grade,unlocked};
+}
+function showResult(ok){
+  $("adlayer").innerHTML="";
+  const lv=LEVELS[G.lvl];
+  const {grade,unlocked}=recordResult(ok);
+  const used=(Date.now()-G.t0)/1000;
+  const wasted=Math.round(G.adWasted||0);
+  const r=el("div","report");
+  const head=el("div","r-head");
+  head.innerHTML=`<div class="r-tag">${ok?"任务完成":"任务失败"} · 广告收益结算报表</div><h3>${lv.name}</h3>`;
+  head.append(el("div","r-grade "+grade,grade));
+  r.append(head);
+  const body=el("div","r-body");
+  const card=el("div","r-card");
+  card.innerHTML=`
+    <div class="r-row"><span>任务用时</span><b>${used.toFixed(1)} 秒</b></div>
+    <div class="r-row hl"><span>被广告浪费的时间</span><b>约 ${wasted} 秒</b></div>
+    <div class="r-row"><span>误触次数</span><b>${G.mis} 次</b></div>
+    <div class="r-row money"><span>你为广告商赚了</span><b>${money(G.earn)}</b></div>
+    <div class="r-row"><span>成功关闭广告</span><b>${G.blocked} 个</b></div>
+    <div class="r-row"><span>老人耐心剩余</span><b>${Math.round(G.patience)} / ${G.patienceMax}</b></div>`;
+  body.append(card);
+  const q=el("div","r-quote");
+  if(ok)q.innerHTML=pick(lv.quotes);
+  else q.innerHTML="任务失败："+(G.failMsg||"广告太坏了")+"<br>这半分钟，是广告商最喜欢的半分钟。";
+  body.append(q);
+  const safe=el("div","r-safety");
+  safe.innerHTML="<b>现实安全提示</b><br>"+lv.safety;
+  body.append(safe);
+  const adTags=el("div","r-ads");
+  (lv.ads.map(a=>a.id)).forEach(id=>{const d=AD_CATALOG[id];if(d)adTags.append(el("span",d.tag))});
+  if(lv.id==="boss")LEVELS[7].ambient.forEach(id=>{const d=AD_CATALOG[id];if(d)adTags.append(el("span",d.tag))});
+  body.append(adTags);
+  r.append(body);
+  const act=el("div","r-actions");
+  if(unlocked.length){
+    act.append(el("div","r-new-ach","新成就解锁："+unlocked.map(k=>ACH[k].name).join("、")));
+  }
+  if(ok){
+    const nxtTxt=G.lvl+1<LEVELS.length?"下一关："+LEVELS[G.lvl+1].name:"看结局";
+    const nxt=el("div","btn btn-primary",nxtTxt);
+    nxt.addEventListener("pointerdown",()=>{
+      if(G.lvl+1<LEVELS.length)loadLevel(G.lvl+1);
+      else showEnding();
+    });
+    act.append(nxt);
+  } else {
+    const retry=el("div","btn btn-primary","再试一次");
+    retry.addEventListener("pointerdown",()=>loadLevel(G.lvl));
+    act.append(retry);
+  }
+  const again=el("div","btn btn-ghost","返回主菜单");
+  again.addEventListener("pointerdown",showMenu);
+  act.append(again);
+  r.append(act);
+  $("app").append(r);
+}
+
+/* ================= 视图：菜单 / 图鉴 / 成就 / 结局 ================= */
+function showMenu(){
+  G.view="menu";G.running=false;
+  clearScreen();
+  const menu=el("div","menu");
+  const cleared=new Set(save.cleared);
+  menu.innerHTML=`
+    <div class="m-logo">THE UNSKIPPABLE · 长辈模式</div>
+    <h2>关不掉的<em>广告</em></h2>
+    <div class="m-sub">你帮长辈操作手机，在广告围剿中完成拍照、报警、导航、挂号、接电话。</div>
+    <div class="m-quote">不是老人笨，<b>是广告太会伪装</b>。<br>「本游戏无广告，请放心。」</div>`;
+  const btns=el("div","m-btns");
+  const play=el("div","m-btn play","▶ 开始游戏");
+  play.addEventListener("pointerdown",startJourney);
+  const codex=el("div","m-btn ghost","广告图鉴 "+save.codex.length+"/14");
+  codex.addEventListener("pointerdown",showCodex);
+  const ach=el("div","m-btn ghost","我的成就 "+save.ach.length+"/"+Object.keys(ACH).length);
+  ach.addEventListener("pointerdown",showAch);
+  btns.append(play,codex,ach);
+  menu.append(btns);
+  menu.append(el("div","m-footer","已通关 "+cleared.size+"/"+LEVELS.length+" 关 · 进度自动保存在本机"));
+  $("app").append(menu);
+}
+function startJourney(){
+  const cleared=new Set(save.cleared);
+  let idx=0;
+  for(let i=0;i<LEVELS.length;i++)if(!cleared.has(LEVELS[i].id)){idx=i;break}
+  loadLevel(idx);
+}
+function showCodex(){
+  G.view="codex";G.running=false;
+  clearScreen();
+  const page=el("div","codex-page");
+  const head=el("div","cp-head",'<span class="back" id="cxBack">‹ 返回</span><div class="cp-title">广告图鉴</div><div class="cp-count">'+save.codex.length+"/14</div>");
+  page.append(head);
+  const grid=el("div","codex-grid");
+  AD_ORDER.forEach(id=>{
+    const d=AD_CATALOG[id];const got=save.codex.includes(id);
+    const card=el("div","codex-card"+(got?"":" locked"));
+    card.innerHTML=`<div class="cx-top"><span class="cx-id">${id}</span><span class="cx-tag" style="background:${d.color}">${d.tag}</span></div>`;
+    if(got){
+      card.append(el("div","cx-name",d.name));
+      card.append(el("div","cx-desc",d.desc));
+      card.append(el("div","cx-how","应对："+d.how));
+    }else{
+      card.append(el("div","cx-name","？？？"));
+      card.append(el("div","cx-desc","在游戏中遇到这种广告即可解锁"));
+    }
+    grid.append(card);
+  });
+  page.append(grid);
+  page.querySelector("#cxBack").addEventListener("pointerdown",showMenu);
+  $("app").append(page);
+}
+function showAch(){
+  G.view="ach";G.running=false;
+  clearScreen();
+  const page=el("div","codex-page");
+  const head=el("div","cp-head",'<span class="back" id="aBack">‹ 返回</span><div class="cp-title">我的成就</div><div class="cp-count">'+save.ach.length+"/"+Object.keys(ACH).length+"</div>");
+  page.append(head);
+  const list=el("div","codex-grid");
+  Object.keys(ACH).forEach(k=>{
+    const a=ACH[k],got=save.ach.includes(k);
+    const card=el("div","ach-card"+(got?" got":" locked"));
+    card.innerHTML=`<div class="a-ico">${a.ico}</div><div class="a-info"><div class="a-name">${a.name}</div><div class="a-desc">${a.desc}</div></div><div class="a-state">${got?"已解锁":"未解锁"}</div>`;
+    list.append(card);
+  });
+  page.append(list);
+  page.querySelector("#aBack").addEventListener("pointerdown",showMenu);
+  $("app").append(page);
+}
+function showEnding(){
+  G.view="ending";G.running=false;
+  clearScreen();
+  const gotClean=unlockAch("ach_clean");
+  const e=el("div","ending");
+  e.innerHTML=`
+  <div class="e-inner">
+    <div class="e-tag">ENDING · 广告联盟覆灭</div>
+    <h3>手机终于清净了</h3>
+    <div class="e-scene"><span class="av">👵</span> 奶奶：咦，广告真的少了？<br><span class="av g">🧒</span> 孙子：我帮你把那些关不掉的都关掉了。<br><span class="av">👵</span> 奶奶：你教我一遍，下次我自己来。</div>
+    <div class="e-scene">三天后，奶奶学会了自己关通知、清后台。<br>但就在她准备关屏睡觉时——<br>屏幕上，又弹出了一个预装广告。</div>
+    <div class="e-big">“本游戏无广告，请放心。”</div>
+    <div class="e-ads">本游戏内所有广告品牌均为虚构<br>讽刺的是广告，不是长辈</div>
+    <div class="btn btn-primary e-btn" id="eBack">回到主菜单</div>
+  </div>`;
+  e.querySelector("#eBack").addEventListener("pointerdown",showMenu);
+  $("app").append(e);
+  if(gotClean)setTimeout(()=>toast("成就解锁：本游戏无广告",""),500);
+}
+
+/* ================= 启动 ================= */
+function init(){
+  Sfx.init();
+  renderStatusbar();
+  showMenu();
+}
+window.addEventListener("pointerdown",()=>Sfx.init(),{once:true});
+init();
+
+</script>
+</body>
+</html>
