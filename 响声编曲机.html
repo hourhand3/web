@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>🔔 响声编曲机</title>
+<title>🔔 响声编曲机 · 自动配位版</title>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -12,8 +12,8 @@
     background: #12141a; color: #e8eaf0; min-height: 100vh;
   }
   h1 { font-size: 20px; margin: 0 0 8px; }
-  p.lead { color: #9aa3b8; margin: 0 0 20px; font-size: 14px; line-height: 1.7; max-width: 760px; }
-  .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+  p.lead { color: #9aa3b8; margin: 0 0 20px; font-size: 14px; line-height: 1.7; max-width: 780px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
   button {
     font: inherit; padding: 8px 14px; border-radius: 10px;
     border: 1px solid #2c3040; background: #1c2029; color: #e8eaf0;
@@ -22,17 +22,22 @@
   button:hover { background: #252a36; border-color: #3a4055; }
   button.primary { background: #3b5bfd; border-color: #3b5bfd; color: #fff; font-weight: 600; }
   button.primary:hover { background: #5470ff; }
+  button.accent { background: #1d3a2e; border-color: #2e6b50; color: #7ef0be; }
+  button.accent:hover { background: #234a3a; }
   label { font-size: 13px; color: #9aa3b8; display: flex; align-items: center; gap: 6px; }
   select { background: #1c2029; color: #e8eaf0; border: 1px solid #2c3040; border-radius: 8px; padding: 6px 8px; font: inherit; }
   input[type=range] { width: 110px; accent-color: #3b5bfd; }
-  .hint { font-size: 12.5px; color: #6f7891; margin-bottom: 16px; line-height: 1.7; }
-  .slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; max-width: 720px; }
+  .hint { font-size: 12.5px; color: #6f7891; margin-bottom: 12px; line-height: 1.7; }
+  .status {
+    font-size: 13px; min-height: 20px; margin: 6px 0 16px; color: #7ef0be;
+  }
+  .slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; max-width: 760px; }
   @media (max-width: 560px) { .slots { grid-template-columns: repeat(2, 1fr); } }
   .slot {
-    position: relative; aspect-ratio: 1 / 0.92;
+    position: relative; aspect-ratio: 1 / 1.06;
     border-radius: 14px; border: 1px solid #262b38; background: #171a22;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 6px; cursor: pointer; transition: .12s; user-select: none;
+    gap: 4px; cursor: pointer; transition: .12s; user-select: none;
   }
   .slot:hover { border-color: #3a4055; background: #1c2029; }
   .slot.filled { background: #17202e; border-color: #2d4460; }
@@ -40,40 +45,51 @@
   .slot.hit { box-shadow: 0 0 0 3px #3b5bfd, 0 0 26px #3b5bfd99; transform: translateY(-2px); }
   @keyframes pulse { to { background: #2a1620; } }
   .note { font-size: 19px; font-weight: 700; letter-spacing: .5px; }
-  .state { font-size: 11px; color: #6f7891; }
+  .det { font-size: 11px; letter-spacing: .3px; }
+  .det.ok { color: #5fd0a0; }
+  .det.warn { color: #ffb648; }
+  .det.none { color: #6f7891; }
+  .state { font-size: 10.5px; color: #6f7891; }
   .slot button { position: absolute; top: 6px; padding: 2px 7px; font-size: 12px; border-radius: 8px; line-height: 1.4; }
   .slot .rec { right: 6px; }
   .slot .clr { left: 6px; opacity: 0; transition: .15s; }
   .slot.filled .clr, .slot:hover .clr { opacity: .8; }
+  .slot.moved { animation: flash .7s ease-out; }
+  @keyframes flash { 0% { box-shadow: 0 0 0 3px #5fd0a0; } 100% { box-shadow: 0 0 0 0 transparent; } }
 </style>
 </head>
 <body>
 
-<h1>🔔 响声编曲机</h1>
+<h1>🔔 响声编曲机 · 自动配位版</h1>
 <p class="lead">
-  录下身边短促的响声（敲杯子、拍手、按键盘、弹舌…），每个响声分配到一个音上。
-  然后选一首曲子播放 —— 同一个响声会被拉长缩短变成不同音高，一首歌就"敲"出来了。
+  录下身边短促的响声，程序会自动检测每个声音的<b>实际音高</b>，并把它放到音阶上最合适的位置。
+  播放时再用变速把声音拉到需要的音高，一首曲子就"敲"出来了。
 </p>
 
 <div class="controls">
   <button id="demoBtn">✨ 填充示例响声</button>
+  <button id="detectBtn">🔍 检测音高</button>
+  <button id="autoBtn" class="accent">🎯 自动分配音位</button>
   <button id="clearBtn">🗑 全部清空</button>
+</div>
+<div class="controls">
   <label>曲子 <select id="tuneSel"></select></label>
   <label>速度 <input type="range" id="tempo" min="60" max="220" value="120"><span id="tempoVal">120</span></label>
   <button id="playBtn" class="primary">▶ 播放</button>
 </div>
 
+<div class="status" id="status"></div>
+
 <div class="hint">
-  点格子上的 <b>🎤</b> 录 0.5 秒声音；点格子本身可以试听；空格子点一下直接开始录。
-  想更快上手就先点「填充示例响声」。
+  点格子上的 <b>🎤</b> 录 0.5 秒；点格子本身试听；空格子点一下直接开始录。<br>
+  录完会自动检测音高（显示在音名下面）。点「🎯 自动分配音位」会把所有声音按实际音高重新排到最合适的音上，这样每个响声被拉长缩短的幅度最小，听起来最自然。
 </div>
 
 <div id="slots" class="slots"></div>
 
 <script>
-/* ===================== 基础音频环境 ===================== */
+/* ===================== 音频环境 ===================== */
 const AC = new (window.AudioContext || window.webkitAudioContext)();
-
 const master = AC.createGain();
 master.gain.value = 0.9;
 const comp = AC.createDynamicsCompressor();
@@ -84,12 +100,10 @@ master.connect(comp).connect(AC.destination);
 const activeSources = new Set();
 
 async function unlock() {
-  if (AC.state === 'suspended') {
-    try { await AC.resume(); } catch (e) {}
-  }
+  if (AC.state === 'suspended') { try { await AC.resume(); } catch (e) {} }
 }
 
-/* ===================== 音名 ↔ MIDI ===================== */
+/* ===================== 音名工具 ===================== */
 const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 
 function nameToMidi(name) {
@@ -100,12 +114,131 @@ function nameToMidi(name) {
   if (m[2] === 'b') semi--;
   return semi + (parseInt(m[3], 10) + 1) * 12;
 }
+const freqToMidi = f => 69 + 12 * Math.log2(f / 440);
+function midiToName(m) {
+  const r = Math.round(m);
+  const name = NOTE_NAMES[((r % 12) + 12) % 12];
+  return name + (Math.floor(r / 12) - 1);
+}
 
-/* ===================== 采样槽（8 个音） ===================== */
+/* ===================== 音高检测（YIN） ===================== */
+/**
+ * 返回 { freq, clarity } 或 null
+ * 思路：下混单声道 → 降到 ~11kHz → 找能量最强的位置开窗 → YIN 求基频
+ */
+function analyze(buffer) {
+  const sr = buffer.sampleRate;
+  const nch = buffer.numberOfChannels;
+  const chans = [];
+  for (let c = 0; c < nch; c++) chans.push(buffer.getChannelData(c));
+
+  // --- 降采样到 ~11kHz ---
+  const factor = Math.max(1, Math.round(sr / 11025));
+  const n = Math.floor(buffer.length / factor);
+  if (n < 256) return null;
+  const mono = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const base = i * factor;
+    let s = 0;
+    for (let k = 0; k < factor; k++) {
+      let v = 0;
+      for (let c = 0; c < nch; c++) v += chans[c][base + k];
+      s += v / nch;
+    }
+    mono[i] = s / factor;
+  }
+
+  const sr2 = sr / factor;
+
+  // --- 找能量最强的位置 ---
+  const win = Math.max(1, Math.floor(sr2 * 0.01));
+  let bestPos = 0, bestE = -1;
+  for (let p = 0; p + win <= n; p += win) {
+    let e = 0;
+    for (let i = p; i < p + win; i++) e += mono[i] * mono[i];
+    if (e > bestE) { bestE = e; bestPos = p; }
+  }
+  if (bestE < 1e-8) return null;
+
+  const N = Math.min(2048, n - bestPos);
+  if (N < 256) return null;
+  const x = mono.subarray(bestPos, bestPos + N);
+
+  const minFreq = 80, maxFreq = 1100;
+  const tauMin = Math.max(2, Math.floor(sr2 / maxFreq));
+  const tauMax = Math.min(N - 2, Math.ceil(sr2 / minFreq));
+  if (tauMax <= tauMin) return null;
+
+  // --- 差值函数 ---
+  const d = new Float32Array(tauMax + 1);
+  const limit = N - tauMax;
+  for (let tau = tauMin; tau <= tauMax; tau++) {
+    let sum = 0;
+    for (let i = 0; i < limit; i++) {
+      const diff = x[i] - x[i + tau];
+      sum += diff * diff;
+    }
+    d[tau] = sum;
+  }
+
+  // --- 累积均值归一化 ---
+  const cmnd = new Float32Array(tauMax + 1);
+  let running = 0;
+  cmnd[tauMin] = 1;
+  for (let tau = tauMin; tau <= tauMax; tau++) {
+    running += d[tau];
+    cmnd[tau] = running > 0 ? d[tau] * (tau - tauMin + 1) / running : 1;
+  }
+
+  // --- 找第一个低于阈值的谷 ---
+  const THRESH = 0.15;
+  let tauEst = -1;
+  for (let tau = tauMin; tau <= tauMax; tau++) {
+    if (cmnd[tau] < THRESH) {
+      while (tau + 1 <= tauMax && cmnd[tau + 1] < cmnd[tau]) tau++;
+      tauEst = tau;
+      break;
+    }
+  }
+  if (tauEst < 0) {
+    let bi = tauMin;
+    for (let tau = tauMin; tau <= tauMax; tau++) if (cmnd[tau] < cmnd[bi]) bi = tau;
+    if (cmnd[bi] > 0.5) return null;   // 太不可靠，判定为无音高
+    tauEst = bi;
+  }
+
+  // --- 抛物线插值 ---
+  let better = tauEst;
+  if (tauEst > tauMin && tauEst < tauMax) {
+    const y0 = cmnd[tauEst - 1], y1 = cmnd[tauEst], y2 = cmnd[tauEst + 1];
+    const den = y0 - 2 * y1 + y2;
+    if (Math.abs(den) > 1e-12) better = tauEst + (y0 - y2) / (2 * den);
+  }
+
+  const freq = sr2 / better;
+  if (!isFinite(freq) || freq < minFreq || freq > maxFreq) return null;
+
+  return { freq, clarity: Math.max(0, Math.min(1, 1 - cmnd[tauEst])) };
+}
+
+/** 检测 + 写入槽位 */
+function detectSlot(s) {
+  if (!s.buffer) { s.detectedMidi = undefined; s.clarity = 0; return; }
+  const r = analyze(s.buffer);
+  s.detectedMidi = r ? freqToMidi(r.freq) : null;
+  s.clarity = r ? r.clarity : 0;
+}
+
+/* ===================== 槽位定义 ===================== */
 const SLOT_DEFS = ['C4','D4','E4','F4','G4','A4','B4','C5'];
-let slots = SLOT_DEFS.map(n => ({ name: n, midi: nameToMidi(n), buffer: null }));
+let slots = SLOT_DEFS.map(n => ({
+  name: n, midi: nameToMidi(n),
+  buffer: null, detectedMidi: undefined, clarity: 0
+}));
 
 const slotsEl = document.getElementById('slots');
+const statusEl = document.getElementById('status');
+function setStatus(t) { statusEl.textContent = t; }
 
 function render() {
   slotsEl.innerHTML = '';
@@ -113,17 +246,35 @@ function render() {
     const el = document.createElement('div');
     el.className = 'slot' + (s.buffer ? ' filled' : '');
     el.dataset.i = i;
+
+    let detTxt = '—', detCls = 'det none';
+    if (s.buffer) {
+      if (s.detectedMidi != null) {
+        detTxt = '♪ ' + midiToName(s.detectedMidi);
+        const raw = Math.abs(s.detectedMidi - s.midi);
+        const pc = ((raw % 12) + 12) % 12;
+        const pcDist = Math.min(pc, 12 - pc);
+        const lowConf = s.clarity < 0.4;
+        detCls = (pcDist > 1.6 || lowConf) ? 'det warn' : 'det ok';
+        if (lowConf) detTxt += '?';
+      } else {
+        detTxt = '♪ 无音高';
+        detCls = 'det none';
+      }
+    }
+
     el.innerHTML = `
       <button class="clr" title="删除这个声音">✕</button>
       <button class="rec" title="录 0.5 秒">🎤</button>
       <div class="note">${s.name}</div>
+      <div class="${detCls}">${detTxt}</div>
       <div class="state">${s.buffer ? s.buffer.duration.toFixed(2) + 's' : '空'}</div>
     `;
     slotsEl.appendChild(el);
   });
 }
 
-/* ===================== 播放一个音 ===================== */
+/* ===================== 播放 ===================== */
 function pickSample(midi) {
   let bestIdx = -1, bestDist = Infinity;
   for (let i = 0; i < slots.length; i++) {
@@ -133,14 +284,10 @@ function pickSample(midi) {
     if (d < bestDist) { bestDist = d; bestIdx = i; }
   }
   if (bestIdx < 0) return null;
-  return { index: bestIdx, midi: slots[bestIdx].midi, buffer: slots[bestIdx].buffer };
+  const s = slots[bestIdx];
+  return { index: bestIdx, midi: s.midi, detectedMidi: s.detectedMidi, buffer: s.buffer };
 }
 
-/**
- * 触发一个音
- * midi: 目标音高；when: AudioContext 时间轴上的绝对时间；dur: 期望时长（秒）
- * 返回用到的槽位下标
- */
 function trigger(midi, when, dur) {
   const pick = pickSample(midi);
   if (!pick) return -1;
@@ -148,11 +295,13 @@ function trigger(midi, when, dur) {
   const src = AC.createBufferSource();
   src.buffer = pick.buffer;
 
-  // 核心：用播放速率把采样"变调"
-  const rate = Math.pow(2, (midi - pick.midi) / 12);
+  // 关键：以「检测到的真实音高」为基准算变速比
+  const srcMidi = (pick.detectedMidi != null) ? pick.detectedMidi : pick.midi;
+  let rate = Math.pow(2, (midi - srcMidi) / 12);
+  rate = Math.min(4, Math.max(0.25, rate));
   src.playbackRate.value = rate;
 
-  const natural = pick.buffer.duration / rate;      // 变调后的自然时长
+  const natural = pick.buffer.duration / rate;
   const end = when + Math.min(dur, natural);
   const amp = 0.85;
   const atk = 0.004;
@@ -174,7 +323,7 @@ function trigger(midi, when, dur) {
   return pick.index;
 }
 
-/* ===================== 录音（麦克风） ===================== */
+/* ===================== 录音 ===================== */
 let micStream = null;
 let recording = false;
 
@@ -186,18 +335,15 @@ async function getMic() {
   return micStream;
 }
 
-/** 裁掉首尾静音 + 归一化，让触发更干脆、音量更统一 */
 function processBuffer(buf) {
-  const thresh = 0.015;
   const ch0 = buf.getChannelData(0);
+  const thresh = 0.015;
   let start = 0, end = ch0.length - 1;
   while (start < ch0.length && Math.abs(ch0[start]) < thresh) start++;
   while (end > start && Math.abs(ch0[end]) < thresh) end--;
+  if (end - start < 100) return buf;
 
-  if (end - start < 100) return buf; // 几乎全是静音，原样返回
-
-  const padStart = 64;    // ≈1.5ms
-  const padEnd = 1200;    // ≈27ms 尾巴
+  const padStart = 64, padEnd = 1200;
   start = Math.max(0, start - padStart);
   const len = Math.min(buf.length - start, (end - start) + padEnd);
 
@@ -234,6 +380,7 @@ async function recordInto(i) {
 
   recording = true;
   card && card.classList.add('recording');
+  setStatus('录音中…（0.5 秒）');
 
   const chunks = [];
   const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
@@ -243,7 +390,7 @@ async function recordInto(i) {
   const stopped = new Promise(res => { rec.onstop = res; });
 
   rec.start();
-  await new Promise(r => setTimeout(r, 500));   // 固定录 0.5 秒
+  await new Promise(r => setTimeout(r, 500));
   rec.stop();
   await stopped;
 
@@ -253,38 +400,147 @@ async function recordInto(i) {
   try {
     const arr = await new Blob(chunks, { type: rec.mimeType || 'audio/webm' }).arrayBuffer();
     const decoded = await AC.decodeAudioData(arr);
-    slots[i].buffer = processBuffer(decoded);
+    const s = slots[i];
+    s.buffer = processBuffer(decoded);
+    detectSlot(s);
     render();
-    // 立刻试听一下
-    trigger(slots[i].midi, AC.currentTime + 0.06, 1);
+
+    const detTxt = s.detectedMidi != null
+      ? `检测到音高：${midiToName(s.detectedMidi)}（${Math.round(440 * Math.pow(2, (s.detectedMidi - 69) / 12))} Hz）`
+      : '没能检测出稳定音高（噪声类声音很正常）';
+    setStatus(detTxt);
+
+    trigger(s.midi, AC.currentTime + 0.06, 1);
   } catch (err) {
     alert('音频解码失败：' + err.message);
+    setStatus('');
   }
 }
 
-/* ===================== 示例响声（没麦克风也能玩） ===================== */
+/* ===================== 检测 / 自动分配 ===================== */
+function detectAll() {
+  let n = 0;
+  slots.forEach(s => { if (s.buffer) { detectSlot(s); n++; } });
+  if (!n) { setStatus('还没有任何声音可检测。'); return; }
+  render();
+  setStatus(`已检测 ${n} 个声音的音高。`);
+}
+
+/**
+ * 自动把每个声音放到音阶上离它真实音高最近的槽位。
+ * 用「代价矩阵 + 贪心匹配」求解最小总移调量。
+ */
+function autoAssign() {
+  const filledIdx = [];
+  slots.forEach((s, i) => { if (s.buffer) filledIdx.push(i); });
+  if (!filledIdx.length) {
+    setStatus('还没有任何声音，先录几个或点「填充示例响声」。');
+    return;
+  }
+
+  // 1. 没检测过的先检测
+  for (const i of filledIdx) {
+    if (slots[i].detectedMidi === undefined) detectSlot(slots[i]);
+  }
+
+  // 2. 把音高折到槽位音域内（用八度平移，不改音级）
+  const lo = Math.min(...slots.map(s => s.midi));
+  const hi = Math.max(...slots.map(s => s.midi));
+  const items = filledIdx.map(i => {
+    const s = slots[i];
+    let folded = null;
+    if (s.detectedMidi != null && s.clarity >= 0.35) {
+      folded = s.detectedMidi;
+      while (folded < lo) folded += 12;
+      while (folded > hi) folded -= 12;
+    }
+    return { from: i, folded };
+  });
+
+  // 3. 代价矩阵
+  const pairs = [];
+  for (const it of items) {
+    slots.forEach((slot, j) => {
+      const base = it.folded != null ? it.folded : slot.midi;
+      pairs.push({ from: it.from, to: j, cost: Math.abs(base - slot.midi) });
+    });
+  }
+  pairs.sort((a, b) => a.cost - b.cost);
+
+  // 4. 贪心最小代价匹配
+  const usedFrom = new Set(), usedTo = new Set();
+  const assign = new Array(slots.length).fill(null);
+  for (const p of pairs) {
+    if (usedFrom.has(p.from) || usedTo.has(p.to)) continue;
+    usedFrom.add(p.from); usedTo.add(p.to);
+    assign[p.to] = p.from;
+  }
+
+  // 5. 写回
+  const nb = new Array(slots.length).fill(null);
+  const nd = new Array(slots.length).fill(undefined);
+  const nc = new Array(slots.length).fill(0);
+  const movedTo = new Set();
+  for (let j = 0; j < slots.length; j++) {
+    if (assign[j] == null) continue;
+    const src = slots[assign[j]];
+    nb[j] = src.buffer;
+    nd[j] = src.detectedMidi;
+    nc[j] = src.clarity;
+    if (assign[j] !== j) movedTo.add(j);
+  }
+  for (let j = 0; j < slots.length; j++) {
+    slots[j].buffer = nb[j];
+    slots[j].detectedMidi = nd[j];
+    slots[j].clarity = nc[j];
+  }
+
+  render();
+  movedTo.forEach(j => {
+    const el = slotsEl.querySelector(`.slot[data-i="${j}"]`);
+    if (el) el.classList.add('moved');
+  });
+
+  const noPitch = items.filter(it => it.folded == null).length;
+  setStatus(
+    `已按音高重排 ${items.length} 个声音` +
+    (noPitch ? `（其中 ${noPitch} 个没检测到音高，随意安放）` : '') +
+    '。试试播放吧。'
+  );
+}
+
+/* ===================== 示例响声 ===================== */
+// 故意打乱顺序：自动分配会按音高把它们排回正确位置
+const DEMO_MIDIS = [67, 60, 72, 64, 69, 62, 71, 65];
+
 function makeDemoSound(i) {
   const sr = AC.sampleRate;
-  const dur = 0.15 + (i % 3) * 0.045;
+  const midi = DEMO_MIDIS[i % DEMO_MIDIS.length];
+  const f0 = 440 * Math.pow(2, (midi - 69) / 12);
+  const dur = 0.30;
   const len = Math.floor(sr * dur);
   const buf = AC.createBuffer(1, len, sr);
   const d = buf.getChannelData(0);
-  const rnd = () => Math.random() * 2 - 1;
+  const style = i % 3;
+  const atk = 0.003;
 
   for (let k = 0; k < len; k++) {
     const t = k / sr;
-    let v = 0;
-    switch (i % 8) {
-      case 0: v = Math.sin(2 * Math.PI * 880 * t) * Math.exp(-t * 18); break;
-      case 1: v = rnd() * Math.exp(-t * 45); break;
-      case 2: v = Math.sign(Math.sin(2 * Math.PI * 220 * t)) * Math.exp(-t * 30) * 0.5; break;
-      case 3: v = (Math.sin(2 * Math.PI * 1320 * t) + 0.5 * Math.sin(2 * Math.PI * 1980 * t)) * Math.exp(-t * 12); break;
-      case 4: v = Math.sin(2 * Math.PI * (620 - 420 * t / dur) * t) * Math.exp(-t * 22); break;
-      case 5: v = rnd() * Math.exp(-t * 35) * (1 - Math.exp(-t * 400)); break;
-      case 6: v = (Math.sin(2 * Math.PI * 440 * t) > 0 ? 1 : -1) * Math.exp(-t * 25) * 0.4; break;
-      case 7: v = Math.sin(2 * Math.PI * 1760 * t) * Math.exp(-t * 40); break;
+    const env = Math.exp(-t * 9) * Math.min(1, t / atk);
+    let v;
+    if (style === 0) {
+      v = Math.sin(2 * Math.PI * f0 * t)
+        + 0.50 * Math.sin(2 * Math.PI * 2 * f0 * t)
+        + 0.25 * Math.sin(2 * Math.PI * 3 * f0 * t);
+    } else if (style === 1) {
+      v = Math.sin(2 * Math.PI * f0 * t) * 0.85
+        + 0.35 * Math.sin(2 * Math.PI * 2 * f0 * t)
+        + 0.20 * Math.sin(2 * Math.PI * 4 * f0 * t);
+    } else {
+      v = Math.sin(2 * Math.PI * f0 * t) * 0.95
+        + 0.15 * Math.sin(2 * Math.PI * 3 * f0 * t);
     }
-    d[k] = v * 0.8;
+    d[k] = v * env * 0.55;
   }
   return buf;
 }
@@ -319,10 +575,7 @@ const TUNES = {
 function parseMelody(str) {
   return str.trim().split(/\s+/).map(tok => {
     const [n, d] = tok.split(':');
-    return {
-      midi: n === '-' ? -1 : nameToMidi(n),
-      beats: d ? parseFloat(d) : 1
-    };
+    return { midi: n === '-' ? -1 : nameToMidi(n), beats: d ? parseFloat(d) : 1 };
   });
 }
 
@@ -340,10 +593,8 @@ function stopPlayback() {
   cancelAnimationFrame(playState.raf);
   clearTimeout(playState.timer);
   playBtn.textContent = '▶ 播放';
-
   for (const s of activeSources) { try { s.stop(); } catch (e) {} }
   activeSources.clear();
-
   currentHighlight = -1;
   slotsEl.querySelectorAll('.slot.hit').forEach(el => el.classList.remove('hit'));
 }
@@ -353,7 +604,7 @@ async function togglePlay() {
   if (playState.active) { stopPlayback(); return; }
 
   if (!slots.some(s => s.buffer)) {
-    alert('还没有任何声音，先录几个，或者点「填充示例响声」。');
+    setStatus('还没有任何声音，先录几个，或者点「填充示例响声」。');
     return;
   }
 
@@ -375,6 +626,7 @@ async function togglePlay() {
 
   playState.active = true;
   playBtn.textContent = '⏹ 停止';
+  setStatus('');
   playState.raf = requestAnimationFrame(updateHighlight);
 
   const totalMs = (t - AC.currentTime + 0.35) * 1000;
@@ -407,7 +659,13 @@ slotsEl.addEventListener('click', async (e) => {
   await unlock();
 
   if (e.target.closest('.rec')) { recordInto(i); return; }
-  if (e.target.closest('.clr')) { slots[i].buffer = null; render(); return; }
+  if (e.target.closest('.clr')) {
+    slots[i].buffer = null;
+    slots[i].detectedMidi = undefined;
+    slots[i].clarity = 0;
+    render();
+    return;
+  }
 
   if (slots[i].buffer) {
     trigger(slots[i].midi, AC.currentTime + 0.01, 1);
@@ -418,21 +676,34 @@ slotsEl.addEventListener('click', async (e) => {
 
 document.getElementById('demoBtn').addEventListener('click', async () => {
   await unlock();
-  slots.forEach((s, i) => { s.buffer = makeDemoSound(i); });
+  slots.forEach((s, i) => {
+    s.buffer = makeDemoSound(i);
+    detectSlot(s);
+  });
   render();
+  setStatus('示例响声已就位（顺序是打乱的）。点「🎯 自动分配音位」看看它怎么重排。');
+});
+
+document.getElementById('detectBtn').addEventListener('click', async () => {
+  await unlock();
+  detectAll();
+});
+
+document.getElementById('autoBtn').addEventListener('click', async () => {
+  await unlock();
+  autoAssign();
 });
 
 document.getElementById('clearBtn').addEventListener('click', () => {
   if (!confirm('清空所有录音？')) return;
-  slots.forEach(s => { s.buffer = null; });
+  slots.forEach(s => { s.buffer = null; s.detectedMidi = undefined; s.clarity = 0; });
   render();
+  setStatus('');
 });
 
 playBtn.addEventListener('click', togglePlay);
-
 tempoEl.addEventListener('input', () => { tempoVal.textContent = tempoEl.value; });
 
-// 初始化下拉框
 Object.entries(TUNES).forEach(([k, v]) => {
   const o = document.createElement('option');
   o.value = k;
