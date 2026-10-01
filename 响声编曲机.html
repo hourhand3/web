@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>🔔 响声编曲机</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px;
+    font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #12141a; color: #e8eaf0; min-height: 100vh;
+  }
+  h1 { font-size: 20px; margin: 0 0 8px; }
+  p.lead { color: #9aa3b8; margin: 0 0 20px; font-size: 14px; line-height: 1.7; max-width: 760px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+  button {
+    font: inherit; padding: 8px 14px; border-radius: 10px;
+    border: 1px solid #2c3040; background: #1c2029; color: #e8eaf0;
+    cursor: pointer; transition: .15s;
+  }
+  button:hover { background: #252a36; border-color: #3a4055; }
+  button.primary { background: #3b5bfd; border-color: #3b5bfd; color: #fff; font-weight: 600; }
+  button.primary:hover { background: #5470ff; }
+  label { font-size: 13px; color: #9aa3b8; display: flex; align-items: center; gap: 6px; }
+  select { background: #1c2029; color: #e8eaf0; border: 1px solid #2c3040; border-radius: 8px; padding: 6px 8px; font: inherit; }
+  input[type=range] { width: 110px; accent-color: #3b5bfd; }
+  .hint { font-size: 12.5px; color: #6f7891; margin-bottom: 16px; line-height: 1.7; }
+  .slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; max-width: 720px; }
+  @media (max-width: 560px) { .slots { grid-template-columns: repeat(2, 1fr); } }
+  .slot {
+    position: relative; aspect-ratio: 1 / 0.92;
+    border-radius: 14px; border: 1px solid #262b38; background: #171a22;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 6px; cursor: pointer; transition: .12s; user-select: none;
+  }
+  .slot:hover { border-color: #3a4055; background: #1c2029; }
+  .slot.filled { background: #17202e; border-color: #2d4460; }
+  .slot.recording { border-color: #ff4d6d; animation: pulse .45s infinite alternate; }
+  .slot.hit { box-shadow: 0 0 0 3px #3b5bfd, 0 0 26px #3b5bfd99; transform: translateY(-2px); }
+  @keyframes pulse { to { background: #2a1620; } }
+  .note { font-size: 19px; font-weight: 700; letter-spacing: .5px; }
+  .state { font-size: 11px; color: #6f7891; }
+  .slot button { position: absolute; top: 6px; padding: 2px 7px; font-size: 12px; border-radius: 8px; line-height: 1.4; }
+  .slot .rec { right: 6px; }
+  .slot .clr { left: 6px; opacity: 0; transition: .15s; }
+  .slot.filled .clr, .slot:hover .clr { opacity: .8; }
+</style>
+</head>
+<body>
+
+<h1>🔔 响声编曲机</h1>
+<p class="lead">
+  录下身边短促的响声（敲杯子、拍手、按键盘、弹舌…），每个响声分配到一个音上。
+  然后选一首曲子播放 —— 同一个响声会被拉长缩短变成不同音高，一首歌就"敲"出来了。
+</p>
+
+<div class="controls">
+  <button id="demoBtn">✨ 填充示例响声</button>
+  <button id="clearBtn">🗑 全部清空</button>
+  <label>曲子 <select id="tuneSel"></select></label>
+  <label>速度 <input type="range" id="tempo" min="60" max="220" value="120"><span id="tempoVal">120</span></label>
+  <button id="playBtn" class="primary">▶ 播放</button>
+</div>
+
+<div class="hint">
+  点格子上的 <b>🎤</b> 录 0.5 秒声音；点格子本身可以试听；空格子点一下直接开始录。
+  想更快上手就先点「填充示例响声」。
+</div>
+
+<div id="slots" class="slots"></div>
+
+<script>
+/* ===================== 基础音频环境 ===================== */
+const AC = new (window.AudioContext || window.webkitAudioContext)();
+
+const master = AC.createGain();
+master.gain.value = 0.9;
+const comp = AC.createDynamicsCompressor();
+comp.threshold.value = -12;
+comp.ratio.value = 4;
+master.connect(comp).connect(AC.destination);
+
+const activeSources = new Set();
+
+async function unlock() {
+  if (AC.state === 'suspended') {
+    try { await AC.resume(); } catch (e) {}
+  }
+}
+
+/* ===================== 音名 ↔ MIDI ===================== */
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+function nameToMidi(name) {
+  const m = /^([A-G])(#|b)?(-?\d+)$/.exec(name.trim());
+  if (!m) throw new Error('无法识别的音名: ' + name);
+  let semi = { C:0, D:2, E:4, F:5, G:7, A:9, B:11 }[m[1]];
+  if (m[2] === '#') semi++;
+  if (m[2] === 'b') semi--;
+  return semi + (parseInt(m[3], 10) + 1) * 12;
+}
+
+/* ===================== 采样槽（8 个音） ===================== */
+const SLOT_DEFS = ['C4','D4','E4','F4','G4','A4','B4','C5'];
+let slots = SLOT_DEFS.map(n => ({ name: n, midi: nameToMidi(n), buffer: null }));
+
+const slotsEl = document.getElementById('slots');
+
+function render() {
+  slotsEl.innerHTML = '';
+  slots.forEach((s, i) => {
+    const el = document.createElement('div');
+    el.className = 'slot' + (s.buffer ? ' filled' : '');
+    el.dataset.i = i;
+    el.innerHTML = `
+      <button class="clr" title="删除这个声音">✕</button>
+      <button class="rec" title="录 0.5 秒">🎤</button>
+      <div class="note">${s.name}</div>
+      <div class="state">${s.buffer ? s.buffer.duration.toFixed(2) + 's' : '空'}</div>
+    `;
+    slotsEl.appendChild(el);
+  });
+}
+
+/* ===================== 播放一个音 ===================== */
+function pickSample(midi) {
+  let bestIdx = -1, bestDist = Infinity;
+  for (let i = 0; i < slots.length; i++) {
+    const s = slots[i];
+    if (!s.buffer) continue;
+    const d = Math.abs(s.midi - midi);
+    if (d < bestDist) { bestDist = d; bestIdx = i; }
+  }
+  if (bestIdx < 0) return null;
+  return { index: bestIdx, midi: slots[bestIdx].midi, buffer: slots[bestIdx].buffer };
+}
+
+/**
+ * 触发一个音
+ * midi: 目标音高；when: AudioContext 时间轴上的绝对时间；dur: 期望时长（秒）
+ * 返回用到的槽位下标
+ */
+function trigger(midi, when, dur) {
+  const pick = pickSample(midi);
+  if (!pick) return -1;
+
+  const src = AC.createBufferSource();
+  src.buffer = pick.buffer;
+
+  // 核心：用播放速率把采样"变调"
+  const rate = Math.pow(2, (midi - pick.midi) / 12);
+  src.playbackRate.value = rate;
+
+  const natural = pick.buffer.duration / rate;      // 变调后的自然时长
+  const end = when + Math.min(dur, natural);
+  const amp = 0.85;
+  const atk = 0.004;
+
+  const g = AC.createGain();
+  g.gain.setValueAtTime(0, when);
+  g.gain.linearRampToValueAtTime(amp, when + atk);
+  const relStart = Math.max(when + atk, end - 0.025);
+  g.gain.setValueAtTime(amp, relStart);
+  g.gain.linearRampToValueAtTime(0, end + 0.005);
+
+  src.connect(g).connect(master);
+  src.start(when);
+  src.stop(end + 0.02);
+
+  activeSources.add(src);
+  src.onended = () => activeSources.delete(src);
+
+  return pick.index;
+}
+
+/* ===================== 录音（麦克风） ===================== */
+let micStream = null;
+let recording = false;
+
+async function getMic() {
+  if (micStream) return micStream;
+  micStream = await navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+  });
+  return micStream;
+}
+
+/** 裁掉首尾静音 + 归一化，让触发更干脆、音量更统一 */
+function processBuffer(buf) {
+  const thresh = 0.015;
+  const ch0 = buf.getChannelData(0);
+  let start = 0, end = ch0.length - 1;
+  while (start < ch0.length && Math.abs(ch0[start]) < thresh) start++;
+  while (end > start && Math.abs(ch0[end]) < thresh) end--;
+
+  if (end - start < 100) return buf; // 几乎全是静音，原样返回
+
+  const padStart = 64;    // ≈1.5ms
+  const padEnd = 1200;    // ≈27ms 尾巴
+  start = Math.max(0, start - padStart);
+  const len = Math.min(buf.length - start, (end - start) + padEnd);
+
+  const out = AC.createBuffer(buf.numberOfChannels, len, buf.sampleRate);
+  for (let c = 0; c < buf.numberOfChannels; c++) {
+    out.copyToChannel(buf.getChannelData(c).subarray(start, start + len), c);
+  }
+
+  let peak = 0;
+  for (let c = 0; c < out.numberOfChannels; c++) {
+    const d = out.getChannelData(c);
+    for (let i = 0; i < d.length; i++) peak = Math.max(peak, Math.abs(d[i]));
+  }
+  if (peak > 1e-3 && peak < 0.98) {
+    const gain = 0.98 / peak;
+    for (let c = 0; c < out.numberOfChannels; c++) {
+      const d = out.getChannelData(c);
+      for (let i = 0; i < d.length; i++) d[i] *= gain;
+    }
+  }
+  return out;
+}
+
+async function recordInto(i) {
+  if (recording) return;
+  const card = slotsEl.querySelector(`.slot[data-i="${i}"]`);
+  let stream;
+  try {
+    stream = await getMic();
+  } catch (err) {
+    alert('拿不到麦克风权限：' + err.message + '\n可以先点「填充示例响声」玩玩。');
+    return;
+  }
+
+  recording = true;
+  card && card.classList.add('recording');
+
+  const chunks = [];
+  const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+    ? 'audio/webm;codecs=opus' : '';
+  const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+  rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  const stopped = new Promise(res => { rec.onstop = res; });
+
+  rec.start();
+  await new Promise(r => setTimeout(r, 500));   // 固定录 0.5 秒
+  rec.stop();
+  await stopped;
+
+  recording = false;
+  card && card.classList.remove('recording');
+
+  try {
+    const arr = await new Blob(chunks, { type: rec.mimeType || 'audio/webm' }).arrayBuffer();
+    const decoded = await AC.decodeAudioData(arr);
+    slots[i].buffer = processBuffer(decoded);
+    render();
+    // 立刻试听一下
+    trigger(slots[i].midi, AC.currentTime + 0.06, 1);
+  } catch (err) {
+    alert('音频解码失败：' + err.message);
+  }
+}
+
+/* ===================== 示例响声（没麦克风也能玩） ===================== */
+function makeDemoSound(i) {
+  const sr = AC.sampleRate;
+  const dur = 0.15 + (i % 3) * 0.045;
+  const len = Math.floor(sr * dur);
+  const buf = AC.createBuffer(1, len, sr);
+  const d = buf.getChannelData(0);
+  const rnd = () => Math.random() * 2 - 1;
+
+  for (let k = 0; k < len; k++) {
+    const t = k / sr;
+    let v = 0;
+    switch (i % 8) {
+      case 0: v = Math.sin(2 * Math.PI * 880 * t) * Math.exp(-t * 18); break;
+      case 1: v = rnd() * Math.exp(-t * 45); break;
+      case 2: v = Math.sign(Math.sin(2 * Math.PI * 220 * t)) * Math.exp(-t * 30) * 0.5; break;
+      case 3: v = (Math.sin(2 * Math.PI * 1320 * t) + 0.5 * Math.sin(2 * Math.PI * 1980 * t)) * Math.exp(-t * 12); break;
+      case 4: v = Math.sin(2 * Math.PI * (620 - 420 * t / dur) * t) * Math.exp(-t * 22); break;
+      case 5: v = rnd() * Math.exp(-t * 35) * (1 - Math.exp(-t * 400)); break;
+      case 6: v = (Math.sin(2 * Math.PI * 440 * t) > 0 ? 1 : -1) * Math.exp(-t * 25) * 0.4; break;
+      case 7: v = Math.sin(2 * Math.PI * 1760 * t) * Math.exp(-t * 40); break;
+    }
+    d[k] = v * 0.8;
+  }
+  return buf;
+}
+
+/* ===================== 曲子 ===================== */
+const TUNES = {
+  twinkle: {
+    label: '小星星', bpm: 120,
+    melody: `C4:1 C4:1 G4:1 G4:1 A4:1 A4:1 G4:2
+             F4:1 F4:1 E4:1 E4:1 D4:1 D4:1 C4:2
+             G4:1 G4:1 F4:1 F4:1 E4:1 E4:1 D4:2
+             G4:1 G4:1 F4:1 F4:1 E4:1 E4:1 D4:2
+             C4:1 C4:1 G4:1 G4:1 A4:1 A4:1 G4:2
+             F4:1 F4:1 E4:1 E4:1 D4:1 D4:1 C4:2`
+  },
+  ode: {
+    label: '欢乐颂', bpm: 118,
+    melody: `E4:1 E4:1 F4:1 G4:1 G4:1 F4:1 E4:1 D4:1
+             C4:1 C4:1 D4:1 E4:1 E4:1.5 D4:0.5 D4:2
+             E4:1 E4:1 F4:1 G4:1 G4:1 F4:1 E4:1 D4:1
+             C4:1 C4:1 D4:1 E4:1 D4:1.5 C4:0.5 C4:2`
+  },
+  birthday: {
+    label: '生日快乐', bpm: 108,
+    melody: `G4:0.75 G4:0.25 A4:1 G4:1 C5:1 B4:2
+             G4:0.75 G4:0.25 A4:1 G4:1 D5:1 C5:2
+             G4:0.75 G4:0.25 G5:1 E5:1 C5:1 B4:1 A4:1
+             F5:0.75 F5:0.25 E5:1 C5:1 D5:1 C5:2`
+  }
+};
+
+function parseMelody(str) {
+  return str.trim().split(/\s+/).map(tok => {
+    const [n, d] = tok.split(':');
+    return {
+      midi: n === '-' ? -1 : nameToMidi(n),
+      beats: d ? parseFloat(d) : 1
+    };
+  });
+}
+
+/* ===================== 播放调度 ===================== */
+const playBtn = document.getElementById('playBtn');
+const tuneSel = document.getElementById('tuneSel');
+const tempoEl = document.getElementById('tempo');
+const tempoVal = document.getElementById('tempoVal');
+
+const playState = { active: false, raf: 0, timer: 0, events: [] };
+let currentHighlight = -1;
+
+function stopPlayback() {
+  playState.active = false;
+  cancelAnimationFrame(playState.raf);
+  clearTimeout(playState.timer);
+  playBtn.textContent = '▶ 播放';
+
+  for (const s of activeSources) { try { s.stop(); } catch (e) {} }
+  activeSources.clear();
+
+  currentHighlight = -1;
+  slotsEl.querySelectorAll('.slot.hit').forEach(el => el.classList.remove('hit'));
+}
+
+async function togglePlay() {
+  await unlock();
+  if (playState.active) { stopPlayback(); return; }
+
+  if (!slots.some(s => s.buffer)) {
+    alert('还没有任何声音，先录几个，或者点「填充示例响声」。');
+    return;
+  }
+
+  const bpm = +tempoEl.value;
+  const beat = 60 / bpm;
+  const notes = parseMelody(TUNES[tuneSel.value].melody);
+
+  let t = AC.currentTime + 0.2;
+  playState.events = [];
+
+  for (const n of notes) {
+    const dur = n.beats * beat;
+    if (n.midi >= 0) {
+      const slotIndex = trigger(n.midi, t, dur * 0.95);
+      playState.events.push({ start: t, end: t + dur * 0.95, slotIndex });
+    }
+    t += dur;
+  }
+
+  playState.active = true;
+  playBtn.textContent = '⏹ 停止';
+  playState.raf = requestAnimationFrame(updateHighlight);
+
+  const totalMs = (t - AC.currentTime + 0.35) * 1000;
+  playState.timer = setTimeout(() => { if (playState.active) stopPlayback(); }, totalMs);
+}
+
+function updateHighlight() {
+  if (!playState.active) return;
+  const now = AC.currentTime;
+  let idx = -1;
+  for (const ev of playState.events) {
+    if (now >= ev.start && now < ev.end) { idx = ev.slotIndex; break; }
+  }
+  if (idx !== currentHighlight) {
+    slotsEl.querySelectorAll('.slot.hit').forEach(el => el.classList.remove('hit'));
+    if (idx >= 0) {
+      const el = slotsEl.querySelector(`.slot[data-i="${idx}"]`);
+      if (el) el.classList.add('hit');
+    }
+    currentHighlight = idx;
+  }
+  playState.raf = requestAnimationFrame(updateHighlight);
+}
+
+/* ===================== 界面事件 ===================== */
+slotsEl.addEventListener('click', async (e) => {
+  const card = e.target.closest('.slot');
+  if (!card) return;
+  const i = +card.dataset.i;
+  await unlock();
+
+  if (e.target.closest('.rec')) { recordInto(i); return; }
+  if (e.target.closest('.clr')) { slots[i].buffer = null; render(); return; }
+
+  if (slots[i].buffer) {
+    trigger(slots[i].midi, AC.currentTime + 0.01, 1);
+  } else {
+    recordInto(i);
+  }
+});
+
+document.getElementById('demoBtn').addEventListener('click', async () => {
+  await unlock();
+  slots.forEach((s, i) => { s.buffer = makeDemoSound(i); });
+  render();
+});
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  if (!confirm('清空所有录音？')) return;
+  slots.forEach(s => { s.buffer = null; });
+  render();
+});
+
+playBtn.addEventListener('click', togglePlay);
+
+tempoEl.addEventListener('input', () => { tempoVal.textContent = tempoEl.value; });
+
+// 初始化下拉框
+Object.entries(TUNES).forEach(([k, v]) => {
+  const o = document.createElement('option');
+  o.value = k;
+  o.textContent = v.label;
+  tuneSel.appendChild(o);
+});
+tuneSel.value = 'twinkle';
+tempoEl.value = TUNES.twinkle.bpm;
+tempoVal.textContent = tempoEl.value;
+
+tuneSel.addEventListener('change', () => {
+  const bpm = TUNES[tuneSel.value].bpm;
+  tempoEl.value = bpm;
+  tempoVal.textContent = bpm;
+});
+
+render();
+</script>
+</body>
+</html>
