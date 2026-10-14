@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#0f1115">
+<title>手机共振清灰实验（娱乐向）</title>
+<style>
+:root{
+  --bg:#0f1115; --card:#181c24; --card2:#1f2530; --line:#2a3140;
+  --text:#e6ecf5; --dim:#8a94a6; --accent:#4cc9f0; --accent2:#7b61ff;
+  --warn:#ffb020; --danger:#ff5470; --ok:#3ddc97;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text)}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+  line-height:1.55; padding:18px 16px 70px; max-width:660px; margin:0 auto;
+  overscroll-behavior:none;
+}
+h1{font-size:20px;margin:0 0 4px;letter-spacing:.3px}
+.sub{color:var(--dim);font-size:13px;margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 14px 15px;margin-bottom:14px}
+.card h2{font-size:12px;margin:0 0 12px;color:var(--dim);font-weight:700;letter-spacing:1.2px;text-transform:uppercase}
+.warn{background:rgba(255,176,32,.07);border-color:rgba(255,176,32,.28);color:#ffd08a;font-size:12.5px;line-height:1.65}
+.warn b{color:#ffb020}
+.dim{color:var(--dim);font-size:13px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.row:last-child{margin-bottom:0}
+.row label{font-size:13.5px;color:#c3ccda;flex:1}
+.row .val{font-size:13px;color:var(--accent);font-variant-numeric:tabular-nums;font-weight:600;min-width:74px;text-align:right}
+select{
+  background:var(--card2);color:var(--text);border:1px solid var(--line);border-radius:10px;
+  padding:9px 11px;font-size:14px;outline:none;font-family:inherit;min-width:120px;
+}
+input[type=range]{
+  -webkit-appearance:none;appearance:none;width:100%;height:26px;background:transparent;margin:0;
+}
+input[type=range]::-webkit-slider-runnable-track{height:5px;border-radius:3px;background:#2c3444}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--accent);
+  margin-top:-7.5px;box-shadow:0 0 0 4px rgba(76,201,240,.15);
+}
+input[type=range]::-moz-range-track{height:5px;border-radius:3px;background:#2c3444}
+input[type=range]::-moz-range-thumb{width:20px;height:20px;border:none;border-radius:50%;background:var(--accent)}
+.slider-wrap{display:flex;flex-direction:column;gap:2px;width:100%}
+.slider-top{display:flex;justify-content:space-between;font-size:13.5px;color:#c3ccda}
+.slider-top .val{color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums}
+.btns{display:flex;gap:10px}
+.btn{
+  flex:1;border:none;border-radius:13px;padding:15px 16px;font-size:15.5px;font-weight:700;
+  color:#06121a;background:var(--accent);cursor:pointer;font-family:inherit;
+  transition:transform .12s ease,opacity .15s;
+}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.32;pointer-events:none}
+.btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
+.btn.ghost:disabled{opacity:.32}
+.btn.tiny{flex:none;padding:8px 14px;font-size:13px;border-radius:10px}
+
+/* 进度 / 读数 */
+.readout{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+.bigfreq{font-size:34px;font-weight:800;letter-spacing:-1px;font-variant-numeric:tabular-nums;
+  background:linear-gradient(135deg,#4cc9f0,#7b61ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.bigfreq .unit{font-size:15px;font-weight:600;color:var(--dim);-webkit-text-fill-color:var(--dim)}
+.stepinfo{margin-left:auto;font-size:12.5px;color:var(--dim);font-variant-numeric:tabular-nums}
+.progress{height:6px;border-radius:4px;background:#232a36;overflow:hidden}
+.progress > i{display:block;height:100%;width:0;border-radius:4px;
+  background:linear-gradient(90deg,#4cc9f0,#7b61ff);transition:width .18s linear}
+
+/* 实时振动 */
+.meter{height:10px;border-radius:6px;background:#232a36;overflow:hidden;margin-top:8px}
+.meter > i{display:block;height:100%;width:0;border-radius:6px;
+  background:linear-gradient(90deg,#3ddc97,#ffb020 55%,#ff5470);transition:width .08s linear}
+.meter-label{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-top:6px}
+.meter-label b{color:var(--text);font-variant-numeric:tabular-nums;font-weight:600}
+
+/* 图表 */
+canvas{width:100%;height:220px;display:block;border-radius:10px}
+
+/* 峰值列表 */
+.peak{display:flex;align-items:center;gap:12px;background:var(--card2);border:1px solid var(--line);
+  border-radius:12px;padding:11px 12px;margin-bottom:9px}
+.peak:last-child{margin-bottom:0}
+.peak-rank{width:26px;height:26px;flex:none;border-radius:8px;display:grid;place-items:center;
+  font-size:12.5px;font-weight:800;color:#06121a;background:linear-gradient(135deg,#4cc9f0,#7b61ff)}
+.peak-info{flex:1;min-width:0}
+.peak-f{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums}
+.peak-s{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+.tip{font-size:12px;color:var(--dim);margin-top:10px;line-height:1.6}
+.status{font-size:12.5px;padding:9px 12px;border-radius:10px;margin-bottom:12px;display:none}
+.status.show{display:block}
+.status.err{background:rgba(255,84,112,.12);color:#ff9aae;border:1px solid rgba(255,84,112,.3)}
+.status.info{background:rgba(76,201,240,.1);color:#9ddcf5;border:1px solid rgba(76,201,240,.25)}
+.playing-badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ok)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:pulse 1.1s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
+</style>
+</head>
+<body>
+
+<h1>📳 手机共振清灰实验</h1>
+<p class="sub">娱乐向 · 扫频找共振点 · 顺便看看你的手机怎么“抖”</p>
+
+<div class="card warn">
+  <b>⚠️ 先读这段</b><br>
+  这只是一个物理小实验，<b>不是真正的清灰工具</b>。声波清灰需要极高的声压级，手机扬声器远远达不到。
+  低频大音量、方波/锯齿波长时间播放可能导致扬声器过热、振膜损坏、摄像头马达异常，请勿长时间运行，音量不要开满。
+  如果手机有防水密封或正在充电，请直接关掉页面。
+</div>
+
+<div class="status" id="status"></div>
+
+<!-- 设置 -->
+<div class="card" id="setup">
+  <h2>实验参数</h2>
+
+  <div class="row">
+    <label>波形</label>
+    <select id="waveform">
+      <option value="sine">正弦波 sine</option>
+      <option value="triangle">三角波 triangle</option>
+      <option value="square">方波 square</option>
+      <option value="sawtooth">锯齿波 sawtooth</option>
+    </select>
+  </div>
+
+  <div class="row">
+    <div class="slider-wrap">
+      <div class="slider-top"><span>起始频率</span><span class="val" id="startFVal">30 Hz</span></div>
+      <input type="range" id="startF" min="20" max="300" step="5" value="30">
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="slider-wrap">
+      <div class="slider-top"><span>结束频率</span><span class="val" id="endFVal">1200 Hz</span></div>
+      <input type="range" id="endF" min="200" max="4000" step="50" value="1200">
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="slider-wrap">
+      <div class="slider-top"><span>每步时长</span><span class="val" id="stepMsVal">250 ms</span></div>
+      <input type="range" id="stepMs" min="120" max="600" step="10" value="250">
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="slider-wrap">
+      <div class="slider-top"><span>音量</span><span class="val" id="volVal">60 %</span></div>
+      <input type="range" id="vol" min="0" max="100" step="1" value="60">
+    </div>
+  </div>
+</div>
+
+<!-- 控制 -->
+<div class="card">
+  <h2>运行</h2>
+  <div class="readout">
+    <div class="bigfreq" id="freqReadout">—<span class="unit"> Hz</span></div>
+    <div class="stepinfo" id="stepReadout">待机</div>
+  </div>
+  <div class="progress"><i id="progressBar"></i></div>
+
+  <div class="meter"><i id="meterFill"></i></div>
+  <div class="meter-label">
+    <span>实时振动强度</span>
+    <b id="meterVal">0.000</b>
+  </div>
+
+  <div class="btns" style="margin-top:16px">
+    <button class="btn" id="btnStart">开始扫描</button>
+    <button class="btn ghost" id="btnStop" disabled>停止</button>
+  </div>
+  <p class="tip">
+    提示：把手机平放在<b>硬桌面或玻璃</b>上再开始。拿在手里时手会吸收振动，结果会失真。
+    低频段（&lt;100 Hz）多数手机扬声器几乎没有输出，看不到响应是正常的。
+  </p>
+</div>
+
+<!-- 图表 -->
+<div class="card">
+  <h2>频率响应图</h2>
+  <canvas id="chart"></canvas>
+  <p class="tip" id="chartTip">横轴：频率（对数）　纵轴：该频点检测到的振动强度</p>
+</div>
+
+<!-- 结果 -->
+<div class="card">
+  <h2>检测到的共振峰</h2>
+  <div id="peaks"><p class="dim">还没有数据。点击「开始扫描」。</p></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ============ 状态 ============ */
+  const state = {
+    phase: 'idle',        // idle | sweeping | playing
+    waveform: 'sine',
+    startF: 30,
+    endF: 1200,
+    stepMs: 250,
+    volume: 0.6,
+    results: [],          // { f, score }
+    peaks: [],
+    currentF: 0,
+  };
+
+  const WAVE_SCALE = { sine: 1.0, triangle: 0.92, square: 0.5, sawtooth: 0.65 };
+  const MAX_GAIN = 0.85;
+
+  /* ============ 音频 ============ */
+  let audioCtx = null, osc = null, gainNode = null;
+
+  function initAudio() {
+    if (audioCtx) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new AC();
+    osc = audioCtx.createOscillator();
+    osc.type = state.waveform;
+    osc.frequency.value = 200;
+
+    gainNode = audioCtx.createGain();
+    gainNode.gain.value = 0;
+
+    // 轻度限幅，防止意外爆音
+    const limiter = audioCtx.createDynamicsCompressor();
+    limiter.threshold.value = -6;
+    limiter.knee.value = 6;
+    limiter.ratio.value = 20;
+    limiter.attack.value = 0.003;
+    limiter.release.value = 0.1;
+
+    osc.connect(gainNode);
+    gainNode.connect(limiter);
+    limiter.connect(audioCtx.destination);
+    osc.start();
+  }
+
+  async function ensureAudio() {
+    initAudio();
+    if (audioCtx.state !== 'running') {
+      try { await audioCtx.resume(); } catch (e) {}
+    }
+  }
+
+  function setGain(v, ramp) {
+    if (!gainNode) return;
+    v = Math.max(0, Math.min(MAX_GAIN, v));
+    const t = audioCtx.currentTime;
+    const g = gainNode.gain;
+    g.cancelScheduledValues(t);
+    g.setValueAtTime(g.value, t);
+    g.linearRampToValueAtTime(v, t + ramp);
+  }
+
+  function setFreq(f) {
+    if (!osc) return;
+    osc.frequency.setValueAtTime(f, audioCtx.currentTime);
+  }
+
+  /* ============ 传感器 ============ */
+  let collecting = false;
+  let collectBuf = [];
+  let liveBuf = [];
+  let motionSeen = false;
+  let motionWarned = false;
+
+  function onMotion(e) {
+    motionSeen = true;
+    const a = e.accelerationIncludingGravity || e.acceleration;
+    if (!a) return;
+    const x = a.x || 0, y = a.y || 0, z = a.z || 0;
+    const m = Math.sqrt(x * x + y * y + z * z);
+
+    if (collecting) collectBuf.push(m);
+    liveBuf.push(m);
+    if (liveBuf.length > 60) liveBuf.shift();
+    updateMeter();
+  }
+
+  async function ensureMotionPermission() {
+    if (typeof DeviceMotionEvent === 'undefined') return false;
+    if (typeof DeviceMotionEvent.requestPermission === 'function') {
+      try {
+        const res = await DeviceMotionEvent.requestPermission();
+        return res === 'granted';
+      } catch (err) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /* ============ 工具 ============ */
+  const $ = (id) => document.getElementById(id);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  function std(arr) {
+    const n = arr.length;
+    if (n < 2) return 0;
+    let m = 0;
+    for (let i = 0; i < n; i++) m += arr[i];
+    m /= n;
+    let s = 0;
+    for (let i = 0; i < n; i++) s += (arr[i] - m) * (arr[i] - m);
+    return Math.sqrt(s / n);
+  }
+
+  function buildFreqs() {
+    const out = [];
+    let f = state.startF;
+    const ratio = 1.07;
+    while (f < state.endF && out.length < 160) {
+      out.push(Math.round(f * 10) / 10);
+      f *= ratio;
+    }
+    out.push(state.endF);
+    return out;
+  }
+
+  /* ============ 扫频主流程 ============ */
+  async function startSweep() {
+    await ensureAudio();
+    osc.type = state.waveform;
+
+    state.phase = 'sweeping';
+    state.results = [];
+    state.peaks = [];
+    $('peaks').innerHTML = '<p class="dim">扫描中…</p>';
+    updateControls();
+    setStatus('', '');
+    drawChart();
+
+    const freqs = buildFreqs();
+    const total = freqs.length;
+    const measureMs = Math.max(70, state.stepMs - 85);
+
+    for (let i = 0; i < total; i++) {
+      if (state.phase !== 'sweeping') break;
+
+      const f = freqs[i];
+      state.currentF = f;
+      updateProgress(i, total, f);
+
+      setFreq(f);
+      setGain(state.volume * WAVE_SCALE[state.waveform], 0.015);
+
+      await sleep(50);
+      collectBuf = [];
+      collecting = true;
+      await sleep(measureMs);
+      collecting = false;
+
+      setGain(0, 0.02);
+      await sleep(35);
+
+      const score = std(collectBuf);
+      state.results.push({ f: f, score: score });
+      drawChart();
+    }
+
+    setGain(0, 0.03);
+    state.phase = 'idle';
+    updateControls();
+    updateProgress(state.results.length, Math.max(state.results.length, 1), state.currentF);
+    $('stepReadout').textContent = '完成 ' + state.results.length + ' 个频点';
+
+    analyzeResults();
+  }
+
+  function stopEverything() {
+    if (state.phase === 'sweeping') {
+      state.phase = 'idle';
+    } else if (state.phase === 'playing') {
+      state.phase = 'idle';
+    }
+    setGain(0, 0.04);
+    updateControls();
+  }
+
+  /* ============ 峰值分析 ============ */
+  function analyzeResults() {
+    const res = state.results;
+    if (res.length < 6) {
+      state.peaks = [];
+      renderPeaks();
+      drawChart();
+      setStatus('数据太少，无法分析。请完整跑完一次扫描。', 'info');
+      return;
+    }
+
+    // 3 点滑动平均
+    const sm = res.map(function (r, i) {
+      let s = 0, c = 0;
+      for (let k = -1; k <= 1; k++) {
+        const j = i + k;
+        if (j >= 0 && j < res.length) { s += res[j].score; c++; }
+      }
+      return s / c;
+    });
+
+    const maxV = Math.max.apply(null, sm);
+    const minV = Math.min.apply(null, sm);
+
+    if (maxV < 1e-4 || (maxV - minV) / maxV < 0.35) {
+      state.peaks = [];
+      renderPeaks();
+      drawChart();
+      setStatus('响应曲线比较平坦，没有发现突出的共振峰。可以试试增大音量、换波形，或把手机放在更硬的表面上。', 'info');
+      return;
+    }
+
+    const cands = [];
+    for (let i = 1; i < sm.length - 1; i++) {
+      if (sm[i] > sm[i - 1] && sm[i] >= sm[i + 1] && sm[i] > maxV * 0.4) {
+        cands.push({ f: res[i].f, score: res[i].score, s: sm[i] });
+      }
+    }
+    cands.sort(function (a, b) { return b.s - a.s; });
+
+    const top = [];
+    for (let i = 0; i < cands.length && top.length < 3; i++) {
+      const p = cands[i];
+      let ok = true;
+      for (let j = 0; j < top.length; j++) {
+        if (Math.abs(Math.log2(top[j].f / p.f)) < 0.18) { ok = false; break; }
+      }
+      if (ok) top.push(p);
+    }
+
+    state.peaks = top;
+    renderPeaks();
+    drawChart();
+
+    if (top.length) {
+      setStatus('找到 ' + top.length + ' 个疑似共振点。注意：这通常是外壳/屏幕/摄像头模组的结构共振，不代表能吹走灰尘 😄', 'info');
+    } else {
+      setStatus('没有找到明显峰值。', 'info');
+    }
+  }
+
+  function renderPeaks() {
+    const el = $('peaks');
+    const peaks = state.peaks || [];
+    if (!peaks.length) {
+      el.innerHTML = '<p class="dim">未检测到明显共振峰。试试调整频率范围、加大音量，或把手机放到硬质桌面上重试。</p>';
+      return;
+    }
+    el.innerHTML = peaks.map(function (p, i) {
+      const fTxt = p.f < 100 ? p.f.toFixed(1) : Math.round(p.f);
+      return '' +
+        '<div class="peak">' +
+          '<div class="peak-rank">#' + (i + 1) + '</div>' +
+          '<div class="peak-info">' +
+            '<div class="peak-f">' + fTxt + ' Hz</div>' +
+            '<div class="peak-s">振动强度 ' + p.score.toFixed(4) + '</div>' +
+          '</div>' +
+          '<button class="btn tiny" data-play="' + p.f + '">重播</button>' +
+        '</div>';
+    }).join('');
+  }
+
+  async function playTone(f) {
+    await ensureAudio();
+    osc.type = state.waveform;
+    setFreq(f);
+    setGain(state.volume * WAVE_SCALE[state.waveform], 0.06);
+    state.phase = 'playing';
+    state.currentF = f;
+    $('freqReadout').innerHTML = (f < 100 ? f.toFixed(1) : Math.round(f)) + '<span class="unit"> Hz</span>';
+    $('stepReadout').innerHTML = '<span class="playing-badge"><i class="dot"></i>持续播放中</span>';
+    updateControls();
+  }
+
+  /* ============ UI 更新 ============ */
+  function updateControls() {
+    const sweeping = state.phase === 'sweeping';
+    const playing = state.phase === 'playing';
+    $('btnStart').disabled = sweeping || playing;
+    $('btnStop').disabled = !sweeping && !playing;
+  }
+
+  function updateProgress(i, total, f) {
+    const pct = total ? Math.min(100, (i / total) * 100) : 0;
+    $('progressBar').style.width = pct + '%';
+    if (state.phase === 'sweeping') {
+      $('freqReadout').innerHTML =
+        (f < 100 ? f.toFixed(1) : Math.round(f)) + '<span class="unit"> Hz</span>';
+      $('stepReadout').textContent = (i + 1) + ' / ' + total;
+    }
+  }
+
+  function updateMeter() {
+    const v = std(liveBuf);
+    const pct = Math.min(100, (v / 2.0) * 100);
+    $('meterFill').style.width = pct + '%';
+    $('meterVal').textContent = v.toFixed(3);
+  }
+
+  function setStatus(msg, type) {
+    const el = $('status');
+    if (!msg) { el.className = 'status'; el.textContent = ''; return; }
+    el.className = 'status show ' + (type || 'info');
+    el.textContent = msg;
+  }
+
+  /* ============ 绘图 ============ */
+  const canvas = $('chart');
+  const ctx2d = canvas.getContext('2d');
+
+  function drawChart() {
+    const rect = canvas.getBoundingClientRect();
+    const W = Math.max(rect.width, 200);
+    const H = Math.max(rect.height, 120);
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+
+    if (canvas.width !== Math.round(W * dpr) || canvas.height !== Math.round(H * dpr)) {
+      canvas.width = Math.round(W * dpr);
+      canvas.height = Math.round(H * dpr);
+    }
+    ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx2d.clearRect(0, 0, W, H);
+
+    const padL = 34, padR = 10, padT = 12, padB = 24;
+    const plotW = W - padL - padR;
+    const plotH = H - padT - padB;
+
+    const f0 = Math.log10(state.startF);
+    const f1 = Math.log10(state.endF);
+    const xOf = function (f) {
+      return padL + ((Math.log10(f) - f0) / (f1 - f0)) * plotW;
+    };
+
+    // --- 网格 ---
+    const gridF = [20, 30, 50, 70, 100, 200, 300, 500, 700, 1000, 1500, 2000, 3000, 4000];
+    ctx2d.lineWidth = 1;
+    ctx2d.font = '10px -apple-system,system-ui,sans-serif';
+    ctx2d.textAlign = 'center';
+    ctx2d.textBaseline = 'top';
+    gridF.forEach(function (f) {
+      if (f < state.startF || f > state.endF) return;
+      const x = xOf(f);
+      ctx2d.strokeStyle = 'rgba(255,255,255,0.055)';
+      ctx2d.beginPath();
+      ctx2d.moveTo(x, padT);
+      ctx2d.lineTo(x, padT + plotH);
+      ctx2d.stroke();
+
+      const label = f >= 1000 ? (f / 1000) + 'k' : String(f);
+      ctx2d.fillStyle = '#5c6678';
+      ctx2d.fillText(label, x, padT + plotH + 6);
+    });
+
+    // 水平基线
+    ctx2d.strokeStyle = 'rgba(255,255,255,0.09)';
+    ctx2d.beginPath();
+    ctx2d.moveTo(padL, padT + plotH);
+    ctx2d.lineTo(padL + plotW, padT + plotH);
+    ctx2d.stroke();
+
+    // --- 空状态 ---
+    if (!state.results.length) {
+      ctx2d.fillStyle = '#4a5568';
+      ctx2d.font = '12.5px -apple-system,system-ui,sans-serif';
+      ctx2d.textAlign = 'center';
+      ctx2d.textBaseline = 'middle';
+      ctx2d.fillText('开始扫描后这里会显示频率响应', W / 2, H / 2);
+      return;
+    }
+
+    // --- 数据 ---
+    const res = state.results;
+    let maxScore = 0;
+    for (let i = 0; i < res.length; i++) if (res[i].score > maxScore) maxScore = res[i].score;
+    if (maxScore <= 0) maxScore = 1e-6;
+    const yMax = maxScore * 1.2;
+
+    const xs = res.map(function (r) { return xOf(r.f); });
+
+    // 柱
+    for (let i = 0; i < res.length; i++) {
+      const x = xs[i];
+      const nextX = (i + 1 < xs.length) ? xs[i + 1] : x + (x - xs[i - 1] || 4);
+      let bw = nextX - x - 1.2;
+      if (bw < 1.5) bw = 1.5;
+      if (bw > 22) bw = 22;
+
+      const h = Math.max(1, (res[i].score / yMax) * plotH);
+      const y = padT + plotH - h;
+
+      const t = Math.min(1, res[i].score / maxScore);
+      const r = Math.round(60 + t * 140);
+      const g = Math.round(160 + t * 40);
+      const b = Math.round(230 - t * 120);
+      ctx2d.fillStyle = 'rgba(' + r + ',' + g + ',' + b + ',0.85)';
+      ctx2d.fillRect(x, y, bw, h);
+    }
+
+    // 折线趋势
+    ctx2d.beginPath();
+    for (let i = 0; i < res.length; i++) {
+      const x = xs[i] + 1;
+      const y = padT + plotH - (res[i].score / yMax) * plotH;
+      if (i === 0) ctx2d.moveTo(x, y); else ctx2d.lineTo(x, y);
+    }
+    ctx2d.strokeStyle = 'rgba(123,97,255,0.7)';
+    ctx2d.lineWidth = 1.6;
+    ctx2d.stroke();
+
+    // 峰值标记
+    (state.peaks || []).forEach(function (p, idx) {
+      let best = 0, bestD = Infinity;
+      for (let i = 0; i < res.length; i++) {
+        const d = Math.abs(Math.log(res[i].f / p.f));
+        if (d < bestD) { bestD = d; best = i; }
+      }
+      const x = xs[best] + 1;
+      const y = padT + plotH - (res[best].score / yMax) * plotH;
+
+      ctx2d.strokeStyle = 'rgba(76,201,240,0.55)';
+      ctx2d.setLineDash([3, 3]);
+      ctx2d.lineWidth = 1;
+      ctx2d.beginPath();
+      ctx2d.moveTo(x, y);
+      ctx2d.lineTo(x, padT + plotH);
+      ctx2d.stroke();
+      ctx2d.setLineDash([]);
+
+      ctx2d.beginPath();
+      ctx2d.arc(x, y, 4.5, 0, Math.PI * 2);
+      ctx2d.fillStyle = '#4cc9f0';
+      ctx2d.fill();
+      ctx2d.strokeStyle = '#0f1115';
+      ctx2d.lineWidth = 2;
+      ctx2d.stroke();
+
+      ctx2d.fillStyle = '#4cc9f0';
+      ctx2d.font = 'bold 10.5px -apple-system,system-ui,sans-serif';
+      ctx2d.textAlign = 'center';
+      ctx2d.textBaseline = 'bottom';
+      ctx2d.fillText('#' + (idx + 1), x, y - 7);
+    });
+
+    // 纵轴最大值
+    ctx2d.fillStyle = '#5c6678';
+    ctx2d.font = '10px -apple-system,system-ui,sans-serif';
+    ctx2d.textAlign = 'right';
+    ctx2d.textBaseline = 'top';
+    ctx2d.fillText(yMax.toFixed(3), padL - 5, padT);
+    ctx2d.textBaseline = 'bottom';
+    ctx2d.fillText('0', padL - 5, padT + plotH);
+  }
+
+  /* ============ 事件绑定 ============ */
+  $('waveform').addEventListener('change', function (e) {
+    state.waveform = e.target.value;
+    if (osc) osc.type = state.waveform;
+  });
+
+  $('startF').addEventListener('input', function (e) {
+    let v = parseInt(e.target.value, 10);
+    if (v >= state.endF - 20) {
+      v = Math.max(20, state.endF - 20);
+      e.target.value = v;
+    }
+    state.startF = v;
+    $('startFVal').textContent = v + ' Hz';
+  });
+
+  $('endF').addEventListener('input', function (e) {
+    let v = parseInt(e.target.value, 10);
+    if (v <= state.startF + 20) {
+      v = state.startF + 20;
+      e.target.value = v;
+    }
+    state.endF = v;
+    $('endFVal').textContent = v + ' Hz';
+  });
+
+  $('stepMs').addEventListener('input', function (e) {
+    state.stepMs = parseInt(e.target.value, 10);
+    $('stepMsVal').textContent = state.stepMs + ' ms';
+  });
+
+  $('vol').addEventListener('input', function (e) {
+    state.volume = parseInt(e.target.value, 10) / 100;
+    $('volVal').textContent = Math.round(state.volume * 100) + ' %';
+    if (state.phase === 'playing') {
+      setGain(state.volume * WAVE_SCALE[state.waveform], 0.05);
+    }
+  });
+
+  $('btnStart').addEventListener('click', async function () {
+    if (state.phase !== 'idle') return;
+
+    const ok = await ensureMotionPermission();
+    if (!ok) {
+      setStatus('未获得运动传感器权限，无法测量振动。（iOS 需要在弹窗里点「允许」，且必须通过 HTTPS 打开）', 'err');
+      return;
+    }
+
+    window.addEventListener('devicemotion', onMotion);
+
+    motionSeen = false;
+    motionWarned = false;
+    setTimeout(function () {
+      if (!motionSeen && !motionWarned) {
+        motionWarned = true;
+        setStatus('没有收到运动传感器数据。设备可能不支持，或页面不在 HTTPS 环境。音频仍会播放，但看不到振动曲线。', 'err');
+      }
+    }, 2500);
+
+    await startSweep();
+  });
+
+  $('btnStop').addEventListener('click', function () {
+    stopEverything();
+    if (state.results.length > 5 && state.phase === 'idle') {
+      analyzeResults();
+    }
+    $('stepReadout').textContent = '已停止';
+  });
+
+  $('peaks').addEventListener('click', function (e) {
+    const btn = e.target.closest('[data-play]');
+    if (!btn) return;
+    playTone(parseFloat(btn.dataset.play));
+  });
+
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) stopEverything();
+  });
+
+  window.addEventListener('resize', function () {
+    clearTimeout(window.__rz);
+    window.__rz = setTimeout(drawChart, 120);
+  });
+
+  /* ============ 启动 ============ */
+  window.addEventListener('load', function () {
+    setTimeout(drawChart, 60);
+  });
+  drawChart();
+})();
+</script>
+</body>
+</html>
