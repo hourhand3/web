@@ -86,7 +86,6 @@
   .primary-btn:active { opacity: 0.85; }
   .primary-btn:disabled { background: #475569; color: #94a3b8; }
 
-  /* 倒计时界面 */
   #screen-countdown { align-items: center; justify-content: center; text-align: center; }
   .countdown-label { font-size: 16px; color: var(--muted); margin-bottom: 24px; }
   .countdown-num {
@@ -104,7 +103,6 @@
     max-width: 280px;
   }
 
-  /* 测量中界面 */
   #screen-measuring { align-items: center; justify-content: center; text-align: center; }
   .measuring-label { font-size: 16px; color: var(--muted); margin-bottom: 16px; }
   .measuring-timer {
@@ -117,7 +115,6 @@
   }
   .measuring-hint { font-size: 14px; color: var(--muted); }
 
-  /* 结果界面 */
   .result-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -179,7 +176,6 @@
     cursor: pointer;
   }
 
-  /* 页脚 */
   footer {
     position: fixed;
     bottom: 0; left: 0; right: 0;
@@ -205,7 +201,6 @@
     cursor: pointer;
   }
 
-  /* 调试面板 */
   #debugPanel {
     position: fixed;
     bottom: 0; left: 0; right: 0;
@@ -259,7 +254,6 @@
 
 <div id="app">
 
-  <!-- ===== idle ===== -->
   <div class="screen active" id="screen-idle">
     <h1>呼吸心率自测</h1>
     <p class="subtitle">将手机平放在仰卧者的胸口，测量指定时间段内的平均呼吸频率与心率。</p>
@@ -281,21 +275,18 @@
     <button class="primary-btn" id="startBtn">开始自测</button>
   </div>
 
-  <!-- ===== countdown ===== -->
   <div class="screen" id="screen-countdown">
     <div class="countdown-label">请将手机放到胸口</div>
     <div class="countdown-num" id="countdownNum">5</div>
     <div class="countdown-hint">倒计时结束后开始记录，请保持平躺、安静呼吸。</div>
   </div>
 
-  <!-- ===== measuring ===== -->
   <div class="screen" id="screen-measuring">
     <div class="measuring-label">测量中</div>
     <div class="measuring-timer" id="measureTimer">30</div>
     <div class="measuring-hint">请保持不动，结束后会有提示音。</div>
   </div>
 
-  <!-- ===== done ===== -->
   <div class="screen" id="screen-done">
     <h1 style="margin-bottom:16px;">测量结果</h1>
 
@@ -347,7 +338,7 @@
 /* ============================================================
  * 版本信息
  * ============================================================ */
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 const BUILD_DATE  = '2026-10-17';
 document.getElementById('version').textContent = `v${APP_VERSION} · ${BUILD_DATE}`;
 
@@ -356,12 +347,13 @@ document.getElementById('version').textContent = `v${APP_VERSION} · ${BUILD_DAT
  * ============================================================ */
 const CONFIG = {
   countdownSec: 5,
-  measureSec: 30,          // 会被用户选择覆盖
-  breathLowPassHz: 0.5,    // 呼吸通道低通
-  breathBaselineHz: 0.02,  // 呼吸基线（超慢低通）
-  heartHighPassHz: 1.0,    // 心跳通道高通
-  heartLowPassHz: 10.0,    // 心跳通道低通
+  measureSec: 30,
+  breathLowPassHz: 0.5,
+  breathBaselineHz: 0.02,
+  heartHighPassHz: 1.0,
+  heartLowPassHz: 10.0,
   minSamplesForValid: 100,
+  heartMinIntervalMs: 350,
 };
 
 /* ============================================================
@@ -372,10 +364,7 @@ const debugLogEl = document.getElementById('debugLog');
 const debugPanel = document.getElementById('debugPanel');
 
 function log(category, message, data) {
-  const entry = {
-    t: performance.now(),
-    category, message, data
-  };
+  const entry = { t: performance.now(), category, message, data };
   logs.push(entry);
 
   const line = document.createElement('div');
@@ -418,7 +407,6 @@ document.getElementById('debugCopy').addEventListener('click', async () => {
     await navigator.clipboard.writeText(text);
     alert('日志已复制到剪贴板');
   } catch (e) {
-    // fallback: 选中文本
     const range = document.createRange();
     range.selectNodeContents(debugLogEl);
     const sel = window.getSelection();
@@ -485,7 +473,7 @@ function setState(newState) {
 }
 
 /* ============================================================
- * 测量时长选择
+ * 时长选择
  * ============================================================ */
 document.getElementById('durationRow').addEventListener('click', e => {
   const btn = e.target.closest('.duration-btn');
@@ -504,10 +492,8 @@ document.getElementById('startBtn').addEventListener('click', startFlow);
 async function startFlow() {
   log('flow', '用户点击开始');
 
-  // 1. 音频初始化（必须在用户手势内）
   initAudio();
 
-  // 2. 传感器权限（iOS 13+）
   try {
     if (typeof DeviceMotionEvent !== 'undefined' &&
         typeof DeviceMotionEvent.requestPermission === 'function') {
@@ -526,13 +512,11 @@ async function startFlow() {
     return;
   }
 
-  // 3. 检查传感器 API 是否存在
   if (!('DeviceMotionEvent' in window)) {
     alert('当前浏览器不支持 DeviceMotion，请使用 iOS Safari 或 Android Chrome。');
     return;
   }
 
-  // 4. 屏幕常亮
   try {
     if ('wakeLock' in navigator) {
       wakeLock = await navigator.wakeLock.request('screen');
@@ -544,13 +528,12 @@ async function startFlow() {
     log('wakeLock', 'Wake Lock 失败', { error: e.message });
   }
 
-  // 5. 进入倒计时
   enterCountdown();
 }
 
 function enterCountdown() {
   setState('countdown');
-  beep(800, 0.1);  // 进入倒计时提示音
+  beep(800, 0.1);
 
   let remaining = CONFIG.countdownSec;
   const numEl = document.getElementById('countdownNum');
@@ -568,7 +551,7 @@ function enterCountdown() {
 
 function startMeasuring() {
   setState('measuring');
-  beep(600, 0.15);  // 测量开始提示音
+  beep(600, 0.15);
   log('flow', '测量开始', { durationSec: measureDurationSec });
 
   samples = [];
@@ -611,14 +594,13 @@ function stopMeasuring() {
 
   const result = analyze(samples);
 
-  // ★ 关键修复：先切到 done，让 canvas 父元素变为可见
+  // 先切到 done，让 canvas 父元素可见，再在下一帧绘制
   setState('done');
-  // 等一帧让布局生效，再绘制
   requestAnimationFrame(() => renderResult(result));
 }
 
 /* ============================================================
- * 滤波函数（一阶 IIR，按实际时间戳 dt 计算）
+ * 滤波
  * ============================================================ */
 function lowPassArray(input, ts, fc) {
   const n = input.length;
@@ -658,7 +640,7 @@ function highPassArray(input, ts, fc) {
 }
 
 /* ============================================================
- * 工具函数
+ * 通用工具
  * ============================================================ */
 function arrayMin(arr) {
   let m = Infinity;
@@ -670,6 +652,17 @@ function arrayMax(arr) {
   for (let i = 0; i < arr.length; i++) if (arr[i] > m) m = arr[i];
   return m;
 }
+function average(arr) {
+  let s = 0;
+  for (let i = 0; i < arr.length; i++) s += arr[i];
+  return arr.length ? s / arr.length : 0;
+}
+function stddev(arr, mean) {
+  if (arr.length < 2) return 0;
+  let s = 0;
+  for (let i = 0; i < arr.length; i++) s += (arr[i] - mean) ** 2;
+  return Math.sqrt(s / (arr.length - 1));
+}
 function median(arr) {
   const s = [...arr].sort((a, b) => a - b);
   const mid = Math.floor(s.length / 2);
@@ -677,7 +670,79 @@ function median(arr) {
 }
 
 /* ============================================================
- * 核心分析
+ * 信号处理辅助
+ * ============================================================ */
+function movingAverage(signal, window) {
+  const n = signal.length;
+  const out = new Array(n);
+  const half = Math.floor(window / 2);
+  for (let i = 0; i < n; i++) {
+    const start = Math.max(0, i - half);
+    const end   = Math.min(n - 1, i + half);
+    let sum = 0;
+    for (let j = start; j <= end; j++) sum += signal[j];
+    out[i] = sum / (end - start + 1);
+  }
+  return out;
+}
+
+function filterByIQR(arr, multiplier) {
+  if (arr.length < 5) return [...arr];
+  const sorted = [...arr].sort((a, b) => a - b);
+  const q1 = sorted[Math.floor(sorted.length * 0.25)];
+  const q3 = sorted[Math.floor(sorted.length * 0.75)];
+  const iqr = q3 - q1;
+  const lo = q1 - multiplier * iqr;
+  const hi = q3 + multiplier * iqr;
+  return arr.filter(v => v >= lo && v <= hi);
+}
+
+function autocorrelationBpm(signal, ts) {
+  const n = signal.length;
+  if (n < 100) return 0;
+
+  const dt = (ts[n - 1] - ts[0]) / (n - 1) / 1000;
+  if (!(dt > 0)) return 0;
+
+  const mean = average(signal);
+  const centered = signal.map(v => v - mean);
+
+  let zeroEnergy = 0;
+  for (let i = 0; i < n; i++) zeroEnergy += centered[i] * centered[i];
+  if (zeroEnergy < 1e-9) return 0;
+
+  const minLag = Math.max(1, Math.round(0.35 / dt));
+  const maxLag = Math.min(n - 2, Math.round(1.6 / dt));
+  if (maxLag <= minLag) return 0;
+
+  const ac = new Array(maxLag + 1).fill(0);
+  for (let lag = 0; lag <= maxLag; lag++) {
+    let sum = 0;
+    for (let i = 0; i < n - lag; i++) sum += centered[i] * centered[i + lag];
+    ac[lag] = sum / zeroEnergy;
+  }
+
+  let bestLag = -1;
+  let bestVal = 0;
+  for (let lag = minLag; lag <= maxLag; lag++) {
+    const isLocalMax =
+      ac[lag] > ac[lag - 1] &&
+      (lag === maxLag || ac[lag] >= ac[lag + 1]);
+    if (isLocalMax) {
+      if (ac[lag] > bestVal) {
+        bestVal = ac[lag];
+        bestLag = lag;
+      }
+      if (ac[lag] > 0.35) break;
+    }
+  }
+
+  if (bestLag <= 0) return 0;
+  return 60 / (bestLag * dt);
+}
+
+/* ============================================================
+ * 分析入口
  * ============================================================ */
 function analyze(rawSamples) {
   const t0 = performance.now();
@@ -712,10 +777,7 @@ function analyze(rawSamples) {
     sampleRate: +sampleRate.toFixed(2)
   });
 
-  /* ---------- 呼吸通道 ----------
-   * 每轴：0.5Hz 低通 → 0.02Hz 低通作为基线 → 差值
-   * 三轴差值的平方和开方 → 与朝向无关的呼吸信号
-   */
+  // ---------- 呼吸通道 ----------
   const xsLp = lowPassArray(xs, ts, CONFIG.breathLowPassHz);
   const ysLp = lowPassArray(ys, ts, CONFIG.breathLowPassHz);
   const zsLp = lowPassArray(zs, ts, CONFIG.breathLowPassHz);
@@ -732,17 +794,14 @@ function analyze(rawSamples) {
     breathSignal[i] = Math.sqrt(dx*dx + dy*dy + dz*dz);
   }
 
-  const breathPeaks = detectPeaks(breathSignal, ts);
-  const breathRate = computeRate(breathPeaks);
+  const breathPeaks = detectBreathPeaks(breathSignal, ts);
+  const breathRate = computeBreathRate(breathPeaks);
   log('analyze', '呼吸峰值', {
     peakCount: breathPeaks.length,
     rate: +breathRate.toFixed(1)
   });
 
-  /* ---------- 心跳通道 ----------
-   * 每轴：1Hz 高通 → 10Hz 低通
-   * 三轴平方和开方 → 与朝向无关的心跳信号
-   */
+  // ---------- 心跳通道 ----------
   const xsHp = highPassArray(xs, ts, CONFIG.heartHighPassHz);
   const ysHp = highPassArray(ys, ts, CONFIG.heartHighPassHz);
   const zsHp = highPassArray(zs, ts, CONFIG.heartHighPassHz);
@@ -772,6 +831,7 @@ function analyze(rawSamples) {
     breathRate: Math.round(breathRate),
     heartRate: heartResult.bpm,
     heartQuality: heartResult.quality,
+    heartNote: heartResult.note,
     breathSignal,
     heartSignal,
     ts,
@@ -779,8 +839,10 @@ function analyze(rawSamples) {
   };
 }
 
-/* ---------- 峰值检测（带迟滞）---------- */
-function detectPeaks(signal, ts) {
+/* ============================================================
+ * 呼吸峰值检测
+ * ============================================================ */
+function detectBreathPeaks(signal, ts) {
   const min = arrayMin(signal);
   const max = arrayMax(signal);
   const range = max - min;
@@ -802,7 +864,7 @@ function detectPeaks(signal, ts) {
   return peaks;
 }
 
-function computeRate(peaks) {
+function computeBreathRate(peaks) {
   if (peaks.length < 2) return 0;
   const intervals = [];
   for (let i = 1; i < peaks.length; i++) {
@@ -814,60 +876,122 @@ function computeRate(peaks) {
   return 60 / avg;
 }
 
-/* ---------- 心率检测 ---------- */
+/* ============================================================
+ * 心率检测（间隔均匀性先验）
+ * ============================================================ */
 function detectHeartRate(signal, ts) {
   const n = signal.length;
-  let mean = 0;
-  for (let i = 0; i < n; i++) mean += signal[i];
-  mean /= n;
-
-  let variance = 0;
-  for (let i = 0; i < n; i++) variance += (signal[i] - mean) ** 2;
-  variance /= n;
-  const std = Math.sqrt(variance);
-
-  if (std < 1e-5) {
-    return { bpm: 0, peakCount: 0, quality: '信号过弱' };
+  if (n < 100) {
+    return { bpm: 0, quality: '样本不足', peakCount: 0 };
   }
 
-  const high = mean + 0.5 * std;
-  const low  = mean + 0.15 * std;
+  // 1. 平滑
+  const smoothed = movingAverage(signal, 5);
 
+  // 2. 统计量
+  const mean = average(smoothed);
+  const std  = stddev(smoothed, mean);
+  if (std < 1e-6) {
+    return { bpm: 0, quality: '信号过弱', peakCount: 0 };
+  }
+
+  // 3. 严格阈值
+  const highTh = mean + 0.7 * std;
+  const lowTh  = mean + 0.2 * std;
+
+  // 4. 峰值检测 + 最小间隔约束
   const peaks = [];
   let above = false;
+  let lastPeakT = -Infinity;
+
   for (let i = 0; i < n; i++) {
-    if (!above && signal[i] > high) {
-      peaks.push(ts[i]);
+    if (!above && smoothed[i] > highTh) {
+      const t = ts[i];
+      if (t - lastPeakT >= CONFIG.heartMinIntervalMs) {
+        peaks.push(t);
+        lastPeakT = t;
+      }
       above = true;
-    } else if (above && signal[i] < low) {
+    } else if (above && smoothed[i] < lowTh) {
       above = false;
     }
   }
 
   if (peaks.length < 5) {
-    return { bpm: 0, peakCount: peaks.length, quality: '峰值不足' };
+    return {
+      bpm: 0, quality: '峰值不足', peakCount: peaks.length
+    };
   }
 
-  const intervals = [];
+  // 5. 间隔统计 + IQR 剔除
+  const rawIntervals = [];
   for (let i = 1; i < peaks.length; i++) {
-    intervals.push((peaks[i] - peaks[i-1]) / 1000);
+    rawIntervals.push((peaks[i] - peaks[i - 1]) / 1000);
   }
-  const valid = intervals.filter(iv => iv > 0.3 && iv < 2.0);
-  if (valid.length < 3) {
-    return { bpm: 0, peakCount: peaks.length, quality: '间隔异常' };
+  const cleanIntervals = filterByIQR(rawIntervals, 1.5);
+
+  if (cleanIntervals.length < 3) {
+    return {
+      bpm: 0, quality: '间隔过于离散', peakCount: peaks.length,
+      rawIntervalCount: rawIntervals.length,
+      cleanIntervalCount: cleanIntervals.length
+    };
   }
 
-  const med = median(valid);
-  const bpm = 60 / med;
+  // 6. 中位数 BPM + 变异系数
+  const medInterval = median(cleanIntervals);
+  const bpmPeak = 60 / medInterval;
 
+  const meanInterval = average(cleanIntervals);
+  const stdInterval  = stddev(cleanIntervals, meanInterval);
+  const cv = meanInterval > 0 ? stdInterval / meanInterval : 1;
+
+  // 7. 自相关交叉验证
+  const bpmAutocorr = autocorrelationBpm(signal, ts);
+
+  // 8. 综合决策
+  let finalBpm = bpmPeak;
   let quality = '良好';
-  if (bpm < 40 || bpm > 180) quality = '数值异常（参考）';
+  let note = '';
+
+  const autocorrValid = bpmAutocorr >= 35 && bpmAutocorr <= 180;
+  const peakValid     = bpmPeak     >= 40 && bpmPeak     <= 180;
+
+  if (autocorrValid && peakValid) {
+    const diff = Math.abs(bpmPeak - bpmAutocorr) / bpmAutocorr;
+    if (diff > 0.20) {
+      finalBpm = bpmAutocorr;
+      quality = '参考值（通道不一致）';
+      note = `峰值法 ${bpmPeak.toFixed(0)}，自相关 ${bpmAutocorr.toFixed(0)}，差异过大，取自相关值`;
+    } else {
+      finalBpm = (bpmPeak + bpmAutocorr) / 2;
+      quality = '良好';
+    }
+  } else if (autocorrValid) {
+    finalBpm = bpmAutocorr;
+    quality = '参考值（仅自相关可用）';
+    note = `峰值法异常（${bpmPeak.toFixed(0)} BPM）`;
+  } else if (!peakValid) {
+    finalBpm = bpmPeak;
+    quality = '数值异常（参考）';
+  }
+
+  if (cv > 0.25 && quality === '良好') {
+    quality = '间隔不均（参考）';
+    note = `间隔变异系数 ${cv.toFixed(2)} 偏高，可能含杂波`;
+  }
 
   return {
-    bpm: Math.round(bpm),
+    bpm: Math.round(finalBpm),
     peakCount: peaks.length,
-    medianInterval: +med.toFixed(3),
-    quality
+    rawIntervalCount: rawIntervals.length,
+    cleanIntervalCount: cleanIntervals.length,
+    medianInterval: +medInterval.toFixed(3),
+    cv: +cv.toFixed(3),
+    bpmPeak: +bpmPeak.toFixed(1),
+    bpmAutocorr: +bpmAutocorr.toFixed(1),
+    quality,
+    note
   };
 }
 
@@ -884,7 +1008,8 @@ function renderResult(result) {
     heartEl.textContent  = '--';
     qualityEl.textContent = result.error;
     qualityEl.classList.add('warn');
-    document.getElementById('waveform').getContext('2d').clearRect(0, 0, 9999, 9999);
+    const ctx = document.getElementById('waveform').getContext('2d');
+    ctx.clearRect(0, 0, 9999, 9999);
     return;
   }
 
@@ -892,13 +1017,18 @@ function renderResult(result) {
   heartEl.textContent  = result.heartRate  > 0 ? result.heartRate  : '--';
 
   qualityEl.classList.toggle('warn', result.quality !== 'good');
+
+  const baseInfo =
+    `采样 ${result.sampleCount} 个点 · ${result.duration.toFixed(1)} 秒 · ` +
+    `采样率约 ${result.sampleRate.toFixed(0)} Hz。`;
+
   if (result.quality === 'good') {
-    qualityEl.textContent =
-      `采样 ${result.sampleCount} 个点 · ${result.duration.toFixed(1)} 秒 · 采样率约 ${result.sampleRate.toFixed(0)} Hz。` +
-      `呼吸与心率均为该时段的平均值，仅供参考。`;
+    qualityEl.textContent = baseInfo + ' 呼吸与心率均为该时段平均值，仅供参考。';
   } else {
+    const q = result.heartQuality || '';
+    const n = result.heartNote ? ' ' + result.heartNote + '。' : '';
     qualityEl.textContent =
-      `心率信号质量：${result.heartQuality}。呼吸数值可参考，心率数值可能不准确，建议调整手机位置后重测。`;
+      baseInfo + ` 心率信号质量较低（${q}）。${n}建议重新放置手机后重测。`;
   }
 
   drawWaveforms(result.breathSignal, result.heartSignal);
@@ -910,25 +1040,25 @@ function renderResult(result) {
 function drawWaveforms(breathSignal, heartSignal) {
   const canvas = document.getElementById('waveform');
   const rect = canvas.getBoundingClientRect();
-  // 兜底：若尺寸为 0，退回 clientWidth / 固定值
-  let cssW = rect.width  || canvas.clientWidth  || canvas.parentElement.clientWidth  || 320;
-  let cssH = rect.height || canvas.clientHeight || 240;
+
+  // 尺寸兜底：避免父元素 display:none 时拿到 0
+  const cssW = rect.width  || canvas.clientWidth || canvas.parentElement.clientWidth  || 320;
+  const cssH = rect.height || canvas.clientHeight || 240;
   const dpr = window.devicePixelRatio || 1;
 
-  canvas.width  = rect.width  * dpr;
-  canvas.height = rect.height * dpr;
+  canvas.width  = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  canvas.style.height = cssH + 'px';
 
   const ctx = canvas.getContext('2d');
-  // 用 setTransform 而非 scale，避免多次调用累积缩放
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  const W = rect.width;
-  const H = rect.height;
+  const W = cssW;
+  const H = cssH;
   const halfH = H / 2;
 
   ctx.clearRect(0, 0, W, H);
 
-  // 分隔线
   ctx.strokeStyle = '#1e293b';
   ctx.lineWidth = 1;
   ctx.beginPath();
@@ -936,11 +1066,15 @@ function drawWaveforms(breathSignal, heartSignal) {
   ctx.lineTo(W, halfH);
   ctx.stroke();
 
-  drawSignal(ctx, breathSignal, 0, 0, W, halfH, '#4ade80', '呼吸波形');
-  drawSignal(ctx, heartSignal, 0, halfH, W, halfH, '#f87171', '心跳波形');
+  drawSignal(ctx, breathSignal, 0, 0,     W, halfH, '#4ade80', '呼吸波形');
+  drawSignal(ctx, heartSignal,  0, halfH, W, halfH, '#f87171', '心跳波形');
+
   log('render', '波形已绘制', {
-    canvasW: canvas.width, canvasH: canvas.height,
-    dpr, breathLen: breathSignal?.length, heartLen: heartSignal?.length
+    canvasW: canvas.width,
+    canvasH: canvas.height,
+    dpr,
+    breathLen: breathSignal ? breathSignal.length : 0,
+    heartLen: heartSignal ? heartSignal.length : 0
   });
 }
 
@@ -961,7 +1095,7 @@ function drawSignal(ctx, signal, x0, y0, w, h, color, label) {
 
   for (let i = 0; i < signal.length; i++) {
     const x = x0 + (i / (signal.length - 1)) * w;
-    const norm = (signal[i] - min) / range;   // 0..1
+    const norm = (signal[i] - min) / range;
     const y = y0 + padTop + (1 - norm) * plotH;
     if (i === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
@@ -976,15 +1110,11 @@ function drawSignal(ctx, signal, x0, y0, w, h, color, label) {
 /* ============================================================
  * 按钮事件
  * ============================================================ */
-document.getElementById('againBtn').addEventListener('click', () => {
-  setState('idle');
-});
-document.getElementById('homeBtn').addEventListener('click', () => {
-  setState('idle');
-});
+document.getElementById('againBtn').addEventListener('click', () => setState('idle'));
+document.getElementById('homeBtn').addEventListener('click', () => setState('idle'));
 
 /* ============================================================
- * 启动日志
+ * 启动
  * ============================================================ */
 log('init', '应用已加载', {
   version: APP_VERSION,
