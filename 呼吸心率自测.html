@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0f172a">
+<title>呼吸心率自测</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --green: #4ade80;
+    --red: #f87171;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  #app {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 24px 20px 80px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .screen { display: none; flex: 1; flex-direction: column; }
+  .screen.active { display: flex; }
+
+  h1 { font-size: 22px; margin: 0 0 8px; font-weight: 600; }
+  .subtitle { color: var(--muted); font-size: 14px; line-height: 1.6; margin-bottom: 24px; }
+
+  .hint-box {
+    background: var(--panel);
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--muted);
+    margin-bottom: 20px;
+  }
+  .hint-box strong { color: var(--text); }
+
+  .duration-row {
+    display: flex; gap: 10px; margin-bottom: 24px;
+  }
+  .duration-btn {
+    flex: 1;
+    padding: 12px 0;
+    background: var(--panel);
+    border: 1px solid transparent;
+    color: var(--text);
+    border-radius: 10px;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .duration-btn.selected {
+    border-color: var(--accent);
+    background: rgba(56, 189, 248, 0.15);
+    color: var(--accent);
+  }
+
+  .primary-btn {
+    display: block;
+    width: 100%;
+    padding: 18px;
+    background: var(--accent);
+    color: #0f172a;
+    border: none;
+    border-radius: 14px;
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: auto;
+  }
+  .primary-btn:active { opacity: 0.85; }
+  .primary-btn:disabled { background: #475569; color: #94a3b8; }
+
+  /* 倒计时界面 */
+  #screen-countdown { align-items: center; justify-content: center; text-align: center; }
+  .countdown-label { font-size: 16px; color: var(--muted); margin-bottom: 24px; }
+  .countdown-num {
+    font-size: 120px;
+    font-weight: 200;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 32px;
+    font-variant-numeric: tabular-nums;
+  }
+  .countdown-hint {
+    font-size: 15px;
+    color: var(--text);
+    line-height: 1.8;
+    max-width: 280px;
+  }
+
+  /* 测量中界面 */
+  #screen-measuring { align-items: center; justify-content: center; text-align: center; }
+  .measuring-label { font-size: 16px; color: var(--muted); margin-bottom: 16px; }
+  .measuring-timer {
+    font-size: 88px;
+    font-weight: 200;
+    color: var(--green);
+    line-height: 1;
+    margin-bottom: 16px;
+    font-variant-numeric: tabular-nums;
+  }
+  .measuring-hint { font-size: 14px; color: var(--muted); }
+
+  /* 结果界面 */
+  .result-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .result-card {
+    background: var(--panel);
+    border-radius: 14px;
+    padding: 18px 14px;
+    text-align: center;
+  }
+  .result-card .label { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .result-card .value {
+    font-size: 40px;
+    font-weight: 300;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .result-card .unit { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .result-card.breath .value { color: var(--green); }
+  .result-card.heart .value { color: var(--red); }
+
+  .quality-note {
+    font-size: 13px;
+    color: var(--muted);
+    background: var(--panel);
+    border-radius: 10px;
+    padding: 12px 14px;
+    line-height: 1.6;
+    margin-bottom: 20px;
+  }
+  .quality-note.warn { color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.3); }
+
+  .waveform-wrap {
+    background: var(--panel);
+    border-radius: 14px;
+    padding: 12px;
+    margin-bottom: 20px;
+  }
+  #waveform {
+    width: 100%;
+    height: 240px;
+    display: block;
+    border-radius: 8px;
+    background: #0b1220;
+  }
+
+  .btn-row { display: flex; gap: 12px; margin-top: auto; }
+  .btn-row .primary-btn { margin-top: 0; }
+  .btn-row .secondary-btn {
+    flex: 0 0 40%;
+    padding: 18px;
+    background: var(--panel);
+    color: var(--text);
+    border: none;
+    border-radius: 14px;
+    font-size: 16px;
+    cursor: pointer;
+  }
+
+  /* 页脚 */
+  footer {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid #1e293b;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--muted);
+    z-index: 10;
+  }
+  #version { font-family: ui-monospace, monospace; }
+  #debugToggle {
+    background: transparent;
+    border: 1px solid #334155;
+    color: var(--muted);
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  /* 调试面板 */
+  #debugPanel {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 60vh;
+    background: #0b1220;
+    border-top: 1px solid #334155;
+    display: none;
+    flex-direction: column;
+    z-index: 20;
+    box-shadow: 0 -8px 24px rgba(0,0,0,0.5);
+  }
+  #debugPanel.open { display: flex; }
+  .debug-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid #1e293b;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .debug-header span:first-child { flex: 1; }
+  .debug-header button {
+    background: transparent;
+    border: 1px solid #334155;
+    color: var(--muted);
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  #debugLog {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 14px;
+    font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 11px;
+    line-height: 1.6;
+    color: #cbd5e1;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .log-line { margin-bottom: 2px; }
+  .log-line .t { color: #64748b; }
+  .log-line .cat { color: #7dd3fc; }
+  .log-line .msg { color: #e2e8f0; }
+  .log-line .data { color: #94a3b8; }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ===== idle ===== -->
+  <div class="screen active" id="screen-idle">
+    <h1>呼吸心率自测</h1>
+    <p class="subtitle">将手机平放在仰卧者的胸口，测量指定时间段内的平均呼吸频率与心率。</p>
+
+    <div class="hint-box">
+      <strong>使用前请确认：</strong><br>
+      1. 手机屏幕朝上或朝下均可，放在胸口中央。<br>
+      2. 保持平躺、安静呼吸，测量期间不要移动身体。<br>
+      3. 听到结束提示音后拿起手机查看结果。<br>
+      4. 本工具仅供日常趋势参考，不能替代医疗设备。
+    </div>
+
+    <div class="duration-row" id="durationRow">
+      <button class="duration-btn" data-sec="15">15 秒</button>
+      <button class="duration-btn selected" data-sec="30">30 秒</button>
+      <button class="duration-btn" data-sec="60">60 秒</button>
+    </div>
+
+    <button class="primary-btn" id="startBtn">开始自测</button>
+  </div>
+
+  <!-- ===== countdown ===== -->
+  <div class="screen" id="screen-countdown">
+    <div class="countdown-label">请将手机放到胸口</div>
+    <div class="countdown-num" id="countdownNum">5</div>
+    <div class="countdown-hint">倒计时结束后开始记录，请保持平躺、安静呼吸。</div>
+  </div>
+
+  <!-- ===== measuring ===== -->
+  <div class="screen" id="screen-measuring">
+    <div class="measuring-label">测量中</div>
+    <div class="measuring-timer" id="measureTimer">30</div>
+    <div class="measuring-hint">请保持不动，结束后会有提示音。</div>
+  </div>
+
+  <!-- ===== done ===== -->
+  <div class="screen" id="screen-done">
+    <h1 style="margin-bottom:16px;">测量结果</h1>
+
+    <div class="result-grid">
+      <div class="result-card breath">
+        <div class="label">呼吸频率</div>
+        <div class="value" id="breathValue">--</div>
+        <div class="unit">次 / 分钟</div>
+      </div>
+      <div class="result-card heart">
+        <div class="label">心率</div>
+        <div class="value" id="heartValue">--</div>
+        <div class="unit">BPM</div>
+      </div>
+    </div>
+
+    <div class="quality-note" id="qualityNote">正在分析...</div>
+
+    <div class="waveform-wrap">
+      <canvas id="waveform"></canvas>
+    </div>
+
+    <div class="btn-row">
+      <button class="secondary-btn" id="againBtn">再测一次</button>
+      <button class="primary-btn" id="homeBtn">返回首页</button>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <span id="version"></span>
+  <button id="debugToggle">调试</button>
+</footer>
+
+<div id="debugPanel">
+  <div class="debug-header">
+    <span>调试日志</span>
+    <button id="debugCopy">复制</button>
+    <button id="debugClear">清空</button>
+    <button id="debugClose">关闭</button>
+  </div>
+  <div id="debugLog"></div>
+</div>
+
+<script>
+'use strict';
+
+/* ============================================================
+ * 版本信息
+ * ============================================================ */
+const APP_VERSION = '1.0.0';
+const BUILD_DATE  = '2026-10-17';
+document.getElementById('version').textContent = `v${APP_VERSION} · ${BUILD_DATE}`;
+
+/* ============================================================
+ * 配置
+ * ============================================================ */
+const CONFIG = {
+  countdownSec: 5,
+  measureSec: 30,          // 会被用户选择覆盖
+  breathLowPassHz: 0.5,    // 呼吸通道低通
+  breathBaselineHz: 0.02,  // 呼吸基线（超慢低通）
+  heartHighPassHz: 1.0,    // 心跳通道高通
+  heartLowPassHz: 10.0,    // 心跳通道低通
+  minSamplesForValid: 100,
+};
+
+/* ============================================================
+ * 调试日志
+ * ============================================================ */
+const logs = [];
+const debugLogEl = document.getElementById('debugLog');
+const debugPanel = document.getElementById('debugPanel');
+
+function log(category, message, data) {
+  const entry = {
+    t: performance.now(),
+    category, message, data
+  };
+  logs.push(entry);
+
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  const t = (entry.t / 1000).toFixed(2) + 's';
+  const dataStr = data ? ' ' + JSON.stringify(data) : '';
+  line.innerHTML =
+    `<span class="t">[${t}]</span> ` +
+    `<span class="cat">[${category}]</span> ` +
+    `<span class="msg">${escapeHtml(message)}</span>` +
+    `<span class="data">${escapeHtml(dataStr)}</span>`;
+  debugLogEl.appendChild(line);
+  debugLogEl.scrollTop = debugLogEl.scrollHeight;
+
+  console.log(`[${category}] ${message}`, data || '');
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+document.getElementById('debugToggle').addEventListener('click', () => {
+  debugPanel.classList.toggle('open');
+});
+document.getElementById('debugClose').addEventListener('click', () => {
+  debugPanel.classList.remove('open');
+});
+document.getElementById('debugClear').addEventListener('click', () => {
+  logs.length = 0;
+  debugLogEl.innerHTML = '';
+});
+document.getElementById('debugCopy').addEventListener('click', async () => {
+  const text = logs.map(l => {
+    const t = (l.t / 1000).toFixed(2) + 's';
+    const data = l.data ? ' ' + JSON.stringify(l.data) : '';
+    return `[${t}] [${l.category}] ${l.message}${data}`;
+  }).join('\n');
+  try {
+    await navigator.clipboard.writeText(text);
+    alert('日志已复制到剪贴板');
+  } catch (e) {
+    // fallback: 选中文本
+    const range = document.createRange();
+    range.selectNodeContents(debugLogEl);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    alert('请手动复制选中的文本');
+  }
+});
+
+/* ============================================================
+ * 音频
+ * ============================================================ */
+let audioCtx = null;
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  log('audio', 'AudioContext 已初始化', { state: audioCtx.state });
+}
+
+function beep(freq, duration, volume) {
+  if (!audioCtx) { log('audio', 'beep 跳过：audioCtx 未初始化'); return; }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  const t0 = audioCtx.currentTime;
+  gain.gain.setValueAtTime(volume || 0.25, t0);
+  gain.gain.exponentialRampToValueAtTime(0.001, t0 + duration);
+
+  osc.start(t0);
+  osc.stop(t0 + duration);
+}
+
+/* ============================================================
+ * 状态机
+ * ============================================================ */
+let state = 'idle';
+let samples = [];
+let measureStartTime = 0;
+let measureDurationSec = CONFIG.measureSec;
+let wakeLock = null;
+let countdownTimer = null;
+let measureInterval = null;
+
+const screens = {
+  idle:       document.getElementById('screen-idle'),
+  countdown:  document.getElementById('screen-countdown'),
+  measuring:  document.getElementById('screen-measuring'),
+  done:       document.getElementById('screen-done'),
+};
+
+function setState(newState) {
+  state = newState;
+  Object.entries(screens).forEach(([k, el]) => {
+    el.classList.toggle('active', k === newState);
+  });
+  log('state', '切换到 ' + newState);
+}
+
+/* ============================================================
+ * 测量时长选择
+ * ============================================================ */
+document.getElementById('durationRow').addEventListener('click', e => {
+  const btn = e.target.closest('.duration-btn');
+  if (!btn) return;
+  document.querySelectorAll('.duration-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  measureDurationSec = parseInt(btn.dataset.sec, 10);
+  log('config', '测量时长设为 ' + measureDurationSec + ' 秒');
+});
+
+/* ============================================================
+ * 开始流程
+ * ============================================================ */
+document.getElementById('startBtn').addEventListener('click', startFlow);
+
+async function startFlow() {
+  log('flow', '用户点击开始');
+
+  // 1. 音频初始化（必须在用户手势内）
+  initAudio();
+
+  // 2. 传感器权限（iOS 13+）
+  try {
+    if (typeof DeviceMotionEvent !== 'undefined' &&
+        typeof DeviceMotionEvent.requestPermission === 'function') {
+      const perm = await DeviceMotionEvent.requestPermission();
+      log('permission', 'DeviceMotion 权限', { result: perm });
+      if (perm !== 'granted') {
+        alert('需要允许访问运动传感器才能测量，请在设置中开启后重试。');
+        return;
+      }
+    } else {
+      log('permission', '无需显式请求 DeviceMotion 权限');
+    }
+  } catch (e) {
+    log('permission', '权限请求异常', { error: e.message });
+    alert('无法获取传感器权限：' + e.message);
+    return;
+  }
+
+  // 3. 检查传感器 API 是否存在
+  if (!('DeviceMotionEvent' in window)) {
+    alert('当前浏览器不支持 DeviceMotion，请使用 iOS Safari 或 Android Chrome。');
+    return;
+  }
+
+  // 4. 屏幕常亮
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      log('wakeLock', '屏幕常亮已启用');
+    } else {
+      log('wakeLock', '当前浏览器不支持 Wake Lock');
+    }
+  } catch (e) {
+    log('wakeLock', 'Wake Lock 失败', { error: e.message });
+  }
+
+  // 5. 进入倒计时
+  enterCountdown();
+}
+
+function enterCountdown() {
+  setState('countdown');
+  beep(800, 0.1);  // 进入倒计时提示音
+
+  let remaining = CONFIG.countdownSec;
+  const numEl = document.getElementById('countdownNum');
+  numEl.textContent = remaining;
+
+  countdownTimer = setInterval(() => {
+    remaining--;
+    numEl.textContent = Math.max(remaining, 0);
+    if (remaining <= 0) {
+      clearInterval(countdownTimer);
+      startMeasuring();
+    }
+  }, 1000);
+}
+
+function startMeasuring() {
+  setState('measuring');
+  beep(600, 0.15);  // 测量开始提示音
+  log('flow', '测量开始', { durationSec: measureDurationSec });
+
+  samples = [];
+  measureStartTime = performance.now();
+  window.addEventListener('devicemotion', onMotion);
+
+  const totalMs = measureDurationSec * 1000;
+  const timerEl = document.getElementById('measureTimer');
+  timerEl.textContent = measureDurationSec;
+
+  measureInterval = setInterval(() => {
+    const elapsed = performance.now() - measureStartTime;
+    const remaining = Math.max(0, Math.ceil((totalMs - elapsed) / 1000));
+    timerEl.textContent = remaining;
+    if (elapsed >= totalMs) {
+      clearInterval(measureInterval);
+      stopMeasuring();
+    }
+  }, 150);
+}
+
+function onMotion(event) {
+  const a = event.accelerationIncludingGravity;
+  if (!a || a.x === null || a.y === null || a.z === null) return;
+  samples.push({ t: performance.now(), x: a.x, y: a.y, z: a.z });
+}
+
+function stopMeasuring() {
+  window.removeEventListener('devicemotion', onMotion);
+  log('flow', '测量结束', { sampleCount: samples.length });
+
+  // 结束提示音：两声递进
+  beep(660, 0.25, 0.3);
+  setTimeout(() => beep(880, 0.35, 0.3), 350);
+
+  if (wakeLock) {
+    wakeLock.release().catch(() => {});
+    wakeLock = null;
+    log('wakeLock', '屏幕常亮已释放');
+  }
+
+  // 计算结果
+  const result = analyze(samples);
+  renderResult(result);
+  setState('done');
+}
+
+/* ============================================================
+ * 滤波函数（一阶 IIR，按实际时间戳 dt 计算）
+ * ============================================================ */
+function lowPassArray(input, ts, fc) {
+  const n = input.length;
+  const out = new Array(n);
+  if (n === 0) return out;
+  const RC = 1 / (2 * Math.PI * fc);
+  let prev = input[0];
+  out[0] = prev;
+  for (let i = 1; i < n; i++) {
+    const dt = (ts[i] - ts[i-1]) / 1000;
+    if (dt <= 0) { out[i] = prev; continue; }
+    const alpha = dt / (RC + dt);
+    prev = prev + alpha * (input[i] - prev);
+    out[i] = prev;
+  }
+  return out;
+}
+
+function highPassArray(input, ts, fc) {
+  const n = input.length;
+  const out = new Array(n);
+  if (n === 0) return out;
+  const RC = 1 / (2 * Math.PI * fc);
+  let prevIn = input[0];
+  let prevOut = 0;
+  out[0] = 0;
+  for (let i = 1; i < n; i++) {
+    const dt = (ts[i] - ts[i-1]) / 1000;
+    if (dt <= 0) { out[i] = prevOut; continue; }
+    const alpha = RC / (RC + dt);
+    const y = alpha * (prevOut + input[i] - prevIn);
+    prevIn = input[i];
+    prevOut = y;
+    out[i] = y;
+  }
+  return out;
+}
+
+/* ============================================================
+ * 工具函数
+ * ============================================================ */
+function arrayMin(arr) {
+  let m = Infinity;
+  for (let i = 0; i < arr.length; i++) if (arr[i] < m) m = arr[i];
+  return m;
+}
+function arrayMax(arr) {
+  let m = -Infinity;
+  for (let i = 0; i < arr.length; i++) if (arr[i] > m) m = arr[i];
+  return m;
+}
+function median(arr) {
+  const s = [...arr].sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+
+/* ============================================================
+ * 核心分析
+ * ============================================================ */
+function analyze(rawSamples) {
+  const t0 = performance.now();
+  log('analyze', '开始分析', { sampleCount: rawSamples.length });
+
+  if (rawSamples.length < CONFIG.minSamplesForValid) {
+    log('analyze', '样本不足');
+    return {
+      ok: false,
+      error: '样本数量不足，请重试',
+      sampleCount: rawSamples.length,
+      duration: 0,
+      sampleRate: 0,
+      breathRate: 0,
+      heartRate: 0,
+      breathSignal: [],
+      heartSignal: [],
+      quality: 'bad'
+    };
+  }
+
+  const ts = rawSamples.map(s => s.t);
+  const xs = rawSamples.map(s => s.x);
+  const ys = rawSamples.map(s => s.y);
+  const zs = rawSamples.map(s => s.z);
+
+  const durationSec = (ts[ts.length - 1] - ts[0]) / 1000;
+  const sampleRate = rawSamples.length / durationSec;
+
+  log('analyze', '采样统计', {
+    durationSec: +durationSec.toFixed(2),
+    sampleRate: +sampleRate.toFixed(2)
+  });
+
+  /* ---------- 呼吸通道 ----------
+   * 每轴：0.5Hz 低通 → 0.02Hz 低通作为基线 → 差值
+   * 三轴差值的平方和开方 → 与朝向无关的呼吸信号
+   */
+  const xsLp = lowPassArray(xs, ts, CONFIG.breathLowPassHz);
+  const ysLp = lowPassArray(ys, ts, CONFIG.breathLowPassHz);
+  const zsLp = lowPassArray(zs, ts, CONFIG.breathLowPassHz);
+
+  const xsBase = lowPassArray(xsLp, ts, CONFIG.breathBaselineHz);
+  const ysBase = lowPassArray(ysLp, ts, CONFIG.breathBaselineHz);
+  const zsBase = lowPassArray(zsLp, ts, CONFIG.breathBaselineHz);
+
+  const breathSignal = new Array(rawSamples.length);
+  for (let i = 0; i < rawSamples.length; i++) {
+    const dx = xsLp[i] - xsBase[i];
+    const dy = ysLp[i] - ysBase[i];
+    const dz = zsLp[i] - zsBase[i];
+    breathSignal[i] = Math.sqrt(dx*dx + dy*dy + dz*dz);
+  }
+
+  const breathPeaks = detectPeaks(breathSignal, ts);
+  const breathRate = computeRate(breathPeaks);
+  log('analyze', '呼吸峰值', {
+    peakCount: breathPeaks.length,
+    rate: +breathRate.toFixed(1)
+  });
+
+  /* ---------- 心跳通道 ----------
+   * 每轴：1Hz 高通 → 10Hz 低通
+   * 三轴平方和开方 → 与朝向无关的心跳信号
+   */
+  const xsHp = highPassArray(xs, ts, CONFIG.heartHighPassHz);
+  const ysHp = highPassArray(ys, ts, CONFIG.heartHighPassHz);
+  const zsHp = highPassArray(zs, ts, CONFIG.heartHighPassHz);
+
+  const xsBp = lowPassArray(xsHp, ts, CONFIG.heartLowPassHz);
+  const ysBp = lowPassArray(ysHp, ts, CONFIG.heartLowPassHz);
+  const zsBp = lowPassArray(zsHp, ts, CONFIG.heartLowPassHz);
+
+  const heartSignal = new Array(rawSamples.length);
+  for (let i = 0; i < rawSamples.length; i++) {
+    heartSignal[i] = Math.sqrt(
+      xsBp[i]*xsBp[i] + ysBp[i]*ysBp[i] + zsBp[i]*zsBp[i]
+    );
+  }
+
+  const heartResult = detectHeartRate(heartSignal, ts);
+  log('analyze', '心跳结果', heartResult);
+
+  const elapsed = performance.now() - t0;
+  log('analyze', '分析完成', { elapsedMs: +elapsed.toFixed(1) });
+
+  return {
+    ok: true,
+    sampleCount: rawSamples.length,
+    duration: durationSec,
+    sampleRate,
+    breathRate: Math.round(breathRate),
+    heartRate: heartResult.bpm,
+    heartQuality: heartResult.quality,
+    breathSignal,
+    heartSignal,
+    ts,
+    quality: heartResult.quality === '良好' ? 'good' : 'warn'
+  };
+}
+
+/* ---------- 峰值检测（带迟滞）---------- */
+function detectPeaks(signal, ts) {
+  const min = arrayMin(signal);
+  const max = arrayMax(signal);
+  const range = max - min;
+  if (range < 1e-6) return [];
+
+  const low  = min + 0.2 * range;
+  const high = min + 0.4 * range;
+
+  const peaks = [];
+  let above = false;
+  for (let i = 0; i < signal.length; i++) {
+    if (!above && signal[i] > high) {
+      peaks.push(ts[i]);
+      above = true;
+    } else if (above && signal[i] < low) {
+      above = false;
+    }
+  }
+  return peaks;
+}
+
+function computeRate(peaks) {
+  if (peaks.length < 2) return 0;
+  const intervals = [];
+  for (let i = 1; i < peaks.length; i++) {
+    intervals.push((peaks[i] - peaks[i-1]) / 1000);
+  }
+  const valid = intervals.filter(iv => iv > 0.5 && iv < 15);
+  if (valid.length === 0) return 0;
+  const avg = valid.reduce((a, b) => a + b, 0) / valid.length;
+  return 60 / avg;
+}
+
+/* ---------- 心率检测 ---------- */
+function detectHeartRate(signal, ts) {
+  const n = signal.length;
+  let mean = 0;
+  for (let i = 0; i < n; i++) mean += signal[i];
+  mean /= n;
+
+  let variance = 0;
+  for (let i = 0; i < n; i++) variance += (signal[i] - mean) ** 2;
+  variance /= n;
+  const std = Math.sqrt(variance);
+
+  if (std < 1e-5) {
+    return { bpm: 0, peakCount: 0, quality: '信号过弱' };
+  }
+
+  const high = mean + 0.5 * std;
+  const low  = mean + 0.15 * std;
+
+  const peaks = [];
+  let above = false;
+  for (let i = 0; i < n; i++) {
+    if (!above && signal[i] > high) {
+      peaks.push(ts[i]);
+      above = true;
+    } else if (above && signal[i] < low) {
+      above = false;
+    }
+  }
+
+  if (peaks.length < 5) {
+    return { bpm: 0, peakCount: peaks.length, quality: '峰值不足' };
+  }
+
+  const intervals = [];
+  for (let i = 1; i < peaks.length; i++) {
+    intervals.push((peaks[i] - peaks[i-1]) / 1000);
+  }
+  const valid = intervals.filter(iv => iv > 0.3 && iv < 2.0);
+  if (valid.length < 3) {
+    return { bpm: 0, peakCount: peaks.length, quality: '间隔异常' };
+  }
+
+  const med = median(valid);
+  const bpm = 60 / med;
+
+  let quality = '良好';
+  if (bpm < 40 || bpm > 180) quality = '数值异常（参考）';
+
+  return {
+    bpm: Math.round(bpm),
+    peakCount: peaks.length,
+    medianInterval: +med.toFixed(3),
+    quality
+  };
+}
+
+/* ============================================================
+ * 结果渲染
+ * ============================================================ */
+function renderResult(result) {
+  const breathEl = document.getElementById('breathValue');
+  const heartEl  = document.getElementById('heartValue');
+  const qualityEl = document.getElementById('qualityNote');
+
+  if (!result.ok) {
+    breathEl.textContent = '--';
+    heartEl.textContent  = '--';
+    qualityEl.textContent = result.error;
+    qualityEl.classList.add('warn');
+    document.getElementById('waveform').getContext('2d').clearRect(0, 0, 9999, 9999);
+    return;
+  }
+
+  breathEl.textContent = result.breathRate > 0 ? result.breathRate : '--';
+  heartEl.textContent  = result.heartRate  > 0 ? result.heartRate  : '--';
+
+  qualityEl.classList.toggle('warn', result.quality !== 'good');
+  if (result.quality === 'good') {
+    qualityEl.textContent =
+      `采样 ${result.sampleCount} 个点 · ${result.duration.toFixed(1)} 秒 · 采样率约 ${result.sampleRate.toFixed(0)} Hz。` +
+      `呼吸与心率均为该时段的平均值，仅供参考。`;
+  } else {
+    qualityEl.textContent =
+      `心率信号质量：${result.heartQuality}。呼吸数值可参考，心率数值可能不准确，建议调整手机位置后重测。`;
+  }
+
+  drawWaveforms(result.breathSignal, result.heartSignal);
+}
+
+/* ============================================================
+ * 波形绘制
+ * ============================================================ */
+function drawWaveforms(breathSignal, heartSignal) {
+  const canvas = document.getElementById('waveform');
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+
+  canvas.width  = rect.width  * dpr;
+  canvas.height = rect.height * dpr;
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const W = rect.width;
+  const H = rect.height;
+  const halfH = H / 2;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // 分隔线
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, halfH);
+  ctx.lineTo(W, halfH);
+  ctx.stroke();
+
+  drawSignal(ctx, breathSignal, 0, 0, W, halfH, '#4ade80', '呼吸波形');
+  drawSignal(ctx, heartSignal, 0, halfH, W, halfH, '#f87171', '心跳波形');
+}
+
+function drawSignal(ctx, signal, x0, y0, w, h, color, label) {
+  if (!signal || signal.length < 2) return;
+
+  const min = arrayMin(signal);
+  const max = arrayMax(signal);
+  const range = max - min || 1;
+
+  const padTop = 22;
+  const padBottom = 12;
+  const plotH = h - padTop - padBottom;
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+
+  for (let i = 0; i < signal.length; i++) {
+    const x = x0 + (i / (signal.length - 1)) * w;
+    const norm = (signal[i] - min) / range;   // 0..1
+    const y = y0 + padTop + (1 - norm) * plotH;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  ctx.fillStyle = color;
+  ctx.font = '12px -apple-system, sans-serif';
+  ctx.fillText(label, x0 + 10, y0 + 16);
+}
+
+/* ============================================================
+ * 按钮事件
+ * ============================================================ */
+document.getElementById('againBtn').addEventListener('click', () => {
+  setState('idle');
+});
+document.getElementById('homeBtn').addEventListener('click', () => {
+  setState('idle');
+});
+
+/* ============================================================
+ * 启动日志
+ * ============================================================ */
+log('init', '应用已加载', {
+  version: APP_VERSION,
+  build: BUILD_DATE,
+  ua: navigator.userAgent,
+  hasDeviceMotion: 'DeviceMotionEvent' in window,
+  hasWakeLock: 'wakeLock' in navigator,
+  isSecureContext: window.isSecureContext,
+});
+</script>
+</body>
+</html>
