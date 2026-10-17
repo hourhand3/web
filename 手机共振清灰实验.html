@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#0f1115">
-<title>手机共振清灰实验 · 粗扫 + 细化</title>
+<title>手机共振清灰实验 v2.1.0</title>
 <style>
 :root{
   --bg:#0f1115; --card:#181c24; --card2:#1f2530; --line:#2a3140;
@@ -18,7 +18,9 @@ body{
   line-height:1.55;padding:18px 16px 70px;max-width:660px;margin:0 auto;
   overscroll-behavior:none;
 }
-h1{font-size:20px;margin:0 0 4px;letter-spacing:.3px}
+h1{font-size:20px;margin:0 0 4px;letter-spacing:.3px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ver{font-size:11px;font-weight:600;color:var(--accent);background:rgba(76,201,240,.12);
+  border:1px solid rgba(76,201,240,.3);border-radius:6px;padding:2px 7px;letter-spacing:.5px}
 .sub{color:var(--dim);font-size:13px;margin:0 0 16px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 14px 15px;margin-bottom:14px}
 .card h2{font-size:12px;margin:0 0 12px;color:var(--dim);font-weight:700;letter-spacing:1.2px;text-transform:uppercase}
@@ -64,7 +66,6 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border:none;border-ra
 .progress > i{display:block;height:100%;width:0;border-radius:4px;
   background:linear-gradient(90deg,#4cc9f0,#7b61ff);transition:width .18s linear}
 
-/* 实时振动 —— 放大版 */
 .meter{height:16px;border-radius:9px;background:#232a36;overflow:hidden;margin-top:16px;position:relative}
 .meter > i{display:block;height:100%;width:0;border-radius:9px;
   background:linear-gradient(90deg,#3ddc97,#ffb020 55%,#ff5470);transition:width .06s linear}
@@ -75,21 +76,29 @@ input[type=range]::-moz-range-thumb{width:20px;height:20px;border:none;border-ra
 canvas.main{width:100%;height:220px;display:block;border-radius:10px}
 canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
 
-.peak{display:flex;align-items:center;gap:12px;background:var(--card2);border:1px solid var(--line);
-  border-radius:12px;padding:11px 12px;margin-bottom:9px;cursor:pointer;transition:border-color .15s,background .15s}
+.peak{background:var(--card2);border:1px solid var(--line);
+  border-radius:12px;padding:11px 12px;margin-bottom:9px;transition:border-color .15s,background .15s}
 .peak:last-child{margin-bottom:0}
 .peak.active{border-color:var(--accent);background:rgba(76,201,240,.09)}
+.peak-head{display:flex;align-items:center;gap:12px;cursor:pointer}
 .peak-rank{width:26px;height:26px;flex:none;border-radius:8px;display:grid;place-items:center;
   font-size:12.5px;font-weight:800;color:#06121a;background:linear-gradient(135deg,#4cc9f0,#7b61ff)}
 .peak-info{flex:1;min-width:0}
 .peak-f{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums}
 .peak-s{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
 .peak-s .tag{color:var(--ok)}
+.peak-live{font-size:12px;margin-top:5px;padding:4px 8px;border-radius:7px;display:none;
+  font-variant-numeric:tabular-nums;font-weight:600}
+.peak-live.show{display:block}
+.peak-live.ok{background:rgba(61,220,151,.12);color:#6ee7b7}
+.peak-live.mid{background:rgba(255,176,32,.12);color:#ffd08a}
+.peak-live.bad{background:rgba(255,84,112,.12);color:#ff9aae}
 .tip{font-size:12px;color:var(--dim);margin-top:10px;line-height:1.6}
-.status{font-size:12.5px;padding:9px 12px;border-radius:10px;margin-bottom:12px;display:none}
+.status{font-size:12.5px;padding:9px 12px;border-radius:10px;margin-bottom:12px;display:none;line-height:1.6}
 .status.show{display:block}
 .status.err{background:rgba(255,84,112,.12);color:#ff9aae;border:1px solid rgba(255,84,112,.3)}
 .status.info{background:rgba(76,201,240,.1);color:#9ddcf5;border:1px solid rgba(76,201,240,.25)}
+.status.good{background:rgba(61,220,151,.1);color:#86efac;border:1px solid rgba(61,220,151,.3)}
 .playing-badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ok)}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:pulse 1.1s infinite}
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
@@ -97,12 +106,15 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
 .step-chip{flex:1;text-align:center;font-size:11.5px;padding:7px 4px;border-radius:9px;
   background:#141922;border:1px solid var(--line);color:var(--dim);font-weight:600}
 .step-chip.on{background:rgba(76,201,240,.13);border-color:rgba(76,201,240,.45);color:var(--accent)}
+.log{font-size:12px;color:var(--dim);line-height:1.8;margin:0;padding-left:16px}
+.log li{margin-bottom:2px}
+.log b{color:#c3ccda}
 </style>
 </head>
 <body>
 
-<h1>📳 手机共振清灰实验</h1>
-<p class="sub">粗扫找峰 → 细化定位 · 娱乐向物理小实验</p>
+<h1>📳 手机共振清灰实验 <span class="ver">v2.1.0</span></h1>
+<p class="sub">粗扫找峰 → 细化定位 → 重播验证 · 娱乐向物理小实验</p>
 
 <div class="card warn">
   <b>⚠️ 先读这段</b><br>
@@ -154,9 +166,9 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
   <h2>运行与实时监测</h2>
 
   <div class="steps">
-    <div class="step-chip on" id="chipCoarse">① 粗扫</div>
+    <div class="step-chip" id="chipCoarse">① 粗扫</div>
     <div class="step-chip" id="chipFine">② 细化</div>
-    <div class="step-chip" id="chipPlay">③ 重播</div>
+    <div class="step-chip" id="chipPlay">③ 重播验证</div>
   </div>
 
   <div class="readout">
@@ -185,8 +197,9 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
     <button class="btn ghost" id="btnClear" disabled>清除结果</button>
   </div>
   <p class="tip">
-    细化逻辑：对每个已找到的峰，在其 ±15% 频率范围内用线性步进（21 点）重新扫一遍，取最大值作为更精确的峰。
-    <b>可以反复点「细化」，每次范围自动收窄到上一次的 35%</b>，越点越准。
+    <b>重播验证</b>：点峰值卡片上的「重播」，页面会一边播放一边实时测量该频率的实际振动强度，
+    并与扫描时记录的值对比。若实测明显偏低，说明这个峰在当前摆放状态下没有复现，建议重新粗扫。
+    <b>细化</b>可以反复点，每次范围收窄到上一次的 35%，越点越准；重播中也可以直接点细化，会自动停止播放。
   </p>
 </div>
 
@@ -205,7 +218,7 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
 <div class="card">
   <h2>局部放大（线性横轴）</h2>
   <canvas class="zoom" id="chartZoom"></canvas>
-  <p class="tip" id="zoomTip">粗扫完成后，点击下方的共振峰卡片，这里会显示该峰附近的细化扫描细节。</p>
+  <p class="tip" id="zoomTip">粗扫完成后，点击下方的共振峰卡片，这里会显示该峰附近的扫描细节。</p>
 </div>
 
 <!-- 峰值 -->
@@ -214,9 +227,25 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
   <div id="peaks"><p class="dim">还没有数据。点击「① 开始粗扫」。</p></div>
 </div>
 
+<!-- 关于 -->
+<div class="card">
+  <h2>关于与更新日志</h2>
+  <p class="dim" style="font-size:12.5px;margin:0 0 8px">
+    手机共振清灰实验 <b style="color:var(--accent)">v2.1.0</b>
+  </p>
+  <ul class="log">
+    <li><b>v2.1.0</b>：重播时实时验证振动强度，显示「实测 / 记录」比例；细化按钮在重播中也可用（自动停止播放）；
+      峰值判定加入信噪比门槛；整体振动过弱时给出明确提示；可切换播放中的峰，再次点击同一峰即停止。</li>
+    <li><b>v2.0.0</b>：粗扫 + 细化两阶段扫描；局部放大图；实时振动曲线；峰值可反复细化。</li>
+    <li><b>v1.0.0</b>：基础扫频与共振峰检测。</li>
+  </ul>
+</div>
+
 <script>
 (function () {
   'use strict';
+
+  const VERSION = '2.1.0';
 
   /* ================= 状态 ================= */
   const state = {
@@ -226,8 +255,12 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
     stepMs: 250, volume: 0.6,
     coarse: [],               // [{f, score}]
     fine: [],                 // [{f, score, peakIndex}]
-    peaks: [],                // [{f, score, range, refined, fineData}]
+    peaks: [],                // [{f, score, range, refined, fineData, snr, lastMeasured}]
     selectedPeak: -1,
+    playingPeakIdx: -1,
+    playMeasured: null,
+    playStartTime: 0,
+    lastPlayMeasure: 0,
     noiseFloor: 0,
     currentF: 0
   };
@@ -293,7 +326,6 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
   let liveRefEff = 0.01;
   let motionAttached = false;
   let motionSeen = false;
-
   const HIST_MAX = 150;
 
   function onMotion(e) {
@@ -407,6 +439,8 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
     state.fine = [];
     state.peaks = [];
     state.selectedPeak = -1;
+    state.playingPeakIdx = -1;
+    state.playMeasured = null;
     renderPeaks();
     updateControls();
     setStatus('', '');
@@ -458,6 +492,7 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
     state.phase = 'fine';
     updateControls();
     setStatus('', '');
+    $('stepReadout').textContent = '细化中…';
 
     const myId = ++sweepId;
     const peaks = state.peaks;
@@ -472,7 +507,6 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
       const freqs = [];
       for (let k = 0; k < STEPS; k++) freqs.push(lo + (hi - lo) * k / (STEPS - 1));
 
-      // 清除该峰旧的细化数据
       state.fine = state.fine.filter(function (d) { return d.peakIndex !== pi; });
 
       const label = '峰 ' + (pi + 1) + '/' + peaks.length;
@@ -487,6 +521,9 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
         p.range = Math.max(0.004, range * 0.35);
         p.refined = true;
         p.fineData = res;
+        p.lastMeasured = null;
+        const nf = Math.max(state.noiseFloor, 1e-6);
+        p.snr = p.score / nf;
         res.forEach(function (r) { state.fine.push({ f: r.f, score: r.score, peakIndex: pi }); });
         state.selectedPeak = pi;
       }
@@ -506,13 +543,22 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
   }
 
   function stopAll() {
+    // 保存重播验证结果
+    if (state.playingPeakIdx >= 0 && state.playMeasured != null) {
+      const p = state.peaks[state.playingPeakIdx];
+      if (p) p.lastMeasured = state.playMeasured;
+    }
+
     sweepId++;
     state.phase = 'idle';
+    state.playingPeakIdx = -1;
+    state.playMeasured = null;
     setGain(0, 0.04);
     updateControls();
     $('stepReadout').textContent = '已停止';
     $('freqReadout').innerHTML = '—<span class="unit"> Hz</span>';
     $('progressBar').style.width = '0%';
+    renderPeaks();
   }
 
   function clearAll() {
@@ -554,16 +600,31 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
       if (sm[i] < minV) minV = sm[i];
     }
 
-    if (maxV < 1e-5 || (maxV - minV) / maxV < 0.3) {
+    // 整体信号过弱：基本不可能是真共振，提示摆放问题
+    if (maxV < 0.015) {
       state.peaks = [];
       renderPeaks(); drawChart(); drawZoom();
-      setStatus('响应曲线比较平坦，没有突出峰值。可以试试加大音量、换波形，或把手机放到更硬的表面。', 'info');
+      setStatus(
+        '整体振动强度极低（最大 ' + maxV.toFixed(4) + '）。手机很可能放在软表面或被手拿着，' +
+        '或者扬声器在这个频段本来就没有多少输出。请把手机平放在硬桌面/玻璃上，适当提高音量后重试。',
+        'err'
+      );
       return;
     }
 
+    if ((maxV - minV) / maxV < 0.3) {
+      state.peaks = [];
+      renderPeaks(); drawChart(); drawZoom();
+      setStatus('响应曲线比较平坦，没有突出峰值。可以试试换波形、加大音量，或把手机放到更硬的表面。', 'info');
+      return;
+    }
+
+    const noise = Math.max(state.noiseFloor, 1e-6);
+    const relTh = Math.max(maxV * 0.45, noise * 2.5);
+
     const cands = [];
     for (let i = 1; i < sm.length - 1; i++) {
-      if (sm[i] > sm[i - 1] && sm[i] >= sm[i + 1] && sm[i] > maxV * 0.4) {
+      if (sm[i] > sm[i - 1] && sm[i] >= sm[i + 1] && sm[i] > relTh) {
         cands.push({ f: res[i].f, score: res[i].score, s: sm[i] });
       }
     }
@@ -582,7 +643,9 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
     state.peaks = top.map(function (p) {
       return {
         f: p.f, score: p.score,
-        range: 0.15, refined: false, fineData: null
+        range: 0.15, refined: false, fineData: null,
+        snr: p.score / noise,
+        lastMeasured: null
       };
     });
     if (state.peaks.length) state.selectedPeak = 0;
@@ -592,37 +655,83 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
     drawZoom();
 
     if (state.peaks.length) {
-      setStatus('找到 ' + state.peaks.length + ' 个疑似共振点。点「② 细化扫描」在峰附近做精细扫描。注意这些通常是结构共振，跟灰尘关系不大 😄', 'info');
+      setStatus('找到 ' + state.peaks.length + ' 个疑似共振点。建议逐个点「重播」验证实测强度——实测明显偏低的峰可能只是噪声波动。也可以直接点「② 细化扫描」继续逼近。', 'info');
     } else {
-      setStatus('没有找到明显峰值。', 'info');
+      setStatus('没有找到明显峰值。可以试试换波形、加大音量，或把手机放到更硬的表面后重扫。', 'info');
     }
   }
 
-  /* ================= 播放 ================= */
-  async function playTone(f) {
+  /* ================= 播放 / 重播验证 ================= */
+  async function playTone(f, peakIdx) {
     await ensureAudio();
-    sweepId++;
+    sweepId++;                       // 中止任何正在进行的扫描
+
     osc.type = state.waveform;
     setFreq(f);
     setGain(state.volume * WAVE_SCALE[state.waveform], 0.06);
+
     state.phase = 'playing';
     state.currentF = f;
+    state.playingPeakIdx = peakIdx;
+    state.playMeasured = null;
+    state.playStartTime = performance.now();
+    state.lastPlayMeasure = 0;
+    liveBuf = [];                    // 清空，保证验证测量只反映当前播放
+
+    if (state.peaks[peakIdx]) state.selectedPeak = peakIdx;
+
     $('freqReadout').innerHTML = fmtFreq(f) + '<span class="unit"> Hz</span>';
-    $('stepReadout').innerHTML = '<span class="playing-badge"><i class="dot"></i>持续播放中</span>';
+    $('stepReadout').innerHTML = '<span class="playing-badge"><i class="dot"></i>重播验证中</span>';
     $('progressBar').style.width = '100%';
     updateControls();
+    renderPeaks();
+    drawZoom();
+    setStatus('正在播放并实时验证该频率的振动强度。请保持手机平放在硬桌面上，约 1 秒后出结果。', 'info');
+  }
+
+  function updateLivePeak() {
+    const idx = state.playingPeakIdx;
+    if (idx < 0) return;
+    const el = document.querySelector('.peak[data-idx="' + idx + '"] .peak-live');
+    if (!el) return;
+
+    if (state.playMeasured == null) {
+      el.className = 'peak-live';
+      el.textContent = '';
+      return;
+    }
+
+    const p = state.peaks[idx];
+    const ratio = p && p.score > 0 ? state.playMeasured / p.score : 0;
+    const pct = Math.min(999, Math.round(ratio * 100));
+
+    let cls = 'ok';
+    let extra = '';
+    if (ratio < 0.3) {
+      cls = 'bad';
+      extra = ' · 未复现，建议重扫';
+    } else if (ratio < 0.6) {
+      cls = 'mid';
+      extra = ' · 偏弱';
+    }
+
+    el.className = 'peak-live show ' + cls;
+    el.textContent = '实测 ' + state.playMeasured.toFixed(4) + ' / 记录 ' + p.score.toFixed(4) +
+      ' · ' + pct + '%' + extra;
   }
 
   /* ================= UI ================= */
   function updateControls() {
-    const busy = state.phase !== 'idle';
-    $('btnCoarse').disabled = busy;
-    $('btnFine').disabled = busy || !state.peaks.length;
-    $('btnStop').disabled = !busy;
-    $('btnClear').disabled = busy;
+    const sweeping = state.phase === 'coarse' || state.phase === 'fine';
+    $('btnCoarse').disabled = sweeping;
+    $('btnFine').disabled = sweeping || !state.peaks.length;
+    $('btnStop').disabled = state.phase === 'idle';
+    $('btnClear').disabled = sweeping;
 
-    $('chipCoarse').className = 'step-chip' + (state.phase === 'coarse' ? ' on' : (state.coarse.length ? ' on' : ''));
-    $('chipFine').className = 'step-chip' + (state.phase === 'fine' ? ' on' : (state.fine.length ? ' on' : ''));
+    $('chipCoarse').className = 'step-chip' +
+      ((state.phase === 'coarse' || (state.coarse.length && state.phase !== 'fine')) ? ' on' : '');
+    $('chipFine').className = 'step-chip' +
+      ((state.phase === 'fine' || state.fine.length) ? ' on' : '');
     $('chipPlay').className = 'step-chip' + (state.phase === 'playing' ? ' on' : '');
   }
 
@@ -650,17 +759,41 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
       el.innerHTML = '<p class="dim">未检测到明显共振峰。</p>';
       return;
     }
+
     el.innerHTML = peaks.map(function (p, i) {
       const active = i === state.selectedPeak ? ' active' : '';
-      const tag = p.refined ? '<span class="tag">已细化</span> · 范围 ±' + (p.range * 100).toFixed(1) + '% · ' : '';
+      const tagParts = [];
+      if (p.refined) tagParts.push('<span class="tag">已细化</span>');
+      tagParts.push('范围 ±' + (p.range * 100).toFixed(1) + '%');
+      const snrTxt = isFinite(p.snr) ? ' · 信噪比 ' + p.snr.toFixed(1) : '';
+      const isPlaying = i === state.playingPeakIdx && state.phase === 'playing';
+      const btnTxt = isPlaying ? '停止' : '重播';
+
+      // 历史实测（非播放中时展示）
+      let liveHtml = '';
+      if (!isPlaying && p.lastMeasured != null) {
+        const ratio = p.score > 0 ? p.lastMeasured / p.score : 0;
+        const pct = Math.min(999, Math.round(ratio * 100));
+        let cls = 'ok', extra = '';
+        if (ratio < 0.3) { cls = 'bad'; extra = ' · 未复现'; }
+        else if (ratio < 0.6) { cls = 'mid'; extra = ' · 偏弱'; }
+        liveHtml = '<div class="peak-live show ' + cls + '">上次实测 ' + p.lastMeasured.toFixed(4) +
+          ' / 记录 ' + p.score.toFixed(4) + ' · ' + pct + '%' + extra + '</div>';
+      } else if (isPlaying) {
+        liveHtml = '<div class="peak-live show mid">实测中…</div>';
+      }
+
       return '' +
         '<div class="peak' + active + '" data-idx="' + i + '">' +
-          '<div class="peak-rank">#' + (i + 1) + '</div>' +
-          '<div class="peak-info">' +
-            '<div class="peak-f">' + fmtFreq(p.f) + ' Hz</div>' +
-            '<div class="peak-s">' + tag + '强度 ' + p.score.toFixed(4) + '</div>' +
+          '<div class="peak-head" data-select="' + i + '">' +
+            '<div class="peak-rank">#' + (i + 1) + '</div>' +
+            '<div class="peak-info">' +
+              '<div class="peak-f">' + fmtFreq(p.f) + ' Hz</div>' +
+              '<div class="peak-s">' + tagParts.join(' · ') + ' · 强度 ' + p.score.toFixed(4) + snrTxt + '</div>' +
+            '</div>' +
+            '<button class="btn tiny" data-play="' + i + '">' + btnTxt + '</button>' +
           '</div>' +
-          '<button class="btn tiny" data-play="' + p.f + '">重播</button>' +
+          liveHtml +
         '</div>';
     }).join('');
   }
@@ -690,7 +823,6 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
       return H - 3 - Math.min(1, v / ref) * (H - 8);
     };
 
-    // 面积
     sctx.beginPath();
     sctx.moveTo(W - (n - 1) * step, H);
     for (let i = 0; i < n; i++) {
@@ -704,7 +836,6 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
     sctx.fillStyle = grd;
     sctx.fill();
 
-    // 折线
     sctx.beginPath();
     for (let i = 0; i < n; i++) {
       const x = W - (n - 1 - i) * step;
@@ -749,7 +880,6 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
       return padL + ((Math.log10(f) - f0) / (f1 - f0)) * plotW;
     };
 
-    // 网格
     const gridF = [20, 30, 50, 70, 100, 200, 300, 500, 700, 1000, 1500, 2000, 3000, 4000];
     ctx2d.font = '10px -apple-system,system-ui,sans-serif';
     ctx2d.textAlign = 'center';
@@ -788,7 +918,6 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
     if (maxScore <= 0) maxScore = 1e-6;
     const yMax = maxScore * 1.2;
 
-    // 粗扫柱
     const res = state.coarse;
     for (let i = 0; i < res.length; i++) {
       const x = xOf(res[i].f);
@@ -805,7 +934,6 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
       ctx2d.fillRect(x, padT + plotH - h, bw, h);
     }
 
-    // 细化柱（更亮更细）
     for (let i = 0; i < state.fine.length; i++) {
       const f = state.fine[i].f, sc = state.fine[i].score;
       const x = xOf(f);
@@ -814,7 +942,6 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
       ctx2d.fillRect(x - 1.2, padT + plotH - h, 2.4, h);
     }
 
-    // 峰值标记
     (state.peaks || []).forEach(function (p, idx) {
       const x = xOf(p.f);
       const y = padT + plotH - (p.score / yMax) * plotH;
@@ -908,7 +1035,6 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
       return padL + ((f - lo) / (hi - lo)) * plotW;
     };
 
-    // 横轴刻度（5 个）
     zctx.font = '10px -apple-system,system-ui,sans-serif';
     zctx.textAlign = 'center';
     zctx.textBaseline = 'top';
@@ -924,7 +1050,6 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
       zctx.fillText(fmtFreq(f), x, padT + plotH + 6);
     }
 
-    // 柱
     const n = data.length;
     const bw = Math.max(3, plotW / n * 0.7);
     for (let i = 0; i < n; i++) {
@@ -938,7 +1063,6 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
       zctx.fillRect(x - bw / 2, padT + plotH - h, bw, h);
     }
 
-    // 峰位置竖线
     if (p) {
       const x = xOf(p.f);
       zctx.strokeStyle = 'rgba(76,201,240,0.85)';
@@ -980,6 +1104,19 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
     $('meterVal').textContent = liveNow.toFixed(4);
     $('meterRef').textContent = '参考 ' + ref.toFixed(4);
     drawSpark();
+
+    // 重播验证：播放约 1 秒后开始测量，指数平滑
+    if (state.phase === 'playing' && state.playingPeakIdx >= 0) {
+      const elapsed = performance.now() - state.playStartTime;
+      if (elapsed > 900 && ts - state.lastPlayMeasure > 300) {
+        state.lastPlayMeasure = ts;
+        const v = Math.max(0, std(liveBuf) - state.noiseFloor * 0.8);
+        state.playMeasured = (state.playMeasured == null)
+          ? v
+          : state.playMeasured * 0.55 + v * 0.45;
+        updateLivePeak();
+      }
+    }
   }
   requestAnimationFrame(uiLoop);
 
@@ -1017,7 +1154,8 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
   });
 
   $('btnCoarse').addEventListener('click', async function () {
-    if (state.phase !== 'idle') return;
+    if (state.phase === 'coarse' || state.phase === 'fine') return;
+    if (state.phase === 'playing') stopAll();
 
     if (!motionAttached) {
       const ok = await ensureMotionPermission();
@@ -1038,22 +1176,40 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
     await startCoarse();
   });
 
-  $('btnFine').addEventListener('click', function () { startFine(); });
+  $('btnFine').addEventListener('click', function () {
+    if (state.phase === 'coarse' || state.phase === 'fine') return;
+    if (state.phase === 'playing') stopAll();   // 重播中直接细化：自动停止播放
+    startFine();
+  });
 
   $('btnStop').addEventListener('click', function () {
     stopAll();
   });
 
   $('btnClear').addEventListener('click', function () {
+    if (state.phase === 'coarse' || state.phase === 'fine') return;
     clearAll();
   });
 
+  // 峰值卡片：选择 / 重播 / 停止
   $('peaks').addEventListener('click', function (e) {
     const playBtn = e.target.closest('[data-play]');
-    if (playBtn) { playTone(parseFloat(playBtn.dataset.play)); return; }
-    const card = e.target.closest('.peak');
-    if (card) {
-      state.selectedPeak = parseInt(card.dataset.idx, 10);
+    if (playBtn) {
+      const idx = parseInt(playBtn.dataset.play, 10);
+      const p = state.peaks[idx];
+      if (!p) return;
+
+      if (state.phase === 'playing' && state.playingPeakIdx === idx) {
+        stopAll();                 // 再点一次同一峰 → 停止
+      } else {
+        playTone(p.f, idx);        // 换峰或首次播放
+      }
+      return;
+    }
+
+    const head = e.target.closest('[data-select]');
+    if (head) {
+      state.selectedPeak = parseInt(head.dataset.select, 10);
       renderPeaks();
       drawZoom();
     }
@@ -1075,6 +1231,7 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
   });
   drawChart();
   drawZoom();
+  updateControls();
 })();
 </script>
 </body>
