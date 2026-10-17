@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#0f1115">
-<title>手机共振清灰实验 v2.1.0</title>
+<title>手机共振清灰实验 v2.1.1</title>
 <style>
 :root{
   --bg:#0f1115; --card:#181c24; --card2:#1f2530; --line:#2a3140;
@@ -109,11 +109,13 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
 .log{font-size:12px;color:var(--dim);line-height:1.8;margin:0;padding-left:16px}
 .log li{margin-bottom:2px}
 .log b{color:#c3ccda}
+.diag{font-size:11.5px;color:var(--dim);margin-top:6px;line-height:1.7}
+.diag b{color:#c3ccda;font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
 
-<h1>📳 手机共振清灰实验 <span class="ver">v2.1.0</span></h1>
+<h1>📳 手机共振清灰实验 <span class="ver">v2.1.1</span></h1>
 <p class="sub">粗扫找峰 → 细化定位 → 重播验证 · 娱乐向物理小实验</p>
 
 <div class="card warn">
@@ -231,9 +233,11 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
 <div class="card">
   <h2>关于与更新日志</h2>
   <p class="dim" style="font-size:12.5px;margin:0 0 8px">
-    手机共振清灰实验 <b style="color:var(--accent)">v2.1.0</b>
+    手机共振清灰实验 <b style="color:var(--accent)">v2.1.1</b>
   </p>
   <ul class="log">
+    <li><b>v2.1.1</b>：修复粗扫完成后「细化扫描」按钮保持禁用的 bug；大幅放宽峰值判定阈值，信号较弱时退化为取最高点，
+      确保有信号就能进入细化；信号过弱时给出明确的噪声/信噪比诊断；局部放大空状态提示更明显。</li>
     <li><b>v2.1.0</b>：重播时实时验证振动强度，显示「实测 / 记录」比例；细化按钮在重播中也可用（自动停止播放）；
       峰值判定加入信噪比门槛；整体振动过弱时给出明确提示；可切换播放中的峰，再次点击同一峰即停止。</li>
     <li><b>v2.0.0</b>：粗扫 + 细化两阶段扫描；局部放大图；实时振动曲线；峰值可反复细化。</li>
@@ -245,7 +249,7 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
 (function () {
   'use strict';
 
-  const VERSION = '2.1.0';
+  const VERSION = '2.1.1';
 
   /* ================= 状态 ================= */
   const state = {
@@ -253,16 +257,17 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
     waveform: 'sine',
     startF: 30, endF: 1200,
     stepMs: 250, volume: 0.6,
-    coarse: [],               // [{f, score}]
-    fine: [],                 // [{f, score, peakIndex}]
-    peaks: [],                // [{f, score, range, refined, fineData, snr, lastMeasured}]
+    coarse: [],
+    fine: [],
+    peaks: [],
     selectedPeak: -1,
     playingPeakIdx: -1,
     playMeasured: null,
     playStartTime: 0,
     lastPlayMeasure: 0,
     noiseFloor: 0,
-    currentF: 0
+    currentF: 0,
+    lastDiagnostic: null
   };
 
   const WAVE_SCALE = { sine: 1.0, triangle: 0.92, square: 0.5, sawtooth: 0.65 };
@@ -441,6 +446,7 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
     state.selectedPeak = -1;
     state.playingPeakIdx = -1;
     state.playMeasured = null;
+    state.lastDiagnostic = null;
     renderPeaks();
     updateControls();
     setStatus('', '');
@@ -475,10 +481,11 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
 
     state.coarse = res;
     state.phase = 'idle';
-    updateControls();
     $('stepReadout').textContent = '粗扫完成 · ' + res.length + ' 点';
     setGain(0, 0.03);
+
     analyze();
+    updateControls();   // ← 关键修复：确保细化按钮状态跟随 peaks 更新
   }
 
   async function startFine() {
@@ -543,7 +550,6 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
   }
 
   function stopAll() {
-    // 保存重播验证结果
     if (state.playingPeakIdx >= 0 && state.playMeasured != null) {
       const p = state.peaks[state.playingPeakIdx];
       if (p) p.lastMeasured = state.playMeasured;
@@ -568,6 +574,7 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
     state.peaks = [];
     state.selectedPeak = -1;
     state.noiseFloor = 0;
+    state.lastDiagnostic = null;
     renderPeaks();
     drawChart();
     drawZoom();
@@ -575,11 +582,14 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
     $('stepReadout').textContent = '待机';
   }
 
-  /* ================= 峰值分析 ================= */
+  /* ================= 峰值分析（v2.1.1 大幅放宽） ================= */
   function analyze() {
     const res = state.coarse;
+    const noise = Math.max(state.noiseFloor, 1e-6);
+
     if (res.length < 6) {
       state.peaks = [];
+      state.lastDiagnostic = null;
       renderPeaks(); drawChart(); drawZoom();
       setStatus('数据太少，无法分析。', 'info');
       return;
@@ -594,50 +604,68 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
       return s / c;
     });
 
-    let maxV = 0, minV = Infinity;
+    let maxV = 0, minV = Infinity, maxIdx = 0;
     for (let i = 0; i < sm.length; i++) {
-      if (sm[i] > maxV) maxV = sm[i];
+      if (sm[i] > maxV) { maxV = sm[i]; maxIdx = i; }
       if (sm[i] < minV) minV = sm[i];
     }
 
-    // 整体信号过弱：基本不可能是真共振，提示摆放问题
-    if (maxV < 0.015) {
+    const sigSnr = maxV / noise;
+    const dyn = maxV > 0 ? (maxV - Math.max(minV, 0)) / maxV : 0;
+
+    state.lastDiagnostic = {
+      maxV: maxV, noise: noise, sigSnr: sigSnr, dyn: dyn, points: res.length, maxIdx: maxIdx
+    };
+
+    // 硬拒绝：信号完全淹没在噪声里
+    if (maxV < noise * 1.05) {
       state.peaks = [];
       renderPeaks(); drawChart(); drawZoom();
       setStatus(
-        '整体振动强度极低（最大 ' + maxV.toFixed(4) + '）。手机很可能放在软表面或被手拿着，' +
-        '或者扬声器在这个频段本来就没有多少输出。请把手机平放在硬桌面/玻璃上，适当提高音量后重试。',
+        '整体信号太弱：最大振动 ' + maxV.toFixed(4) + '，噪声基底 ' + noise.toFixed(4) +
+        '（信噪比 ' + sigSnr.toFixed(2) + '）。手机很可能放在软表面或被手拿着，或扬声器此频段无输出。' +
+        '请把手机平放在硬桌面/玻璃上，音量调到 70~85% 后重扫。',
         'err'
       );
       return;
     }
 
-    if ((maxV - minV) / maxV < 0.3) {
-      state.peaks = [];
-      renderPeaks(); drawChart(); drawZoom();
-      setStatus('响应曲线比较平坦，没有突出峰值。可以试试换波形、加大音量，或把手机放到更硬的表面。', 'info');
-      return;
-    }
-
-    const noise = Math.max(state.noiseFloor, 1e-6);
-    const relTh = Math.max(maxV * 0.45, noise * 2.5);
+    // 峰值阈值：相对最大值 30%，且必须高于噪声 1.5 倍
+    const relTh = Math.max(maxV * 0.30, noise * 1.5);
 
     const cands = [];
     for (let i = 1; i < sm.length - 1; i++) {
       if (sm[i] > sm[i - 1] && sm[i] >= sm[i + 1] && sm[i] > relTh) {
-        cands.push({ f: res[i].f, score: res[i].score, s: sm[i] });
+        cands.push({ f: res[i].f, score: res[i].score, s: sm[i], idx: i });
       }
     }
     cands.sort(function (a, b) { return b.s - a.s; });
 
     const top = [];
     for (let i = 0; i < cands.length && top.length < 3; i++) {
-      const p = cands[i];
+      const c = cands[i];
       let ok = true;
       for (let j = 0; j < top.length; j++) {
-        if (Math.abs(Math.log2(top[j].f / p.f)) < 0.18) { ok = false; break; }
+        if (Math.abs(Math.log2(top[j].f / c.f)) < 0.18) { ok = false; break; }
       }
-      if (ok) top.push(p);
+      if (ok) top.push(c);
+    }
+
+    // 退化：没有明显局部极大时，取平滑后最高点，保证细化可用
+    if (top.length === 0) {
+      const order = res.map(function (r, i) {
+        return { f: r.f, score: r.score, s: sm[i], idx: i };
+      }).sort(function (a, b) { return b.s - a.s; });
+
+      for (let i = 0; i < order.length && top.length < 3; i++) {
+        const it = order[i];
+        if (it.s < noise) break;
+        let ok = true;
+        for (let j = 0; j < top.length; j++) {
+          if (Math.abs(Math.log2(top[j].f / it.f)) < 0.18) { ok = false; break; }
+        }
+        if (ok) top.push(it);
+      }
     }
 
     state.peaks = top.map(function (p) {
@@ -655,16 +683,24 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
     drawZoom();
 
     if (state.peaks.length) {
-      setStatus('找到 ' + state.peaks.length + ' 个疑似共振点。建议逐个点「重播」验证实测强度——实测明显偏低的峰可能只是噪声波动。也可以直接点「② 细化扫描」继续逼近。', 'info');
+      let msg = '找到 ' + state.peaks.length + ' 个候选点（信噪比 ' + sigSnr.toFixed(1) + '）。';
+      if (sigSnr < 2) {
+        msg += '信号偏弱，候选可能包含噪声波动，建议逐个点「重播」验证实测强度。';
+      } else if (dyn < 0.3) {
+        msg += '曲线偏平坦，这些候选可能不显著，建议点「重播」验证。';
+      } else {
+        msg += '建议点「重播」验证实测强度，或点「② 细化扫描」继续逼近。';
+      }
+      setStatus(msg, 'info');
     } else {
-      setStatus('没有找到明显峰值。可以试试换波形、加大音量，或把手机放到更硬的表面后重扫。', 'info');
+      setStatus('没有找到可用候选点。请提高音量、把手机放到更硬的表面，或换一种波形后重扫。', 'err');
     }
   }
 
   /* ================= 播放 / 重播验证 ================= */
   async function playTone(f, peakIdx) {
     await ensureAudio();
-    sweepId++;                       // 中止任何正在进行的扫描
+    sweepId++;
 
     osc.type = state.waveform;
     setFreq(f);
@@ -676,7 +712,7 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
     state.playMeasured = null;
     state.playStartTime = performance.now();
     state.lastPlayMeasure = 0;
-    liveBuf = [];                    // 清空，保证验证测量只反映当前播放
+    liveBuf = [];
 
     if (state.peaks[peakIdx]) state.selectedPeak = peakIdx;
 
@@ -756,7 +792,15 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
     const el = $('peaks');
     const peaks = state.peaks || [];
     if (!peaks.length) {
-      el.innerHTML = '<p class="dim">未检测到明显共振峰。</p>';
+      const d = state.lastDiagnostic;
+      let html = '<p class="dim">未检测到明显共振峰。</p>';
+      if (d) {
+        html += '<div class="diag">最大振动 <b>' + d.maxV.toFixed(4) + '</b>' +
+          ' · 噪声基底 <b>' + d.noise.toFixed(4) + '</b>' +
+          ' · 信噪比 <b>' + d.sigSnr.toFixed(2) + '</b>' +
+          ' · 动态范围 <b>' + (d.dyn * 100).toFixed(0) + '%</b></div>';
+      }
+      el.innerHTML = html;
       return;
     }
 
@@ -769,7 +813,6 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
       const isPlaying = i === state.playingPeakIdx && state.phase === 'playing';
       const btnTxt = isPlaying ? '停止' : '重播';
 
-      // 历史实测（非播放中时展示）
       let liveHtml = '';
       if (!isPlaying && p.lastMeasured != null) {
         const ratio = p.score > 0 ? p.lastMeasured / p.score : 0;
@@ -1012,8 +1055,8 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
     zctx.stroke();
 
     if (!data || data.length < 2) {
-      zctx.fillStyle = '#4a5568';
-      zctx.font = '12px -apple-system,system-ui,sans-serif';
+      zctx.fillStyle = '#6b7688';
+      zctx.font = '12.5px -apple-system,system-ui,sans-serif';
       zctx.textAlign = 'center';
       zctx.textBaseline = 'middle';
       zctx.fillText(p ? '点「② 细化扫描」查看该峰细节' : '先做粗扫，再点击下方的共振峰卡片', W / 2, H / 2);
@@ -1105,7 +1148,6 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
     $('meterRef').textContent = '参考 ' + ref.toFixed(4);
     drawSpark();
 
-    // 重播验证：播放约 1 秒后开始测量，指数平滑
     if (state.phase === 'playing' && state.playingPeakIdx >= 0) {
       const elapsed = performance.now() - state.playStartTime;
       if (elapsed > 900 && ts - state.lastPlayMeasure > 300) {
@@ -1178,7 +1220,7 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
 
   $('btnFine').addEventListener('click', function () {
     if (state.phase === 'coarse' || state.phase === 'fine') return;
-    if (state.phase === 'playing') stopAll();   // 重播中直接细化：自动停止播放
+    if (state.phase === 'playing') stopAll();
     startFine();
   });
 
@@ -1191,7 +1233,6 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
     clearAll();
   });
 
-  // 峰值卡片：选择 / 重播 / 停止
   $('peaks').addEventListener('click', function (e) {
     const playBtn = e.target.closest('[data-play]');
     if (playBtn) {
@@ -1200,9 +1241,9 @@ canvas.zoom{width:100%;height:170px;display:block;border-radius:10px}
       if (!p) return;
 
       if (state.phase === 'playing' && state.playingPeakIdx === idx) {
-        stopAll();                 // 再点一次同一峰 → 停止
+        stopAll();
       } else {
-        playTone(p.f, idx);        // 换峰或首次播放
+        playTone(p.f, idx);
       }
       return;
     }
