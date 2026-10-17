@@ -149,18 +149,76 @@
   }
   .quality-note.warn { color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.3); }
 
+  /* ===== 波形区域 ===== */
   .waveform-wrap {
     background: var(--panel);
     border-radius: 14px;
     padding: 12px;
     margin-bottom: 20px;
+    position: relative;
   }
+  .waveform-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .window-btns { display: flex; gap: 6px; flex: 1; }
+  .win-btn {
+    flex: 1;
+    padding: 6px 0;
+    background: transparent;
+    border: 1px solid #334155;
+    color: var(--muted);
+    border-radius: 8px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .win-btn.selected {
+    background: rgba(56, 189, 248, 0.15);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .fullscreen-btn {
+    background: transparent;
+    border: 1px solid #334155;
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 14px;
+    cursor: pointer;
+    line-height: 1;
+  }
+
   #waveform {
     width: 100%;
     height: 240px;
     display: block;
     border-radius: 8px;
     background: #0b1220;
+    touch-action: none;
+    cursor: default;
+  }
+  #waveform.grabbable { cursor: grab; }
+  #waveform.grabbing { cursor: grabbing; }
+
+  /* 全屏模式 */
+  .waveform-wrap.fullscreen {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    border-radius: 0;
+    background: var(--bg);
+    padding: 16px 12px;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .waveform-wrap.fullscreen .waveform-toolbar { margin-bottom: 12px; }
+  .waveform-wrap.fullscreen #waveform {
+    flex: 1;
+    height: auto;
+    min-height: 0;
   }
 
   .btn-row { display: flex; gap: 12px; margin-top: auto; }
@@ -305,7 +363,16 @@
 
     <div class="quality-note" id="qualityNote">正在分析...</div>
 
-    <div class="waveform-wrap">
+    <div class="waveform-wrap" id="waveformWrap">
+      <div class="waveform-toolbar">
+        <div class="window-btns" id="windowBtns">
+          <button class="win-btn selected" data-win="0">全部</button>
+          <button class="win-btn" data-win="20">20s</button>
+          <button class="win-btn" data-win="10">10s</button>
+          <button class="win-btn" data-win="5">5s</button>
+        </div>
+        <button class="fullscreen-btn" id="fullscreenBtn" title="全屏查看">⛶</button>
+      </div>
       <canvas id="waveform"></canvas>
     </div>
 
@@ -338,7 +405,7 @@
 /* ============================================================
  * 版本信息
  * ============================================================ */
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.2.0';
 const BUILD_DATE  = '2026-10-17';
 document.getElementById('version').textContent = `v${APP_VERSION} · ${BUILD_DATE}`;
 
@@ -885,21 +952,17 @@ function detectHeartRate(signal, ts) {
     return { bpm: 0, quality: '样本不足', peakCount: 0 };
   }
 
-  // 1. 平滑
   const smoothed = movingAverage(signal, 5);
 
-  // 2. 统计量
   const mean = average(smoothed);
   const std  = stddev(smoothed, mean);
   if (std < 1e-6) {
     return { bpm: 0, quality: '信号过弱', peakCount: 0 };
   }
 
-  // 3. 严格阈值
   const highTh = mean + 0.7 * std;
   const lowTh  = mean + 0.2 * std;
 
-  // 4. 峰值检测 + 最小间隔约束
   const peaks = [];
   let above = false;
   let lastPeakT = -Infinity;
@@ -923,7 +986,6 @@ function detectHeartRate(signal, ts) {
     };
   }
 
-  // 5. 间隔统计 + IQR 剔除
   const rawIntervals = [];
   for (let i = 1; i < peaks.length; i++) {
     rawIntervals.push((peaks[i] - peaks[i - 1]) / 1000);
@@ -938,7 +1000,6 @@ function detectHeartRate(signal, ts) {
     };
   }
 
-  // 6. 中位数 BPM + 变异系数
   const medInterval = median(cleanIntervals);
   const bpmPeak = 60 / medInterval;
 
@@ -946,10 +1007,8 @@ function detectHeartRate(signal, ts) {
   const stdInterval  = stddev(cleanIntervals, meanInterval);
   const cv = meanInterval > 0 ? stdInterval / meanInterval : 1;
 
-  // 7. 自相关交叉验证
   const bpmAutocorr = autocorrelationBpm(signal, ts);
 
-  // 8. 综合决策
   let finalBpm = bpmPeak;
   let quality = '良好';
   let note = '';
@@ -998,12 +1057,16 @@ function detectHeartRate(signal, ts) {
 /* ============================================================
  * 结果渲染
  * ============================================================ */
+let lastResult = null;
+const waveView = { windowSec: 0, startSec: 0 };
+
 function renderResult(result) {
   const breathEl = document.getElementById('breathValue');
   const heartEl  = document.getElementById('heartValue');
   const qualityEl = document.getElementById('qualityNote');
 
   if (!result.ok) {
+    lastResult = null;
     breathEl.textContent = '--';
     heartEl.textContent  = '--';
     qualityEl.textContent = result.error;
@@ -1012,6 +1075,11 @@ function renderResult(result) {
     ctx.clearRect(0, 0, 9999, 9999);
     return;
   }
+
+  lastResult = result;
+  waveView.windowSec = 0;
+  waveView.startSec = 0;
+  updateWindowBtns();
 
   breathEl.textContent = result.breathRate > 0 ? result.breathRate : '--';
   heartEl.textContent  = result.heartRate  > 0 ? result.heartRate  : '--';
@@ -1031,34 +1099,69 @@ function renderResult(result) {
       baseInfo + ` 心率信号质量较低（${q}）。${n}建议重新放置手机后重测。`;
   }
 
-  drawWaveforms(result.breathSignal, result.heartSignal);
+  drawWaveforms();
 }
 
 /* ============================================================
- * 波形绘制
+ * 波形绘制（含时间窗口与拖动）
  * ============================================================ */
-function drawWaveforms(breathSignal, heartSignal) {
+function updateWindowBtns() {
+  document.querySelectorAll('#windowBtns .win-btn').forEach(b => {
+    const win = parseInt(b.dataset.win, 10) || 0;
+    b.classList.toggle('selected', win === waveView.windowSec);
+  });
+  const canvas = document.getElementById('waveform');
+  canvas.classList.toggle('grabbable', waveView.windowSec > 0);
+}
+
+function clampView() {
+  if (!lastResult || !lastResult.ok) { waveView.startSec = 0; return; }
+  const dur = lastResult.duration;
+  if (waveView.windowSec <= 0) { waveView.startSec = 0; return; }
+  const win = Math.min(waveView.windowSec, dur);
+  waveView.startSec = Math.max(0, Math.min(waveView.startSec, dur - win));
+}
+
+function computeViewRange() {
+  const ts = lastResult.ts;
+  const n = ts.length;
+  const t0 = ts[0];
+  const t1 = ts[n - 1];
+  const duration = (t1 - t0) / 1000;
+
+  let win = waveView.windowSec > 0 ? Math.min(waveView.windowSec, duration) : duration;
+  let start = waveView.windowSec > 0 ? waveView.startSec : 0;
+  start = Math.max(0, Math.min(start, duration - win));
+
+  const targetStart = t0 + start * 1000;
+  const targetEnd   = t0 + (start + win) * 1000;
+
+  let i0 = 0, i1 = n - 1;
+  for (let i = 0; i < n; i++) { if (ts[i] >= targetStart) { i0 = i; break; } }
+  for (let i = n - 1; i >= 0; i--) { if (ts[i] <= targetEnd) { i1 = i; break; } }
+  if (i1 <= i0) { i0 = 0; i1 = n - 1; }
+  return { i0, i1, duration, viewStart: start, viewEnd: start + win };
+}
+
+function drawWaveforms() {
+  if (!lastResult || !lastResult.ok) return;
+
   const canvas = document.getElementById('waveform');
   const rect = canvas.getBoundingClientRect();
-
-  // 尺寸兜底：避免父元素 display:none 时拿到 0
-  const cssW = rect.width  || canvas.clientWidth || canvas.parentElement.clientWidth  || 320;
-  const cssH = rect.height || canvas.clientHeight || 240;
+  const cssW = rect.width  || canvas.clientWidth || 320;
+  const cssH = rect.height || 240;
   const dpr = window.devicePixelRatio || 1;
 
   canvas.width  = Math.round(cssW * dpr);
   canvas.height = Math.round(cssH * dpr);
-  canvas.style.height = cssH + 'px';
 
   const ctx = canvas.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  const W = cssW;
-  const H = cssH;
-  const halfH = H / 2;
-
+  const W = cssW, H = cssH, halfH = H / 2;
   ctx.clearRect(0, 0, W, H);
 
+  // 中线
   ctx.strokeStyle = '#1e293b';
   ctx.lineWidth = 1;
   ctx.beginPath();
@@ -1066,38 +1169,53 @@ function drawWaveforms(breathSignal, heartSignal) {
   ctx.lineTo(W, halfH);
   ctx.stroke();
 
-  drawSignal(ctx, breathSignal, 0, 0,     W, halfH, '#4ade80', '呼吸波形');
-  drawSignal(ctx, heartSignal,  0, halfH, W, halfH, '#f87171', '心跳波形');
+  const range = computeViewRange();
+
+  drawSignal(ctx, lastResult.breathSignal, range.i0, range.i1, 0, 0,     W, halfH, '#4ade80', '呼吸波形');
+  drawSignal(ctx, lastResult.heartSignal,  range.i0, range.i1, 0, halfH, W, halfH, '#f87171', '心跳波形');
+
+  // 时间标签
+  ctx.fillStyle = '#64748b';
+  ctx.font = '11px -apple-system, sans-serif';
+  const label = waveView.windowSec > 0
+    ? `${range.viewStart.toFixed(1)}s – ${range.viewEnd.toFixed(1)}s / 共 ${range.duration.toFixed(1)}s`
+    : `全部 ${range.duration.toFixed(1)}s`;
+  const tw = ctx.measureText(label).width;
+  ctx.fillText(label, W - tw - 8, H - 6);
 
   log('render', '波形已绘制', {
-    canvasW: canvas.width,
-    canvasH: canvas.height,
-    dpr,
-    breathLen: breathSignal ? breathSignal.length : 0,
-    heartLen: heartSignal ? heartSignal.length : 0
+    canvasW: canvas.width, canvasH: canvas.height, dpr,
+    windowSec: waveView.windowSec,
+    visibleSamples: range.i1 - range.i0 + 1
   });
 }
 
-function drawSignal(ctx, signal, x0, y0, w, h, color, label) {
-  if (!signal || signal.length < 2) return;
+function drawSignal(ctx, signal, i0, i1, x0, y0, w, h, color, label) {
+  if (!signal || i1 - i0 < 1) return;
 
-  const min = arrayMin(signal);
-  const max = arrayMax(signal);
-  const range = max - min || 1;
+  // 窗口内局部归一化
+  let min = Infinity, max = -Infinity;
+  for (let i = i0; i <= i1; i++) {
+    if (signal[i] < min) min = signal[i];
+    if (signal[i] > max) max = signal[i];
+  }
+  const range = (max - min) || 1;
 
   const padTop = 22;
-  const padBottom = 12;
+  const padBottom = 18;
   const plotH = h - padTop - padBottom;
 
   ctx.strokeStyle = color;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
 
-  for (let i = 0; i < signal.length; i++) {
-    const x = x0 + (i / (signal.length - 1)) * w;
+  const count = i1 - i0;
+  for (let k = 0; k <= count; k++) {
+    const i = i0 + k;
+    const x = x0 + (k / count) * w;
     const norm = (signal[i] - min) / range;
     const y = y0 + padTop + (1 - norm) * plotH;
-    if (i === 0) ctx.moveTo(x, y);
+    if (k === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
   }
   ctx.stroke();
@@ -1108,10 +1226,115 @@ function drawSignal(ctx, signal, x0, y0, w, h, color, label) {
 }
 
 /* ============================================================
+ * 波形交互：窗口切换 / 拖动 / 全屏
+ * ============================================================ */
+const waveformWrap = document.getElementById('waveformWrap');
+const fullscreenBtn = document.getElementById('fullscreenBtn');
+const canvasEl = document.getElementById('waveform');
+
+document.getElementById('windowBtns').addEventListener('click', e => {
+  const btn = e.target.closest('.win-btn');
+  if (!btn) return;
+  const win = parseInt(btn.dataset.win, 10) || 0;
+  waveView.windowSec = win;
+  if (lastResult && lastResult.ok) {
+    if (win > 0) {
+      // 居中显示
+      waveView.startSec = Math.max(0, (lastResult.duration - win) / 2);
+    } else {
+      waveView.startSec = 0;
+    }
+  }
+  clampView();
+  updateWindowBtns();
+  drawWaveforms();
+  log('view', '时间窗口切换', {
+    windowSec: waveView.windowSec,
+    startSec: +waveView.startSec.toFixed(2)
+  });
+});
+
+// 拖动平移
+let isDragging = false;
+let dragStartX = 0;
+let dragStartStartSec = 0;
+
+canvasEl.addEventListener('pointerdown', e => {
+  if (!lastResult || !lastResult.ok) return;
+  if (waveView.windowSec <= 0) return;
+  isDragging = true;
+  dragStartX = e.clientX;
+  dragStartStartSec = waveView.startSec;
+  canvasEl.classList.add('grabbing');
+  try { canvasEl.setPointerCapture(e.pointerId); } catch (_) {}
+});
+
+canvasEl.addEventListener('pointermove', e => {
+  if (!isDragging) return;
+  const dx = e.clientX - dragStartX;
+  const rect = canvasEl.getBoundingClientRect();
+  const win = Math.min(waveView.windowSec, lastResult.duration);
+  const pxPerSec = rect.width / win;
+  waveView.startSec = dragStartStartSec - dx / pxPerSec;
+  clampView();
+  drawWaveforms();
+});
+
+function endDrag(e) {
+  if (!isDragging) return;
+  isDragging = false;
+  canvasEl.classList.remove('grabbing');
+  try { canvasEl.releasePointerCapture(e.pointerId); } catch (_) {}
+  log('view', '拖动结束', { startSec: +waveView.startSec.toFixed(2) });
+}
+
+canvasEl.addEventListener('pointerup', endDrag);
+canvasEl.addEventListener('pointercancel', endDrag);
+
+// 全屏
+function enterFullscreen() {
+  waveformWrap.classList.add('fullscreen');
+  document.body.style.overflow = 'hidden';
+  fullscreenBtn.textContent = '✕';
+  fullscreenBtn.title = '退出全屏';
+  requestAnimationFrame(() => drawWaveforms());
+  log('view', '进入全屏');
+}
+
+function exitFullscreen() {
+  waveformWrap.classList.remove('fullscreen');
+  document.body.style.overflow = '';
+  fullscreenBtn.textContent = '⛶';
+  fullscreenBtn.title = '全屏查看';
+  requestAnimationFrame(() => {
+    if (lastResult && lastResult.ok) drawWaveforms();
+  });
+  log('view', '退出全屏');
+}
+
+fullscreenBtn.addEventListener('click', () => {
+  if (waveformWrap.classList.contains('fullscreen')) exitFullscreen();
+  else enterFullscreen();
+});
+
+// 窗口尺寸变化时重绘（如设备旋转）
+window.addEventListener('resize', () => {
+  if (lastResult && lastResult.ok) {
+    requestAnimationFrame(() => drawWaveforms());
+  }
+});
+
+/* ============================================================
  * 按钮事件
  * ============================================================ */
-document.getElementById('againBtn').addEventListener('click', () => setState('idle'));
-document.getElementById('homeBtn').addEventListener('click', () => setState('idle'));
+document.getElementById('againBtn').addEventListener('click', () => {
+  if (waveformWrap.classList.contains('fullscreen')) exitFullscreen();
+  setState('idle');
+});
+document.getElementById('homeBtn').addEventListener('click', () => {
+  if (waveformWrap.classList.contains('fullscreen')) exitFullscreen();
+  setState('idle');
+});
 
 /* ============================================================
  * 启动
