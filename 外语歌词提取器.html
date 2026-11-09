@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>外语歌词提取器 · 去中文行</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: #f5f7fb;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            margin: 0;
+        }
+
+        .container {
+            max-width: 900px;
+            width: 100%;
+            background: white;
+            border-radius: 2rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            padding: 2rem 2rem 2.5rem;
+        }
+
+        h1 {
+            font-size: 1.9rem;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            color: #0b1b32;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 0.4rem;
+        }
+
+        h1 span {
+            background: #eef2ff;
+            color: #2563eb;
+            font-size: 1.8rem;
+            width: 48px;
+            height: 48px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 16px;
+        }
+
+        .subhead {
+            color: #4b5563;
+            margin-bottom: 2rem;
+            font-size: 1rem;
+            border-left: 4px solid #2563eb;
+            padding-left: 1rem;
+            background: #f8fafc;
+            border-radius: 0 8px 8px 0;
+            line-height: 1.5;
+            padding: 0.8rem 1rem;
+        }
+
+        /* 工具栏：所有按钮集中到顶部一排 */
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+            align-items: center;
+        }
+
+        button {
+            background: white;
+            border: 1.5px solid #e2e8f0;
+            padding: 0.7rem 1.4rem;
+            border-radius: 60px;
+            font-weight: 500;
+            font-size: 0.95rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            color: #1e293b;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+            flex: 0 0 auto;
+        }
+
+        button:hover {
+            background: #f8fafc;
+            border-color: #cbd5e1;
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(0);
+            box-shadow: none;
+        }
+
+        button.primary {
+            background: #2563eb;
+            border-color: #2563eb;
+            color: white;
+            box-shadow: 0 8px 20px -6px rgba(37, 99, 235, 0.4);
+            padding: 0.7rem 1.8rem;
+        }
+
+        button.primary:hover {
+            background: #1d4ed8;
+            border-color: #1d4ed8;
+        }
+
+        button.success {
+            background: #10b981;
+            border-color: #10b981;
+            color: white;
+            box-shadow: 0 8px 20px -6px rgba(16, 185, 129, 0.4);
+        }
+
+        button.success:hover {
+            background: #059669;
+            border-color: #059669;
+        }
+
+        /* 复制与下载按钮使用较柔和的样式，但保持醒目 */
+        button.copy-btn {
+            background: #f0f9ff;
+            border-color: #bae6fd;
+            color: #0369a1;
+        }
+
+        button.copy-btn:hover {
+            background: #e0f2fe;
+            border-color: #7dd3fc;
+        }
+
+        button.download-btn {
+            background: #f5f3ff;
+            border-color: #ddd6fe;
+            color: #6d28d9;
+        }
+
+        button.download-btn:hover {
+            background: #ede9fe;
+            border-color: #c4b5fd;
+        }
+
+        /* 复制成功的小动画 */
+        @keyframes pulse-green {
+            0% { background: #d1fae5; }
+            50% { background: #a7f3d0; }
+            100% { background: #d1fae5; }
+        }
+
+        .copy-animate {
+            animation: pulse-green 0.4s ease;
+        }
+
+        .editor-wrapper {
+            display: flex;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .editor-col {
+            flex: 1 1 280px;
+            display: flex;
+            flex-direction: column;
+            min-width: 240px;
+        }
+
+        .editor-col label {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            font-weight: 600;
+            color: #64748b;
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .badge {
+            background: #eef2ff;
+            color: #2563eb;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 0.2rem 0.7rem;
+            border-radius: 40px;
+            text-transform: none;
+            letter-spacing: normal;
+        }
+
+        textarea {
+            width: 100%;
+            height: 300px;
+            padding: 1rem 1.2rem;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 1.2rem;
+            font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            resize: vertical;
+            background: #ffffff;
+            color: #0f172a;
+            transition: border 0.15s, box-shadow 0.15s;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.02);
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
+        }
+
+        .output-area {
+            background: #f9fafc;
+        }
+
+        /* 状态栏简化：只保留左侧状态信息，按钮已移走 */
+        .status-bar {
+            margin-top: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+            font-size: 0.9rem;
+            color: #475569;
+            min-height: 2.5rem;
+        }
+
+        .status-msg {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #f1f5f9;
+            padding: 0.3rem 1rem;
+            border-radius: 40px;
+            transition: all 0.2s;
+        }
+
+        .status-msg.success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-msg.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .footer-note {
+            margin-top: 2rem;
+            font-size: 0.8rem;
+            color: #94a3b8;
+            text-align: center;
+            border-top: 1px solid #eef2f6;
+            padding-top: 1.2rem;
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .footer-note kbd {
+            background: #f1f5f9;
+            padding: 0.1rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            border: 1px solid #e2e8f0;
+            color: #334155;
+        }
+
+        /* 让顶部按钮组整体左对齐，但复制和下载按钮紧挨着其他按钮 */
+        /* 保持灵活换行 */
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>
+            <span>🎤</span>
+            外语歌词提取器
+        </h1>
+        <div class="subhead">
+            ⚡ 自动移除中文行（含中文标点）。粘贴歌词 → 一键提取外语 → 复制结果。
+        </div>
+
+        <!-- 工具栏：所有操作按钮集中于此，鼠标移动最少 -->
+        <div class="toolbar">
+            <button class="primary" id="extractBtn">
+                ✨ 提取外语歌词
+            </button>
+            <button id="pasteBtn">
+                📋 从剪贴板粘贴
+            </button>
+            <button id="clearBtn">
+                🧹 清空
+            </button>
+            <!-- 复制结果与下载按钮紧接其后，颜色区分但位置接近 -->
+            <button class="copy-btn" id="copyOutputBtn" title="复制结果到剪贴板">
+                📋 复制结果
+            </button>
+            <button class="download-btn" id="downloadBtn" title="下载为TXT">
+                ⬇️ 下载
+            </button>
+        </div>
+
+        <div class="editor-wrapper">
+            <!-- 左侧输入区 -->
+            <div class="editor-col">
+                <label>
+                    📥 原始歌词 (一行外语/一行中文)
+                    <span class="badge">粘贴到这里</span>
+                </label>
+                <textarea id="inputText" placeholder="例如：&#10;Hello, world!&#10;你好，世界！&#10;We will rock you&#10;我们将震撼你&#10;..."></textarea>
+            </div>
+
+            <!-- 右侧输出区 -->
+            <div class="editor-col">
+                <label>
+                    📤 提取结果 (仅外语)
+                    <span class="badge">自动过滤中文</span>
+                </label>
+                <textarea id="outputText" class="output-area" readonly placeholder="提取后的外语歌词会显示在这里..."></textarea>
+            </div>
+        </div>
+
+        <!-- 状态栏只显示消息，无按钮 -->
+        <div class="status-bar">
+            <div class="status-msg" id="statusMsg">
+                💡 等待操作
+            </div>
+        </div>
+
+        <div class="footer-note">
+            <span>✅ 自动识别 CJK 统一表意文字</span>
+            <span>•</span>
+            <span><kbd>Ctrl</kbd>+<kbd>V</kbd> 快速粘贴</span>
+            <span>•</span>
+            <span><kbd>Ctrl</kbd>+<kbd>Enter</kbd> 快速提取</span>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            // DOM 元素
+            const inputText = document.getElementById('inputText');
+            const outputText = document.getElementById('outputText');
+            const extractBtn = document.getElementById('extractBtn');
+            const pasteBtn = document.getElementById('pasteBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const copyOutputBtn = document.getElementById('copyOutputBtn');
+            const downloadBtn = document.getElementById('downloadBtn');
+            const statusMsg = document.getElementById('statusMsg');
+
+            // 更新状态栏消息
+            function setStatus(message, type = 'info') {
+                statusMsg.textContent = message;
+                statusMsg.className = 'status-msg'; // 重置
+                if (type === 'success') {
+                    statusMsg.classList.add('success');
+                } else if (type === 'error') {
+                    statusMsg.classList.add('error');
+                }
+            }
+
+            // 核心函数：移除包含中文字符的行
+            function removeChineseLines(text) {
+                if (!text || text.trim() === '') {
+                    return '';
+                }
+
+                // 用正则检测 CJK 统一表意文字（基本区 + 扩展A + 兼容区，覆盖绝大多数中文）
+                // 范围: \u4E00-\u9FFF  (基本), \u3400-\u4DBF (扩展A), \uF900-\uFAFF (兼容)
+                const chineseCharRegex = /[\u4E00-\u9FFF\u3400-\u4DBF\uF900-\uFAFF]/;
+
+                // 按行分割
+                const lines = text.split(/\r?\n/);
+
+                // 过滤掉任何含有中文字符的行（空行保留）
+                const filteredLines = lines.filter(line => {
+                    return !chineseCharRegex.test(line);
+                });
+
+                return filteredLines.join('\n');
+            }
+
+            // 执行提取
+            function extractLyrics() {
+                const raw = inputText.value;
+                if (!raw.trim()) {
+                    outputText.value = '';
+                    setStatus('⚠️ 输入为空，请先粘贴歌词', 'error');
+                    return;
+                }
+
+                try {
+                    const result = removeChineseLines(raw);
+                    outputText.value = result;
+
+                    // 统计移除的中文行数
+                    const chineseCharRegex = /[\u4E00-\u9FFF\u3400-\u4DBF\uF900-\uFAFF]/;
+                    const lines = raw.split(/\r?\n/);
+                    const chineseLineCount = lines.filter(line => chineseCharRegex.test(line)).length;
+
+                    if (chineseLineCount > 0) {
+                        setStatus(`✅ 已移除 ${chineseLineCount} 行中文，提取完成`, 'success');
+                    } else {
+                        setStatus(`ℹ️ 未检测到中文行，结果未改变`, 'info');
+                    }
+                } catch (e) {
+                    console.error(e);
+                    setStatus('❌ 提取出错，请检查输入', 'error');
+                }
+            }
+
+            // 从剪贴板粘贴到输入框（并自动提取）
+            async function pasteFromClipboard() {
+                try {
+                    const text = await navigator.clipboard.readText();
+                    if (text) {
+                        inputText.value = text;
+                        setStatus('📋 已从剪贴板粘贴，自动提取中...', 'success');
+                        // 自动提取
+                        extractLyrics();
+                    } else {
+                        setStatus('⚠️ 剪贴板为空或没有文本', 'error');
+                    }
+                } catch (err) {
+                    console.warn('剪贴板读取失败:', err);
+                    setStatus('❌ 无法读取剪贴板，请手动粘贴 (Ctrl+V)', 'error');
+                }
+            }
+
+            // 复制输出结果到剪贴板
+            async function copyOutputToClipboard() {
+                const result = outputText.value;
+                if (!result.trim()) {
+                    setStatus('⚠️ 没有可复制的结果，请先提取', 'error');
+                    return;
+                }
+
+                try {
+                    await navigator.clipboard.writeText(result);
+                    setStatus('✅ 结果已复制到剪贴板', 'success');
+
+                    // 按钮动画反馈
+                    copyOutputBtn.classList.add('copy-animate');
+                    setTimeout(() => copyOutputBtn.classList.remove('copy-animate'), 500);
+                } catch (err) {
+                    console.error('复制失败:', err);
+                    setStatus('❌ 复制失败，请手动选择复制', 'error');
+                    // 降级方案: 选中输出框文本
+                    outputText.select();
+                    outputText.setSelectionRange(0, 99999);
+                    try {
+                        document.execCommand('copy');
+                        setStatus('✅ 已使用备用方式复制', 'success');
+                    } catch (e) {
+                        setStatus('❌ 复制失败，请手动复制', 'error');
+                    }
+                }
+            }
+
+            // 下载结果
+            function downloadResult() {
+                const content = outputText.value;
+                if (!content.trim()) {
+                    setStatus('⚠️ 没有可下载的内容', 'error');
+                    return;
+                }
+                const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `foreign_lyrics_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                setStatus('⬇️ 文件已开始下载', 'success');
+            }
+
+            // 清空输入和输出
+            function clearAll() {
+                inputText.value = '';
+                outputText.value = '';
+                setStatus('🧹 已清空', 'info');
+                inputText.focus();
+            }
+
+            // 绑定事件
+            extractBtn.addEventListener('click', extractLyrics);
+            pasteBtn.addEventListener('click', pasteFromClipboard);
+            clearBtn.addEventListener('click', clearAll);
+            copyOutputBtn.addEventListener('click', copyOutputToClipboard);
+            downloadBtn.addEventListener('click', downloadResult);
+
+            // 额外优化：输入框内按 Ctrl+Enter 直接提取
+            inputText.addEventListener('keydown', (e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                    e.preventDefault();
+                    extractLyrics();
+                }
+            });
+
+            // 页面加载后自动聚焦输入框
+            window.addEventListener('load', () => {
+                inputText.focus();
+                setStatus('📋 粘贴歌词，点击“提取”或 Ctrl+Enter', 'info');
+            });
+        })();
+    </script>
+</body>
+</html>
