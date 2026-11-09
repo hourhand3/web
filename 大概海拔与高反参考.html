@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>大概海拔与高反参考</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 16px; line-height: 1.6; }
+    button { padding: 12px 16px; font-size: 16px; }
+    #result { margin-top: 16px; white-space: pre-wrap; }
+    .warn { color: #b00020; font-weight: 600; }
+    .muted { color: #666; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <h2>大概海拔与高反参考</h2>
+  <button id="btn">获取我的位置和大概海拔</button>
+  <div id="result">点击按钮开始。</div>
+  <p class="muted">注意：结果仅供旅行参考，不是医疗建议。高反与上升速度、过夜海拔、个体差异关系很大。</p>
+
+  <script>
+    const btn = document.getElementById('btn');
+    const result = document.getElementById('result');
+
+    function adviceByElevation(elev) {
+      if (elev == null || Number.isNaN(elev)) {
+        return '未能获得可靠海拔。请到开阔处重试，或使用离线等高线/高程地图。';
+      }
+      if (elev < 2500) {
+        return '海拔较低，高反风险通常较小。';
+      } else if (elev < 3000) {
+        return '已进入高海拔边缘。避免剧烈运动，注意休息和补水。';
+      } else if (elev < 4000) {
+        return '高反风险增加。建议缓慢上升，不饮酒，注意头痛、恶心、失眠等症状。';
+      } else if (elev < 5000) {
+        return '高海拔，风险较高。避免快速爬升，控制过夜海拔；出现明显不适考虑下撤。';
+      } else {
+        return '很高海拔，风险高。即使短暂停留也要注意，出现不适立即下撤并寻求医疗帮助。';
+      }
+    }
+
+    async function queryDemElevation(lat, lon) {
+      // OpenTopoData 公共实例，适合试用；正式使用请自建或换商业服务。
+      const url = `https://api.opentopodata.org/v1/srtm30m?locations=${lat},${lon}`;
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error(`高程接口错误：${resp.status}`);
+      const data = await resp.json();
+      const elev = data?.results?.[0]?.elevation;
+      if (typeof elev !== 'number') throw new Error('高程接口未返回有效数值');
+      return elev;
+    }
+
+    btn.addEventListener('click', () => {
+      if (!navigator.geolocation) {
+        result.textContent = '当前浏览器不支持定位。';
+        return;
+      }
+
+      btn.disabled = true;
+      result.textContent = '正在定位…';
+
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        const { latitude, longitude, accuracy, altitude, altitudeAccuracy } = pos.coords;
+        let demElev = null;
+        let demError = '';
+
+        try {
+          demElev = await queryDemElevation(latitude, longitude);
+        } catch (e) {
+          demError = e.message;
+        }
+
+        const gpsElev = (typeof altitude === 'number') ? altitude : null;
+        const finalElev = (demElev != null) ? demElev : gpsElev;
+
+        const lines = [];
+        lines.push(`纬度：${latitude.toFixed(6)}`);
+        lines.push(`经度：${longitude.toFixed(6)}`);
+        lines.push(`水平定位精度：约 ±${Math.round(accuracy)} 米`);
+        lines.push('');
+
+        if (demElev != null) {
+          lines.push(`DEM 地面高程：约 ${Math.round(demElev)} 米`);
+        } else {
+          lines.push(`DEM 查询失败：${demError}`);
+        }
+
+        if (gpsElev != null) {
+          lines.push(`GPS 高度读数：约 ${Math.round(gpsElev)} 米` +
+            (altitudeAccuracy ? `（高度精度约 ±${Math.round(altitudeAccuracy)} 米）` : ''));
+          lines.push('注：GPS 高度可能是椭球高，且垂直精度较差，不建议作为绝对海拔依据。');
+        } else {
+          lines.push('GPS 高度读数：无');
+        }
+
+        lines.push('');
+        lines.push(`综合参考海拔：约 ${finalElev != null ? Math.round(finalElev) + ' 米' : '未知'}`);
+        lines.push('');
+        lines.push('建议：' + adviceByElevation(finalElev));
+
+        result.textContent = lines.join('\n');
+        btn.disabled = false;
+      }, (err) => {
+        const msg = {
+          1: '你拒绝了定位权限。',
+          2: '无法获取位置，请到开阔处或检查网络/GPS。',
+          3: '定位超时，请重试。'
+        }[err.code] || err.message;
+        result.innerHTML = `<span class="warn">定位失败：${msg}</span>`;
+        btn.disabled = false;
+      }, {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0
+      });
+    });
+  </script>
+</body>
+</html>
