@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>全景拍摄助手</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #111; color: #eee; overflow: hidden;
+    height: 100dvh; display: flex; flex-direction: column;
+  }
+  #camera-wrap { position: relative; flex: 1; overflow: hidden; background: #000; }
+  #video { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  /* 引导层 */
+  #guide { position: absolute; inset: 0; pointer-events: none; }
+  #guide-ring {
+    position: absolute; width: 90px; height: 90px;
+    border: 3px solid rgba(255,255,255,.85); border-radius: 50%;
+    transform: translate(-50%, -50%); transition: left .15s, top .15s;
+    box-shadow: 0 0 0 2px rgba(0,0,0,.3);
+  }
+  #guide-dot {
+    position: absolute; width: 22px; height: 22px;
+    background: #ffd400; border-radius: 50%;
+    transform: translate(-50%, -50%); transition: left .15s, top .15s;
+    box-shadow: 0 0 8px rgba(255,212,0,.8);
+  }
+  #guide-ring.done { border-color: #4caf50; }
+  #guide-dot.done { background: #4caf50; box-shadow: 0 0 8px rgba(76,175,80,.8); }
+
+  /* 顶部状态 */
+  #status {
+    position: absolute; top: 0; left: 0; right: 0;
+    padding: 10px 14px; display: flex; justify-content: space-between;
+    align-items: center; font-size: 14px;
+    background: linear-gradient(to bottom, rgba(0,0,0,.6), transparent);
+  }
+  #status .count { font-weight: 600; }
+  #status .hint { font-size: 12px; opacity: .8; }
+
+  /* 底部控制 */
+  #controls {
+    padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+    background: #1a1a1a; display: flex; flex-direction: column; gap: 10px;
+  }
+  .mode-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #bbb; }
+  .mode-row input[type=checkbox] { width: 18px; height: 18px; accent-color: #ffd400; }
+  .mode-row .sub { font-size: 11px; opacity: .65; }
+
+  .btn-row { display: flex; gap: 10px; }
+  button {
+    flex: 1; padding: 14px; border: none; border-radius: 10px;
+    font-size: 16px; font-weight: 600; cursor: pointer;
+    transition: opacity .15s;
+  }
+  button:disabled { opacity: .35; cursor: not-allowed; }
+  #btn-shoot { background: #ffd400; color: #111; }
+  #btn-save-all { background: #4caf50; color: #fff; }
+  #btn-reset { background: #333; color: #eee; flex: 0 0 auto; padding: 14px 18px; }
+
+  #thumbs {
+    display: flex; gap: 6px; overflow-x: auto; padding: 4px 0;
+    min-height: 56px; align-items: center;
+  }
+  #thumbs:empty::after {
+    content: "尚未拍摄"; font-size: 12px; color: #555; padding-left: 4px;
+  }
+  #thumbs img {
+    width: 50px; height: 50px; object-fit: cover; border-radius: 6px;
+    flex: 0 0 auto; border: 1px solid #333;
+  }
+
+  /* Toast */
+  #toast {
+    position: fixed; left: 50%; bottom: 120px; transform: translateX(-50%);
+    background: rgba(0,0,0,.85); color: #fff; padding: 10px 18px;
+    border-radius: 20px; font-size: 13px; max-width: 85vw; text-align: center;
+    opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 100;
+  }
+  #toast.show { opacity: 1; }
+
+  /* 弹窗 */
+  #modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,.7);
+    display: none; align-items: center; justify-content: center;
+    padding: 24px; z-index: 200;
+  }
+  #modal.show { display: flex; }
+  #modal .card {
+    background: #222; border-radius: 14px; padding: 22px; max-width: 380px;
+    width: 100%; font-size: 14px; line-height: 1.6;
+  }
+  #modal h3 { font-size: 16px; margin-bottom: 10px; color: #ffd400; }
+  #modal p { color: #ccc; margin-bottom: 8px; }
+  #modal .note { font-size: 12px; color: #999; margin-top: 8px; }
+  #modal .actions { display: flex; gap: 10px; margin-top: 16px; }
+  #modal .actions button { padding: 12px; font-size: 15px; }
+  #modal .cancel { background: #444; color: #eee; }
+  #modal .confirm { background: #4caf50; color: #fff; }
+
+  /* 播放音效的隐藏元素占位 */
+  #shutter-flash {
+    position: fixed; inset: 0; background: #fff; opacity: 0;
+    pointer-events: none; transition: opacity .08s; z-index: 50;
+  }
+  #shutter-flash.flash { opacity: .7; }
+</style>
+</head>
+<body>
+
+<div id="camera-wrap">
+  <video id="video" autoplay playsinline muted></video>
+  <div id="guide">
+    <div id="guide-ring"></div>
+    <div id="guide-dot"></div>
+  </div>
+  <div id="status">
+    <span class="count">已拍 <b id="shot-count">0</b> 张</span>
+    <span class="hint" id="orient-hint">转动手机，对准目标点</span>
+  </div>
+</div>
+
+<div id="controls">
+  <div class="mode-row">
+    <input type="checkbox" id="mode-batch" checked>
+    <label for="mode-batch">
+      全部拍完后一次性保存
+      <span class="sub">（关闭则每拍一张立即保存，适合旧手机）</span>
+    </label>
+  </div>
+
+  <div id="thumbs"></div>
+
+  <div class="btn-row">
+    <button id="btn-shoot" disabled>拍摄</button>
+    <button id="btn-save-all" disabled>保存全部</button>
+    <button id="btn-reset">重置</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<div id="modal">
+  <div class="card">
+    <h3 id="modal-title"></h3>
+    <div id="modal-body"></div>
+    <div class="actions">
+      <button class="cancel" id="modal-cancel">取消</button>
+      <button class="confirm" id="modal-confirm">开始保存</button>
+    </div>
+  </div>
+</div>
+
+<div id="shutter-flash"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---------- DOM ----------
+  const video       = document.getElementById('video');
+  const shotCountEl = document.getElementById('shot-count');
+  const thumbsEl    = document.getElementById('thumbs');
+  const btnShoot    = document.getElementById('btn-shoot');
+  const btnSaveAll  = document.getElementById('btn-save-all');
+  const btnReset    = document.getElementById('btn-reset');
+  const modeBatch   = document.getElementById('mode-batch');
+  const toastEl     = document.getElementById('toast');
+  const modal       = document.getElementById('modal');
+  const modalTitle  = document.getElementById('modal-title');
+  const modalBody   = document.getElementById('modal-body');
+  const modalCancel = document.getElementById('modal-cancel');
+  const modalConfirm= document.getElementById('modal-confirm');
+  const guideRing   = document.getElementById('guide-ring');
+  const guideDot    = document.getElementById('guide-dot');
+  const orientHint  = document.getElementById('orient-hint');
+  const flashEl     = document.getElementById('shutter-flash');
+
+  // ---------- 状态 ----------
+  const shots = [];          // { blob, url, name }
+  let stream = null;
+  let shootIndex = 0;
+
+  // 引导点：按水平方向均分 12 个点（30° 一个），外加仰角/俯角各几个
+  // 这里简化为二维屏幕坐标上的环形引导点，根据设备方向旋转
+  const TOTAL_GUIDE = 20;    // 与你说的 20 多张对应
+  let guideIndex = 0;
+  let hasOrientation = false;
+  let deviceHeading = 0;     // 设备朝向（度），0=北
+  let devicePitch = 0;       // 俯仰角
+  let targetHeading = 0;
+  let targetPitch = 0;
+
+  // 生成引导点序列：一圈 12 个（水平），再上仰 4 个，下俯 4 个
+  function buildGuideTargets() {
+    const targets = [];
+    // 水平一圈 12 个
+    for (let i = 0; i < 12; i++) {
+      targets.push({ heading: i * 30, pitch: 0 });
+    }
+    // 上仰 4 个（45° 仰角，间隔 90°）
+    for (let i = 0; i < 4; i++) {
+      targets.push({ heading: i * 90, pitch: 45 });
+    }
+    // 下俯 4 个（-45° 俯角）
+    for (let i = 0; i < 4; i++) {
+      targets.push({ heading: i * 90, pitch: -45 });
+    }
+    return targets;
+  }
+  const guideTargets = buildGuideTargets();
+
+  // ---------- 工具函数 ----------
+  function showToast(msg, duration = 2200) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => toastEl.classList.remove('show'), duration);
+  }
+
+  function flash() {
+    flashEl.classList.add('flash');
+    setTimeout(() => flashEl.classList.remove('flash'), 90);
+  }
+
+  function updateCount() {
+    shotCountEl.textContent = shots.length;
+  }
+
+  function pad(n) { return String(n).padStart(3, '0'); }
+
+  function makeFileName(idx) {
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    return `pano_${pad(idx + 1)}_${ts}.jpg`;
+  }
+
+  // 触发单个文件下载
+  function downloadBlob(blob, filename) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    // 延迟 revoke，避免部分浏览器下载未开始就释放
+    setTimeout(() => {
+      URL.revokeObjectURL(a.href);
+      a.remove();
+    }, 4000);
+  }
+
+  // ---------- 摄像头 ----------
+  async function initCamera() {
+    if (stream) return;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        },
+        audio: false
+      });
+      video.srcObject = stream;
+      await video.play();
+      btnShoot.disabled = false;
+    } catch (err) {
+      console.error(err);
+      orientHint.textContent = '无法访问摄像头';
+      showToast('无法访问摄像头：' + (err.message || err.name));
+    }
+  }
+
+  // ---------- 设备方向 ----------
+  function onOrientation(e) {
+    hasOrientation = true;
+    // iOS 提供 webkitCompassHeading（真正的磁北朝向）
+    if (typeof e.webkitCompassHeading === 'number') {
+      deviceHeading = e.webkitCompassHeading;
+    } else if (typeof e.alpha === 'number') {
+      // alpha: 0~360，设备绕 z 轴旋转；在竖屏下近似为朝向（需校正）
+      // 简化处理：用 360 - alpha 作为朝向近似值
+      deviceHeading = (360 - e.alpha) % 360;
+    }
+    if (typeof e.beta === 'number') {
+      // beta: -180~180，前后倾斜。竖屏时 90 为垂直拿，0 为平放
+      // 转换成俯仰角：竖屏垂直拿时约 90，对应 pitch 0；上仰减小
+      devicePitch = 90 - e.beta;
+    }
+    updateGuideUI();
+  }
+
+  async function requestOrientationPermission() {
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+      try {
+        const res = await DeviceOrientationEvent.requestPermission();
+        if (res === 'granted') {
+          window.addEventListener('deviceorientation', onOrientation, true);
+        } else {
+          orientHint.textContent = '未授权方向传感器，引导可能不准';
+        }
+      } catch (e) {
+        console.warn(e);
+      }
+    } else {
+      window.addEventListener('deviceorientation', onOrientation, true);
+    }
+  }
+
+  // 计算两个角度之差（-180 ~ 180）
+  function angleDiff(a, b) {
+    let d = ((a - b + 540) % 360) - 180;
+    return d;
+  }
+
+  // ---------- 引导 UI ----------
+  function updateGuideUI() {
+    if (!hasOrientation) {
+      // 没有传感器：把引导点固定在屏幕中心偏上，提示用户手动对准
+      guideRing.style.left = '50%';
+      guideRing.style.top = '40%';
+      guideDot.style.left = '50%';
+      guideDot.style.top = '40%';
+      guideRing.classList.add('done');
+      guideDot.classList.add('done');
+      orientHint.textContent = '无方向传感器，请手动把目标点对准中心后拍摄';
+      return;
+    }
+
+    if (guideIndex >= guideTargets.length) {
+      guideRing.style.opacity = '0';
+      guideDot.style.opacity = '0';
+      orientHint.textContent = '引导点已全部完成，可继续自由拍摄或保存';
+      return;
+    }
+    guideRing.style.opacity = '1';
+    guideDot.style.opacity = '1';
+
+    const t = guideTargets[guideIndex];
+    targetHeading = t.heading;
+    targetPitch = t.pitch;
+
+    const hDiff = angleDiff(targetHeading, deviceHeading); // -180~180
+    const pDiff = targetPitch - devicePitch;               // 俯仰差
+
+    // 映射到屏幕位置：水平差 → 横向偏移；俯仰差 → 纵向偏移
+    const cx = 50 + hDiff * 0.5;      // 每度 0.5% 屏宽
+    const cy = 50 - pDiff * 0.8;      // 每度 0.8% 屏高（俯仰更敏感）
+
+    const left = Math.max(8, Math.min(92, cx));
+    const top  = Math.max(15, Math.min(85, cy));
+
+    guideRing.style.left = left + '%';
+    guideRing.style.top  = top + '%';
+    guideDot.style.left  = '50%';
+    guideDot.style.top   = '50%';
+
+    const near = Math.abs(hDiff) < 8 && Math.abs(pDiff) < 8;
+    if (near) {
+      guideRing.classList.add('done');
+      guideDot.classList.add('done');
+      orientHint.textContent = '已对准，可以拍摄';
+    } else {
+      guideRing.classList.remove('done');
+      guideDot.classList.remove('done');
+      orientHint.textContent = `转动手机，把黄点对准白圈（剩余 ${guideTargets.length - guideIndex} 个点）`;
+    }
+  }
+
+  // ---------- 拍摄 ----------
+  async function capture() {
+    if (!stream) return;
+    flash();
+
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    if (!vw || !vh) {
+      showToast('摄像头尚未就绪');
+      return;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = vw;
+    canvas.height = vh;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, vw, vh);
+
+    canvas.toBlob((blob) => {
+      if (!blob) { showToast('拍摄失败'); return; }
+      const name = makeFileName(shots.length);
+      const url = URL.createObjectURL(blob);
+      const item = { blob, url, name };
+      shots.push(item);
+
+      // 缩略图
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = name;
+      thumbsEl.appendChild(img);
+      thumbsEl.scrollLeft = thumbsEl.scrollWidth;
+
+      updateCount();
+      btnSaveAll.disabled = shots.length === 0;
+
+      // 引导点推进
+      if (guideIndex < guideTargets.length) {
+        guideIndex++;
+        updateGuideUI();
+      }
+
+      // 逐张保存模式
+      if (!modeBatch.checked) {
+        downloadBlob(blob, name);
+        showToast(`第 ${shots.length} 张已保存（${name}）`);
+      }
+    }, 'image/jpeg', 0.92);
+  }
+
+  // ---------- 保存全部 ----------
+  function openSaveConfirm() {
+    if (shots.length === 0) {
+      showToast('还没有拍摄照片');
+      return;
+    }
+    modalTitle.textContent = `即将保存 ${shots.length} 张照片`;
+    modalBody.innerHTML =
+      `<p>照片将保存到浏览器的下载目录。如果你的浏览器支持选择位置，请留意弹出的保存对话框；如果不支持，请到手机的“下载”文件夹中查找。</p>` +
+      `<p class="note">注意：连续保存多张时，部分浏览器可能弹出“允许下载多个文件”的提示，请选择允许，否则部分照片可能无法保存。</p>` +
+      `<p class="note">文件名按拍摄顺序编号，如 pano_001_xxx.jpg，方便后续拼接。</p>`;
+    modal.classList.add('show');
+  }
+
+  async function saveAll() {
+    modal.classList.remove('show');
+    showToast(`开始保存 ${shots.length} 张照片…`, 4000);
+    for (let i = 0; i < shots.length; i++) {
+      const s = shots[i];
+      downloadBlob(s.blob, s.name);
+      // 间隔触发，避免浏览器拦截
+      await new Promise(r => setTimeout(r, 350));
+    }
+    setTimeout(() => {
+      showToast(`已触发保存 ${shots.length} 张。请到“下载”文件夹或你选择的文件夹中查看。`, 5000);
+    }, shots.length * 350 + 300);
+  }
+
+  // ---------- 重置 ----------
+  function reset() {
+    shots.forEach(s => URL.revokeObjectURL(s.url));
+    shots.length = 0;
+    thumbsEl.innerHTML = '';
+    guideIndex = 0;
+    updateCount();
+    btnSaveAll.disabled = true;
+    updateGuideUI();
+    showToast('已重置');
+  }
+
+  // ---------- 事件绑定 ----------
+  btnShoot.addEventListener('click', capture);
+  btnSaveAll.addEventListener('click', openSaveConfirm);
+  modalConfirm.addEventListener('click', saveAll);
+  modalCancel.addEventListener('click', () => modal.classList.remove('show'));
+  btnReset.addEventListener('click', reset);
+
+  modeBatch.addEventListener('change', () => {
+    if (modeBatch.checked) {
+      showToast('已切换：全部拍完后一次性保存');
+    } else {
+      showToast('已切换：逐张保存。每张会立即下载到下载目录', 3000);
+    }
+  });
+
+  // 防止页面滚动
+  document.addEventListener('touchmove', (e) => {
+    if (!thumbsEl.contains(e.target)) e.preventDefault();
+  }, { passive: false });
+
+  // ---------- 启动 ----------
+  (async function start() {
+    await initCamera();
+    await requestOrientationPermission();
+    updateGuideUI();
+    // 每帧刷新引导（传感器事件可能频率不足）
+    setInterval(() => {
+      if (hasOrientation) updateGuideUI();
+    }, 120);
+  })();
+
+})();
+</script>
+</body>
+</html>
