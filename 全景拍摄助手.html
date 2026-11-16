@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>全景拍摄助手 - 罗盘版</title>
+<title>全景拍摄助手 - 靶心版</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -14,78 +14,48 @@
   #camera-wrap { position: relative; flex: 1; overflow: hidden; background: #000; }
   #video { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-  /* 画面中央准星 */
-  #guide-cross {
+  /* 固定的目标圈（蓝圈） */
+  #target-ring {
     position: absolute; left: 50%; top: 50%;
-    width: 60px; height: 60px; transform: translate(-50%, -50%);
+    width: 120px; height: 120px; border-radius: 50%;
+    border: 3px solid rgba(33, 150, 243, 0.8);
+    transform: translate(-50%, -50%);
     pointer-events: none; z-index: 10;
+    transition: all 0.2s;
   }
-  #guide-cross::before, #guide-cross::after {
-    content: ""; position: absolute; background: rgba(255,255,255,0.5);
-    box-shadow: 0 0 4px rgba(0,0,0,0.8);
-    transition: background 0.2s;
+  #target-ring.aligned {
+    border-color: #4caf50;
+    box-shadow: 0 0 20px rgba(76, 175, 80, 0.5);
+    width: 100px; height: 100px; /* 变绿时缩小，更有吸附感 */
   }
-  #guide-cross::before { left: 50%; top: 0; width: 2px; height: 100%; transform: translateX(-50%); }
-  #guide-cross::after  { top: 50%; left: 0; height: 2px; width: 100%; transform: translateY(-50%); }
-  
-  /* 中央对准区域（小圆） */
-  #center-dot {
+
+  /* 动态准星（代表你手机当前的指向） */
+  #reticle {
     position: absolute; left: 50%; top: 50%;
-    width: 24px; height: 24px; transform: translate(-50%, -50%);
-    border-radius: 50%; border: 2px solid rgba(255,255,255,0.3);
-    pointer-events: none; z-index: 11; transition: all 0.2s;
+    width: 60px; height: 60px;
+    transform: translate(-50%, -50%);
+    pointer-events: none; z-index: 15;
+    display: flex; align-items: center; justify-content: center;
   }
-  /* 当真正对准时 */
-  #guide-cross.aligned::before, #guide-cross.aligned::after { background: #4caf50; }
-  #center-dot.aligned { 
-    border-color: #4caf50; background: rgba(76,175,80,0.2);
-    box-shadow: 0 0 15px #4caf50;
+  /* 准星十字 */
+  #reticle::before, #reticle::after {
+    content: ""; position: absolute; background: rgba(255, 255, 255, 0.8);
+    box-shadow: 0 0 4px rgba(0,0,0,0.8);
+  }
+  #reticle::before { left: 50%; top: 0; width: 2px; height: 100%; transform: translateX(-50%); }
+  #reticle::after  { top: 50%; left: 0; height: 2px; width: 100%; transform: translateY(-50%); }
+  
+  /* 准星中心的点 */
+  #reticle-dot {
+    width: 10px; height: 10px; border-radius: 50%; background: #fff;
+    box-shadow: 0 0 5px rgba(0,0,0,0.8);
   }
 
-  /* 顶部罗盘引导区 */
-  #compass-area {
-    position: absolute; top: 12%; left: 0; width: 100%; height: 140px;
-    pointer-events: none; z-index: 20;
-    display: flex; justify-content: center; align-items: center;
-  }
-  /* 罗盘背景底圈 */
-  #compass-base {
-    position: absolute; width: 120px; height: 120px;
-    border: 2px solid rgba(255,255,255,0.2); border-radius: 50%;
-  }
-  /* 指示箭头（代表目标方向） */
-  #compass-arrow {
-    position: absolute; width: 120px; height: 120px;
-    transition: transform 0.1s linear;
-  }
-  /* 箭头本体 */
-  #compass-arrow::before {
-    content: ""; position: absolute; top: -10px; left: 50%;
-    transform: translateX(-50%);
-    border-left: 12px solid transparent;
-    border-right: 12px solid transparent;
-    border-bottom: 24px solid #ffd400;
-    filter: drop-shadow(0 0 4px rgba(0,0,0,0.6));
-  }
-  /* 箭头瞄准点（固定不动，代表手机正前方） */
-  #compass-fixed-dot {
-    position: absolute; top: 4px; left: 50%; transform: translateX(-50%);
-    width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.8);
-  }
-  /* 当接近时，箭头变绿 */
-  #compass-arrow.near::before { border-bottom-color: #4caf50; }
+  /* 当对准变绿时 */
+  #reticle.aligned::before, #reticle.aligned::after { background: #4caf50; }
+  #reticle.aligned #reticle-dot { background: #4caf50; }
 
-  /* 提示文字浮层 */
-  #hint-box {
-    position: absolute; top: 32%; left: 50%; transform: translateX(-50%);
-    background: rgba(0,0,0,0.6); padding: 8px 16px; border-radius: 20px;
-    font-size: 14px; font-weight: bold; color: #ffd400; text-align: center;
-    pointer-events: none; z-index: 25; white-space: nowrap;
-    transition: color 0.2s;
-  }
-  #hint-box.aligned { color: #4caf50; }
-
-  /* 状态栏 */
+  /* 顶部状态栏 */
   #status {
     position: absolute; top: 0; left: 0; right: 0;
     padding: 10px 14px; display: flex; justify-content: space-between;
@@ -94,6 +64,11 @@
     z-index: 30;
   }
   #status .count { font-weight: 600; }
+  #status .hint {
+    font-size: 14px; font-weight: bold; text-align: right; max-width: 65%;
+    color: #ffd400; text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+  }
+  #status .hint.aligned { color: #4caf50; }
 
   /* 底部控制 */
   #controls {
@@ -138,25 +113,6 @@
   }
   #toast.show { opacity: 1; }
 
-  /* 弹窗 */
-  #modal {
-    position: fixed; inset: 0; background: rgba(0,0,0,.7);
-    display: none; align-items: center; justify-content: center;
-    padding: 24px; z-index: 200;
-  }
-  #modal.show { display: flex; }
-  #modal .card {
-    background: #222; border-radius: 14px; padding: 22px; max-width: 380px;
-    width: 100%; font-size: 14px; line-height: 1.6;
-  }
-  #modal h3 { font-size: 16px; margin-bottom: 10px; color: #ffd400; }
-  #modal p { color: #ccc; margin-bottom: 8px; }
-  #modal .note { font-size: 12px; color: #999; margin-top: 8px; }
-  #modal .actions { display: flex; gap: 10px; margin-top: 16px; }
-  #modal .actions button { padding: 12px; font-size: 15px; }
-  #modal .cancel { background: #444; color: #eee; }
-  #modal .confirm { background: #4caf50; color: #fff; }
-
   /* 快门闪光 */
   #shutter-flash {
     position: fixed; inset: 0; background: #fff; opacity: 0;
@@ -170,23 +126,17 @@
 <div id="camera-wrap">
   <video id="video" autoplay playsinline muted></video>
   
-  <!-- 中央准星与捕获区 -->
-  <div id="guide-cross"></div>
-  <div id="center-dot"></div>
-
-  <!-- 顶部罗盘 -->
-  <div id="compass-area">
-    <div id="compass-base"></div>
-    <div id="compass-arrow">
-      <div id="compass-fixed-dot"></div>
-    </div>
+  <!-- 固定的目标蓝圈 -->
+  <div id="target-ring"></div>
+  
+  <!-- 动态准星 -->
+  <div id="reticle">
+    <div id="reticle-dot"></div>
   </div>
-
-  <!-- 文字提示 -->
-  <div id="hint-box">初始化…</div>
 
   <div id="status">
     <span class="count">已拍 <b id="shot-count">0</b> 张</span>
+    <span class="hint" id="orient-hint">初始化中…</span>
   </div>
 </div>
 
@@ -195,7 +145,6 @@
     <input type="checkbox" id="mode-batch" checked>
     <label for="mode-batch">
       全部拍完后一次性保存
-      <span class="sub">（关闭则每拍一张立即保存）</span>
     </label>
   </div>
 
@@ -210,36 +159,28 @@
 </div>
 
 <div id="toast"></div>
-
-<div id="modal">
-  <div class="card">
-    <h3 id="modal-title"></h3>
-    <div id="modal-body"></div>
-    <div class="actions">
-      <button class="cancel" id="modal-cancel">取消</button>
-      <button class="confirm" id="modal-confirm">开始保存</button>
-    </div>
-  </div>
-</div>
-
 <div id="shutter-flash"></div>
 
 <script>
 (function () {
   'use strict';
 
-  const VERSION = '3.0.0';
+  const VERSION = '4.0.0';
   const DEBUG = /[?&]debug=1/.test(location.search);
-  if (DEBUG) document.body.classList.add('debug');
 
   // ================= 核心配置 =================
-  // 如果发现（画面上）向右转，但罗盘箭头向左偏，把这里改成 1
+  // 如果发现水平方向反了，改成 1
   const HEADING_SIGN = -1; 
+  // 如果发现抬头/低头反了，改成 -1
   const PITCH_SIGN = 1;
   
-  // 判定容差：角度差在 8 度以内算对准（可放宽到 10）
-  const NEAR_DEG = 8;           
-  const AUTO_SHOOT_DELAY = 500; // 套准后保持多久自动拍
+  // 判定容差：偏差小于 10 度算对准
+  const NEAR_DEG = 10;           
+  const AUTO_SHOOT_DELAY = 600;  // 保持多久自动拍
+  
+  // 屏幕像素缩放倍率：角度差 * 倍率 = 屏幕上的像素位移
+  // 数值越大，准星在屏幕上移动越灵敏
+  const PIXELS_PER_DEGREE = 8;   
   // ============================================
 
   // ---------- DOM ----------
@@ -252,17 +193,11 @@
   const btnReset    = document.getElementById('btn-reset');
   const modeBatch   = document.getElementById('mode-batch');
   const toastEl     = document.getElementById('toast');
-  const modal       = document.getElementById('modal');
-  const modalTitle  = document.getElementById('modal-title');
-  const modalBody   = document.getElementById('modal-body');
-  const modalCancel = document.getElementById('modal-cancel');
-  const modalConfirm= document.getElementById('modal-confirm');
   
-  const compassArrow = document.getElementById('compass-arrow');
-  const crosshair    = document.getElementById('guide-cross');
-  const centerDot    = document.getElementById('center-dot');
-  const hintBox      = document.getElementById('hint-box');
-  const flashEl      = document.getElementById('shutter-flash');
+  const targetRing  = document.getElementById('target-ring');
+  const reticle     = document.getElementById('reticle');
+  const orientHint  = document.getElementById('orient-hint');
+  const flashEl     = document.getElementById('shutter-flash');
 
   // ---------- 状态 ----------
   const shots = [];
@@ -276,15 +211,12 @@
   let lockStart = 0;
   let isAutoShooting = false;
 
-  // 目标点序列：水平12个(每30度)，低头4个(-50度)，抬头4个(50度)
+  // 目标点：水平 12 个（每 30 度），低头 4 个（-45 度），抬头 4 个（45 度）
   function buildGuideTargets() {
     const t = [];
-    // 一圈水平
     for (let i = 0; i < 12; i++) t.push({ heading: i * 30, pitch: 0 });
-    // 低头（注意：有些平台低头时，heading会原地翻转180度。这是正常的物理现象）
-    for (let i = 0; i < 4; i++) t.push({ heading: i * 90, pitch: -50 }); 
-    // 抬头
-    for (let i = 0; i < 4; i++) t.push({ heading: i * 90, pitch: 50 });  
+    for (let i = 0; i < 4; i++) t.push({ heading: i * 90, pitch: -45 }); 
+    for (let i = 0; i < 4; i++) t.push({ heading: i * 90, pitch: 45 });  
     return t;
   }
   const guideTargets = buildGuideTargets();
@@ -331,12 +263,11 @@
       btnShoot.disabled = false;
     } catch (err) {
       console.error(err);
-      hintBox.textContent = '无法访问摄像头';
-      showToast('无法访问摄像头：' + (err.message || err.name));
+      orientHint.textContent = '无法访问摄像头';
     }
   }
 
-  // ---------- 方向传感器 ----------
+  // ---------- 传感器 ----------
   function onOrientation(e) {
     hasOrientation = true;
 
@@ -372,101 +303,93 @@
       try {
         const res = await DeviceOrientationEvent.requestPermission();
         if (res === 'granted') window.addEventListener('deviceorientation', onOrientation, true);
-      } catch (e) { console.warn(e); }
+      } catch (e) {}
     } else {
       window.addEventListener('deviceorientation', onOrientation, true);
     }
   }
 
-  // ---------- UI 与 罗盘逻辑 ----------
+  // ---------- UI 逻辑 ----------
   function updateUI() {
     if (!hasOrientation) return;
 
     if (guideIndex >= guideTargets.length) {
-      compassArrow.style.opacity = '0';
-      hintBox.textContent = '全部目标已拍完！';
-      hintBox.classList.remove('aligned');
+      reticle.style.opacity = '0';
+      targetRing.style.opacity = '0';
+      orientHint.textContent = '全部拍完！';
+      orientHint.classList.remove('aligned');
       return;
     }
 
     const t = guideTargets[guideIndex];
-    
-    // 获取角差
     const hDiff = angleDiff(t.heading, smoothHeading); 
     const pDiff = t.pitch - smoothPitch;
     
-    // 只有当水平和垂直误差都极小（NEAR_DEG=8度）时，才认为真正对准了
+    // 判断是否对准
     const isNear = Math.abs(hDiff) < NEAR_DEG && Math.abs(pDiff) < NEAR_DEG;
 
-    // --- 动态计算罗盘箭头指向 ---
-    // 这里使用极坐标投影到 2D 平面。
-    // hDiff: 目标在左侧(>0)还是右侧(<0)
-    // pDiff: 目标在上方(<0)还是下方(>0)
-    // 注意：当在抬头/低头极限时，为了不出现方向漂移，我们可以冻结水平方位。
-    let angle = 0;
-    if (Math.abs(smoothPitch) > 70) {
-      // 抬头或低头接近90度，alpha会剧变，此时主要靠pitch判定
-      angle = pDiff > 0 ? 0 : 180; // 如果目标还在下方，箭头朝下；反之朝上
-    } else {
-      // 正常角度：利用 atan2 计算空间指向
-      // 屏幕坐标系：x向右为正，y向下为正。
-      // 目标在右侧(hDiff<0)，x应为正。
-      const x = -hDiff; 
-      const y = pDiff;  
-      angle = Math.atan2(y, x) * (180 / Math.PI) + 90; // +90是为了把箭头原本指上方(0度)对齐
-    }
-
-    // 更新罗盘旋转角度（只有当不在附近时才指引，防止在中心抖动）
+    // 计算准星偏移量
+    // 如果目标在左边 (hDiff>0)，准星应该偏左
+    let dx = 0;
+    let dy = 0;
+    
     if (!isNear) {
-      compassArrow.style.opacity = '1';
-      compassArrow.style.transform = `rotate(${angle}deg)`;
-      compassArrow.classList.remove('near');
+      dx = -hDiff * PIXELS_PER_DEGREE;
+      dy = pDiff * PIXELS_PER_DEGREE;
+      
+      // 限制在屏幕内，太远就贴边
+      const maxX = window.innerWidth / 2 - 30;
+      const maxY = window.innerHeight / 2 - 30;
+      dx = Math.max(-maxX, Math.min(maxX, dx));
+      dy = Math.max(-maxY, Math.min(maxY, dy));
+
+      reticle.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+      reticle.style.opacity = '1';
     } else {
-      compassArrow.classList.add('near');
+      // 对准后，强制回正到中心
+      reticle.style.transform = `translate(-50%, -50%)`;
     }
 
-    // --- 更新中央准星状态 ---
+    // 更新颜色和状态
     if (isNear) {
-      crosshair.classList.add('aligned');
-      centerDot.classList.add('aligned');
-      hintBox.classList.add('aligned');
+      reticle.classList.add('aligned');
+      targetRing.classList.add('aligned');
+      orientHint.classList.add('aligned');
       
       const now = performance.now();
       if (!lockStart) {
         lockStart = now;
         vibrate(50);
-        hintBox.textContent = '已对准，保持不动…';
+        orientHint.textContent = '已套准，请保持…';
       } else if (!isAutoShooting && (now - lockStart >= AUTO_SHOOT_DELAY)) {
         isAutoShooting = true;
         vibrate(100);
-        hintBox.textContent = '自动拍摄！';
+        orientHint.textContent = '自动拍摄！';
         capture(true);
       } else {
         const left = Math.max(0, AUTO_SHOOT_DELAY - (now - lockStart)) / 1000;
-        hintBox.textContent = `保持不动… ${left.toFixed(1)}s`;
+        orientHint.textContent = `保持不动… ${left.toFixed(1)}s`;
       }
     } else {
       lockStart = 0;
       isAutoShooting = false;
-      crosshair.classList.remove('aligned');
-      centerDot.classList.remove('aligned');
-      hintBox.classList.remove('aligned');
+      reticle.classList.remove('aligned');
+      targetRing.classList.remove('aligned');
+      orientHint.classList.remove('aligned');
       
-      // 生成方向提示文字
+      // 文字提示逻辑
       let tips = [];
-      if (Math.abs(hDiff) >= NEAR_DEG) {
-        // 因为 hDiff 为正代表手机在目标右边（要向左转）
-        tips.push(hDiff > 0 ? '向左转 ↺' : '向右转 ↻');
-      }
-      if (Math.abs(pDiff) >= NEAR_DEG) {
-        tips.push(pDiff > 0 ? '抬头 ↑' : '低头 ↓');
-      }
+      if (hDiff > NEAR_DEG) tips.push('向左转');
+      else if (hDiff < -NEAR_DEG) tips.push('向右转');
       
+      if (pDiff > NEAR_DEG) tips.push('低头');
+      else if (pDiff < -NEAR_DEG) tips.push('抬头');
+
       if (tips.length === 0) {
-        tips.push('微调手机至正中心');
+        tips.push('微调至中心');
       }
-      
-      hintBox.textContent = `请${tips.join('，')} (剩 ${guideTargets.length - guideIndex})`;
+
+      orientHint.textContent = `请${tips.join('并')} (剩 ${guideTargets.length - guideIndex})`;
     }
   }
 
@@ -522,13 +445,10 @@
   // ---------- 保存与重置 ----------
   function openSaveConfirm() {
     if (shots.length === 0) { showToast('还没有拍摄照片'); return; }
-    modalTitle.textContent = `即将保存 ${shots.length} 张照片`;
-    modalBody.innerHTML = `<p>照片将保存到下载目录。</p><p class="note">文件已按顺序编号。</p>`;
-    modal.classList.add('show');
+    downloadAll();
   }
 
-  async function saveAll() {
-    modal.classList.remove('show');
+  async function downloadAll() {
     showToast(`开始保存 ${shots.length} 张…`, 3000);
     for (let i = 0; i < shots.length; i++) {
       downloadBlob(shots[i].blob, shots[i].name);
@@ -554,8 +474,6 @@
   btnSaveAll.addEventListener('click', openSaveConfirm);
   btnSkip.addEventListener('click', skipGuide);
   btnReset.addEventListener('click', reset);
-  modalConfirm.addEventListener('click', saveAll);
-  modalCancel.addEventListener('click', () => modal.classList.remove('show'));
 
   document.addEventListener('touchmove', (e) => {
     if (!thumbsEl.contains(e.target)) e.preventDefault();
