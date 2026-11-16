@@ -164,6 +164,18 @@
 (function () {
   'use strict';
 
+  const VERSION = '1.1.0';
+  const DEBUG = /[?&]debug=1/.test(location.search);
+
+  function log(...args) {
+    if (DEBUG) console.log(`[pano v${VERSION}]`, ...args);
+  }
+  function logWarn(...args) {
+    if (DEBUG) console.warn(`[pano v${VERSION}]`, ...args);
+  }
+
+  log('启动', { ua: navigator.userAgent });
+
   // ---------- DOM ----------
   const video       = document.getElementById('video');
   const shotCountEl = document.getElementById('shot-count');
@@ -179,45 +191,36 @@
   const modalCancel = document.getElementById('modal-cancel');
   const modalConfirm= document.getElementById('modal-confirm');
   const guideRing   = document.getElementById('guide-ring');
-  const guideDot    = document.getElementById('guide-dot');
   const orientHint  = document.getElementById('orient-hint');
   const flashEl     = document.getElementById('shutter-flash');
 
+  // 顶部显示版本号，便于确认加载的是哪一版
+  document.title = `全景拍摄助手 v${VERSION}`;
+  orientHint.textContent = `v${VERSION} 初始化中…`;
+
   // ---------- 状态 ----------
-  const shots = [];          // { blob, url, name }
+  const shots = [];
   let stream = null;
-  let shootIndex = 0;
 
-  // 引导点：按水平方向均分 12 个点（30° 一个），外加仰角/俯角各几个
-  // 这里简化为二维屏幕坐标上的环形引导点，根据设备方向旋转
-  const TOTAL_GUIDE = 20;    // 与你说的 20 多张对应
-  let guideIndex = 0;
   let hasOrientation = false;
-  let deviceHeading = 0;     // 设备朝向（度），0=北
-  let devicePitch = 0;       // 俯仰角
-  let targetHeading = 0;
-  let targetPitch = 0;
+  let deviceHeading = 0;
+  let devicePitch = 0;
+  let guideIndex = 0;
+  let orientEventCount = 0;   // 用于日志
 
-  // 生成引导点序列：一圈 12 个（水平），再上仰 4 个，下俯 4 个
+  // ---------- 引导目标 ----------
+  // 水平一圈 12 个（每 30°），上仰 4 个（45°），下俯 4 个（-45°）
   function buildGuideTargets() {
     const targets = [];
-    // 水平一圈 12 个
-    for (let i = 0; i < 12; i++) {
-      targets.push({ heading: i * 30, pitch: 0 });
-    }
-    // 上仰 4 个（45° 仰角，间隔 90°）
-    for (let i = 0; i < 4; i++) {
-      targets.push({ heading: i * 90, pitch: 45 });
-    }
-    // 下俯 4 个（-45° 俯角）
-    for (let i = 0; i < 4; i++) {
-      targets.push({ heading: i * 90, pitch: -45 });
-    }
+    for (let i = 0; i < 12; i++) targets.push({ heading: i * 30, pitch: 0 });
+    for (let i = 0; i < 4; i++) targets.push({ heading: i * 90, pitch: 45 });
+    for (let i = 0; i < 4; i++) targets.push({ heading: i * 90, pitch: -45 });
     return targets;
   }
   const guideTargets = buildGuideTargets();
+  log('引导目标数量', guideTargets.length);
 
-  // ---------- 工具函数 ----------
+  // ---------- 工具 ----------
   function showToast(msg, duration = 2200) {
     toastEl.textContent = msg;
     toastEl.classList.add('show');
@@ -241,24 +244,34 @@
     return `pano_${pad(idx + 1)}_${ts}.jpg`;
   }
 
-  // 触发单个文件下载
   function downloadBlob(blob, filename) {
+    log('下载', filename, blob.size, 'bytes');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = filename;
     document.body.appendChild(a);
     a.click();
-    // 延迟 revoke，避免部分浏览器下载未开始就释放
     setTimeout(() => {
       URL.revokeObjectURL(a.href);
       a.remove();
     }, 4000);
   }
 
+  function angleDiff(a, b) {
+    return ((a - b + 540) % 360) - 180;
+  }
+
   // ---------- 摄像头 ----------
   async function initCamera() {
     if (stream) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      orientHint.textContent = '浏览器不支持摄像头 API';
+      showToast('浏览器不支持摄像头 API（需 HTTPS）');
+      logWarn('mediaDevices 不可用');
+      return;
+    }
     try {
+      log('请求摄像头…');
       stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: 'environment' },
@@ -270,150 +283,123 @@
       video.srcObject = stream;
       await video.play();
       btnShoot.disabled = false;
+      log('摄像头就绪', {
+        w: video.videoWidth,
+        h: video.videoHeight,
+        track: stream.getVideoTracks()[0]?.label
+      });
+      orientHint.textContent = '摄像头就绪，等待方向传感器…';
     } catch (err) {
       console.error(err);
       orientHint.textContent = '无法访问摄像头';
       showToast('无法访问摄像头：' + (err.message || err.name));
+      logWarn('摄像头失败', err);
     }
   }
 
-  // ---------- 设备方向 ----------
+  // ---------- 方向传感器 ----------
   function onOrientation(e) {
     hasOrientation = true;
-    // iOS 提供 webkitCompassHeading（真正的磁北朝向）
+    orientEventCount++;
+
     if (typeof e.webkitCompassHeading === 'number') {
       deviceHeading = e.webkitCompassHeading;
     } else if (typeof e.alpha === 'number') {
-      // alpha: 0~360，设备绕 z 轴旋转；在竖屏下近似为朝向（需校正）
-      // 简化处理：用 360 - alpha 作为朝向近似值
       deviceHeading = (360 - e.alpha) % 360;
     }
+
     if (typeof e.beta === 'number') {
-      // beta: -180~180，前后倾斜。竖屏时 90 为垂直拿，0 为平放
-      // 转换成俯仰角：竖屏垂直拿时约 90，对应 pitch 0；上仰减小
       devicePitch = 90 - e.beta;
+      if (devicePitch > 90)  devicePitch = 90;
+      if (devicePitch < -90) devicePitch = -90;
     }
+
+    // 每 30 个事件打一条日志，避免刷屏
+    if (orientEventCount % 30 === 1) {
+      log('方向事件', {
+        n: orientEventCount,
+        alpha: e.alpha,
+        beta: e.beta,
+        gamma: e.gamma,
+        webkitCompassHeading: e.webkitCompassHeading,
+        heading: deviceHeading,
+        pitch: devicePitch
+      });
+    }
+
     updateGuideUI();
   }
 
   async function requestOrientationPermission() {
-    if (typeof DeviceOrientationEvent !== 'undefined' &&
-        typeof DeviceOrientationEvent.requestPermission === 'function') {
+    if (typeof DeviceOrientationEvent === 'undefined') {
+      orientHint.textContent = '设备不支持方向传感器';
+      logWarn('DeviceOrientationEvent 不存在');
+      return;
+    }
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
       try {
         const res = await DeviceOrientationEvent.requestPermission();
+        log('方向权限结果', res);
         if (res === 'granted') {
           window.addEventListener('deviceorientation', onOrientation, true);
         } else {
-          orientHint.textContent = '未授权方向传感器，引导可能不准';
+          orientHint.textContent = '未授权方向传感器，引导不可用';
         }
       } catch (e) {
         console.warn(e);
+        orientHint.textContent = '方向权限请求失败';
       }
     } else {
       window.addEventListener('deviceorientation', onOrientation, true);
+      log('已绑定 deviceorientation（无需授权）');
     }
   }
 
-  // 计算两个角度之差（-180 ~ 180）
-  function angleDiff(a, b) {
-    let d = ((a - b + 540) % 360) - 180;
-    return d;
+  // ---------- 引导 UI ----------
+  function updateGuideUI() {
+    if (!hasOrientation) {
+      guideRing.style.opacity = '0';
+      return;
+    }
+
+    if (guideIndex >= guideTargets.length) {
+      guideRing.style.opacity = '0';
+      orientHint.textContent = '引导点已全部完成，可继续自由拍摄或保存';
+      return;
+    }
+
+    const t = guideTargets[guideIndex];
+    const hDiff = angleDiff(t.heading, deviceHeading);
+    const pDiff = t.pitch - devicePitch;
+
+    if (Math.abs(hDiff) > 110) {
+      guideRing.style.opacity = '0';
+      const dir = hDiff > 0 ? '右' : '左';
+      orientHint.textContent = `目标在你的${dir}后方，请转身`;
+      return;
+    }
+
+    guideRing.style.opacity = '1';
+
+    const fovH = 70, fovV = 50;
+    const cx = 50 + (hDiff / fovH) * 100;
+    const cy = 50 - (pDiff / fovV) * 100;
+    const left = Math.max(10, Math.min(90, cx));
+    const top  = Math.max(15, Math.min(85, cy));
+
+    guideRing.style.left = left + '%';
+    guideRing.style.top  = top + '%';
+
+    const near = Math.abs(hDiff) < 10 && Math.abs(pDiff) < 10;
+    if (near) {
+      guideRing.classList.add('done');
+      orientHint.textContent = '已对准，可以拍摄';
+    } else {
+      guideRing.classList.remove('done');
+      orientHint.textContent = `转动手机，把目标圈移到画面中心（剩余 ${guideTargets.length - guideIndex} 个点）`;
+    }
   }
 
-// ---------- 引导：球面目标点 + 角差投影 ----------
-// 目标点序列：水平一圈 12 个，上仰 4 个，下俯 4 个
-function buildGuideTargets() {
-  const targets = [];
-  for (let i = 0; i < 12; i++) targets.push({ heading: i * 30, pitch: 0 });
-  for (let i = 0; i < 4; i++) targets.push({ heading: i * 90, pitch: 45 });
-  for (let i = 0; i < 4; i++) targets.push({ heading: i * 90, pitch: -45 });
-  return targets;
-}
-const guideTargets = buildGuideTargets();
-let guideIndex = 0;
-
-// 设备朝向（度）
-let deviceHeading = 0;
-let devicePitch = 0;
-let hasOrientation = false;
-
-function onOrientation(e) {
-  hasOrientation = true;
-
-  // heading：磁北朝向 0~360
-  if (typeof e.webkitCompassHeading === 'number') {
-    deviceHeading = e.webkitCompassHeading;
-  } else if (typeof e.alpha === 'number') {
-    // alpha 是绕 z 轴旋转，竖屏下近似为朝向；不同平台方向可能相反
-    deviceHeading = (360 - e.alpha) % 360;
-  }
-
-  // pitch：俯仰角，-90(向下) ~ +90(向上)
-  if (typeof e.beta === 'number') {
-    // beta: 竖屏垂直拿时约 90；上仰减小、下俯增大
-    devicePitch = 90 - e.beta;   // 范围约 -90 ~ 90
-    if (devicePitch > 90)  devicePitch = 90;
-    if (devicePitch < -90) devicePitch = -90;
-  }
-
-  updateGuideUI();
-}
-
-// 角度差 -180~180
-function angleDiff(a, b) {
-  return ((a - b + 540) % 360) - 180;
-}
-
-function updateGuideUI() {
-  if (!hasOrientation) {
-    guideRing.style.opacity = '0';
-    orientHint.textContent = '无方向传感器，请手动把目标点对准中心后拍摄';
-    return;
-  }
-
-  if (guideIndex >= guideTargets.length) {
-    guideRing.style.opacity = '0';
-    orientHint.textContent = '引导点已全部完成，可继续自由拍摄或保存';
-    return;
-  }
-
-  const t = guideTargets[guideIndex];
-  const hDiff = angleDiff(t.heading, deviceHeading); // -180~180
-  const pDiff = t.pitch - devicePitch;               // 俯仰差
-
-  // 目标在背后（|hDiff| > 110°）时隐藏圈，提示转过去
-  if (Math.abs(hDiff) > 110) {
-    guideRing.style.opacity = '0';
-    const dir = hDiff > 0 ? '右' : '左';
-    orientHint.textContent = `目标在你的${dir}后方，请转身`;
-    return;
-  }
-
-  guideRing.style.opacity = '1';
-
-  // 投影：hDiff 映射到屏幕横向，pDiff 映射到纵向
-  // 视野假设水平约 70°，垂直约 50°，据此换算百分比
-  const fovH = 70, fovV = 50;
-  const cx = 50 + (hDiff / fovH) * 100;
-  const cy = 50 - (pDiff / fovV) * 100;
-
-  // 限制在屏幕内，并稍作边缘收缩
-  const left = Math.max(10, Math.min(90, cx));
-  const top  = Math.max(15, Math.min(85, cy));
-
-  guideRing.style.left = left + '%';
-  guideRing.style.top  = top + '%';
-
-  // 对准判断：角差都很小
-  const near = Math.abs(hDiff) < 10 && Math.abs(pDiff) < 10;
-  if (near) {
-    guideRing.classList.add('done');
-    orientHint.textContent = '已对准，可以拍摄';
-  } else {
-    guideRing.classList.remove('done');
-    orientHint.textContent = `转动手机，把目标圈移到画面中心（剩余 ${guideTargets.length - guideIndex} 个点）`;
-  }
-}
   // ---------- 拍摄 ----------
   async function capture() {
     if (!stream) return;
@@ -423,23 +409,22 @@ function updateGuideUI() {
     const vh = video.videoHeight;
     if (!vw || !vh) {
       showToast('摄像头尚未就绪');
+      logWarn('videoWidth/Height 为 0');
       return;
     }
 
     const canvas = document.createElement('canvas');
     canvas.width = vw;
     canvas.height = vh;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, vw, vh);
+    canvas.getContext('2d').drawImage(video, 0, 0, vw, vh);
 
     canvas.toBlob((blob) => {
       if (!blob) { showToast('拍摄失败'); return; }
       const name = makeFileName(shots.length);
       const url = URL.createObjectURL(blob);
-      const item = { blob, url, name };
-      shots.push(item);
+      shots.push({ blob, url, name });
+      log('拍摄', name, blob.size, 'bytes', '共', shots.length, '张');
 
-      // 缩略图
       const img = document.createElement('img');
       img.src = url;
       img.alt = name;
@@ -449,13 +434,12 @@ function updateGuideUI() {
       updateCount();
       btnSaveAll.disabled = shots.length === 0;
 
-      // 引导点推进
       if (guideIndex < guideTargets.length) {
         guideIndex++;
+        log('引导推进到', guideIndex);
         updateGuideUI();
       }
 
-      // 逐张保存模式
       if (!modeBatch.checked) {
         downloadBlob(blob, name);
         showToast(`第 ${shots.length} 张已保存（${name}）`);
@@ -481,9 +465,7 @@ function updateGuideUI() {
     modal.classList.remove('show');
     showToast(`开始保存 ${shots.length} 张照片…`, 4000);
     for (let i = 0; i < shots.length; i++) {
-      const s = shots[i];
-      downloadBlob(s.blob, s.name);
-      // 间隔触发，避免浏览器拦截
+      downloadBlob(shots[i].blob, shots[i].name);
       await new Promise(r => setTimeout(r, 350));
     }
     setTimeout(() => {
@@ -501,9 +483,10 @@ function updateGuideUI() {
     btnSaveAll.disabled = true;
     updateGuideUI();
     showToast('已重置');
+    log('重置');
   }
 
-  // ---------- 事件绑定 ----------
+  // ---------- 事件 ----------
   btnShoot.addEventListener('click', capture);
   btnSaveAll.addEventListener('click', openSaveConfirm);
   modalConfirm.addEventListener('click', saveAll);
@@ -511,30 +494,28 @@ function updateGuideUI() {
   btnReset.addEventListener('click', reset);
 
   modeBatch.addEventListener('change', () => {
-    if (modeBatch.checked) {
-      showToast('已切换：全部拍完后一次性保存');
-    } else {
-      showToast('已切换：逐张保存。每张会立即下载到下载目录', 3000);
-    }
+    showToast(modeBatch.checked
+      ? '已切换：全部拍完后一次性保存'
+      : '已切换：逐张保存。每张会立即下载到下载目录', 3000);
   });
 
-  // 防止页面滚动
   document.addEventListener('touchmove', (e) => {
     if (!thumbsEl.contains(e.target)) e.preventDefault();
   }, { passive: false });
 
   // ---------- 启动 ----------
   (async function start() {
+    log('start');
     await initCamera();
     await requestOrientationPermission();
     updateGuideUI();
-    // 每帧刷新引导（传感器事件可能频率不足）
+    // 传感器事件频率不足时兜底刷新
     setInterval(() => {
       if (hasOrientation) updateGuideUI();
     }, 120);
   })();
 
 })();
-</script>
+</script>>
 </body>
 </html>
