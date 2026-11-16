@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>全景拍摄助手 - 靶心版</title>
+<title>全景拍摄助手 - 打包版</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -14,7 +14,7 @@
   #camera-wrap { position: relative; flex: 1; overflow: hidden; background: #000; }
   #video { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-  /* 固定的目标圈（蓝圈） */
+  /* 中央目标圈 */
   #target-ring {
     position: absolute; left: 50%; top: 50%;
     width: 120px; height: 120px; border-radius: 50%;
@@ -26,32 +26,28 @@
   #target-ring.aligned {
     border-color: #4caf50;
     box-shadow: 0 0 20px rgba(76, 175, 80, 0.5);
-    width: 100px; height: 100px; /* 变绿时缩小，更有吸附感 */
+    width: 100px; height: 100px;
   }
 
-  /* 动态准星（代表你手机当前的指向） */
+  /* 动态准星（限制在中心附近） */
   #reticle {
     position: absolute; left: 50%; top: 50%;
-    width: 60px; height: 60px;
+    width: 40px; height: 40px;
     transform: translate(-50%, -50%);
     pointer-events: none; z-index: 15;
     display: flex; align-items: center; justify-content: center;
+    transition: transform 0.1s linear;
   }
-  /* 准星十字 */
   #reticle::before, #reticle::after {
     content: ""; position: absolute; background: rgba(255, 255, 255, 0.8);
     box-shadow: 0 0 4px rgba(0,0,0,0.8);
   }
   #reticle::before { left: 50%; top: 0; width: 2px; height: 100%; transform: translateX(-50%); }
   #reticle::after  { top: 50%; left: 0; height: 2px; width: 100%; transform: translateY(-50%); }
-  
-  /* 准星中心的点 */
   #reticle-dot {
-    width: 10px; height: 10px; border-radius: 50%; background: #fff;
-    box-shadow: 0 0 5px rgba(0,0,0,0.8);
+    width: 8px; height: 8px; border-radius: 50%; background: #fff;
   }
 
-  /* 当对准变绿时 */
   #reticle.aligned::before, #reticle.aligned::after { background: #4caf50; }
   #reticle.aligned #reticle-dot { background: #4caf50; }
 
@@ -120,20 +116,17 @@
   }
   #shutter-flash.flash { opacity: .7; }
 </style>
+<!-- 引入 JSZip 用于打包下载 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
 
 <div id="camera-wrap">
   <video id="video" autoplay playsinline muted></video>
-  
-  <!-- 固定的目标蓝圈 -->
   <div id="target-ring"></div>
-  
-  <!-- 动态准星 -->
   <div id="reticle">
     <div id="reticle-dot"></div>
   </div>
-
   <div id="status">
     <span class="count">已拍 <b id="shot-count">0</b> 张</span>
     <span class="hint" id="orient-hint">初始化中…</span>
@@ -143,16 +136,12 @@
 <div id="controls">
   <div class="mode-row">
     <input type="checkbox" id="mode-batch" checked>
-    <label for="mode-batch">
-      全部拍完后一次性保存
-    </label>
+    <label for="mode-batch">全部拍完后打包(ZIP)一次性保存</label>
   </div>
-
   <div id="thumbs"></div>
-
   <div class="btn-row">
     <button id="btn-shoot" disabled>强制拍摄</button>
-    <button id="btn-save-all" disabled>保存全部</button>
+    <button id="btn-save-all" disabled>保存(ZIP)</button>
     <button id="btn-skip">跳过</button>
     <button id="btn-reset">重置</button>
   </div>
@@ -165,25 +154,20 @@
 (function () {
   'use strict';
 
-  const VERSION = '4.0.0';
-  const DEBUG = /[?&]debug=1/.test(location.search);
+  const VERSION = '5.0.0';
 
   // ================= 核心配置 =================
-  // 如果发现水平方向反了，改成 1
   const HEADING_SIGN = -1; 
-  // 如果发现抬头/低头反了，改成 -1
   const PITCH_SIGN = 1;
   
-  // 判定容差：偏差小于 10 度算对准
-  const NEAR_DEG = 10;           
-  const AUTO_SHOOT_DELAY = 600;  // 保持多久自动拍
+  // 角度容差（放宽到 12 度，配合更稳的滤波）
+  const NEAR_DEG = 12;           
+  const AUTO_SHOOT_DELAY = 800;  // 保持 0.8 秒才自动拍
   
-  // 屏幕像素缩放倍率：角度差 * 倍率 = 屏幕上的像素位移
-  // 数值越大，准星在屏幕上移动越灵敏
-  const PIXELS_PER_DEGREE = 8;   
+  // 准星最大偏移像素（限制范围，防飘飞）
+  const MAX_OFFSET_PX = 80;      
   // ============================================
 
-  // ---------- DOM ----------
   const video       = document.getElementById('video');
   const shotCountEl = document.getElementById('shot-count');
   const thumbsEl    = document.getElementById('thumbs');
@@ -193,16 +177,13 @@
   const btnReset    = document.getElementById('btn-reset');
   const modeBatch   = document.getElementById('mode-batch');
   const toastEl     = document.getElementById('toast');
-  
   const targetRing  = document.getElementById('target-ring');
   const reticle     = document.getElementById('reticle');
   const orientHint  = document.getElementById('orient-hint');
   const flashEl     = document.getElementById('shutter-flash');
 
-  // ---------- 状态 ----------
   const shots = [];
   let stream = null;
-
   let hasOrientation = false;
   let rawHeading = 0, rawPitch = 0;
   let smoothHeading = 0, smoothPitch = 0;
@@ -211,17 +192,20 @@
   let lockStart = 0;
   let isAutoShooting = false;
 
-  // 目标点：水平 12 个（每 30 度），低头 4 个（-45 度），抬头 4 个（45 度）
+  // 调整拍摄序列，完全符合人在原地转身习惯
+  // 水平 12 张 -> 稍微低头拍 4 张 -> 稍微仰头拍 4 张
   function buildGuideTargets() {
     const t = [];
+    // 第一圈：水平，从 0 到 330
     for (let i = 0; i < 12; i++) t.push({ heading: i * 30, pitch: 0 });
-    for (let i = 0; i < 4; i++) t.push({ heading: i * 90, pitch: -45 }); 
-    for (let i = 0; i < 4; i++) t.push({ heading: i * 90, pitch: 45 });  
+    // 第二圈：低头，稍微下压 40 度（如果设备识别反了，通过 PITCH_SIGN 控制）
+    for (let i = 0; i < 4; i++) t.push({ heading: i * 90, pitch: -40 }); 
+    // 第三圈：抬头
+    for (let i = 0; i < 4; i++) t.push({ heading: i * 90, pitch: 40 });  
     return t;
   }
   const guideTargets = buildGuideTargets();
 
-  // ---------- 工具 ----------
   function showToast(msg, duration = 2200) {
     toastEl.textContent = msg;
     toastEl.classList.add('show');
@@ -234,23 +218,19 @@
   }
   function updateCount() { shotCountEl.textContent = shots.length; }
   function pad(n) { return String(n).padStart(3, '0'); }
+  
+  // 规范文件名：pano_001_20231025_121500.jpg
   function makeFileName(idx) {
-    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const d = new Date();
+    const ts = `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
     return `pano_${pad(idx + 1)}_${ts}.jpg`;
   }
-  function downloadBlob(blob, filename) {
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
-  }
+
   function angleDiff(a, b) { return ((a - b + 540) % 360) - 180; }
+  // 极重度平滑滤波，解决手抖
   function smoothAngle(oldVal, newVal, k) { return oldVal + angleDiff(newVal, oldVal) * k; }
   function vibrate(ms) { if (navigator.vibrate) navigator.vibrate(ms); }
 
-  // ---------- 摄像头 ----------
   async function initCamera() {
     if (stream) return;
     try {
@@ -262,12 +242,10 @@
       await video.play();
       btnShoot.disabled = false;
     } catch (err) {
-      console.error(err);
       orientHint.textContent = '无法访问摄像头';
     }
   }
 
-  // ---------- 传感器 ----------
   function onOrientation(e) {
     hasOrientation = true;
 
@@ -290,8 +268,9 @@
       smoothPitch = p;
       hasSmoothInit = true;
     } else {
-      smoothHeading = smoothAngle(smoothHeading, h, 0.2);
-      smoothPitch += (p - smoothPitch) * 0.2;
+      // 把平滑系数从 0.2 降到 0.08，极大减少准星乱飘
+      smoothHeading = smoothAngle(smoothHeading, h, 0.08);
+      smoothPitch += (p - smoothPitch) * 0.08;
     }
 
     updateUI();
@@ -309,14 +288,13 @@
     }
   }
 
-  // ---------- UI 逻辑 ----------
   function updateUI() {
     if (!hasOrientation) return;
 
     if (guideIndex >= guideTargets.length) {
       reticle.style.opacity = '0';
       targetRing.style.opacity = '0';
-      orientHint.textContent = '全部拍完！';
+      orientHint.textContent = '全部拍完！可保存';
       orientHint.classList.remove('aligned');
       return;
     }
@@ -325,32 +303,21 @@
     const hDiff = angleDiff(t.heading, smoothHeading); 
     const pDiff = t.pitch - smoothPitch;
     
-    // 判断是否对准
     const isNear = Math.abs(hDiff) < NEAR_DEG && Math.abs(pDiff) < NEAR_DEG;
 
-    // 计算准星偏移量
-    // 如果目标在左边 (hDiff>0)，准星应该偏左
-    let dx = 0;
-    let dy = 0;
-    
+    // 更新准星位置（限制最大偏移量）
+    let dx = 0, dy = 0;
     if (!isNear) {
-      dx = -hDiff * PIXELS_PER_DEGREE;
-      dy = pDiff * PIXELS_PER_DEGREE;
-      
-      // 限制在屏幕内，太远就贴边
-      const maxX = window.innerWidth / 2 - 30;
-      const maxY = window.innerHeight / 2 - 30;
-      dx = Math.max(-maxX, Math.min(maxX, dx));
-      dy = Math.max(-maxY, Math.min(maxY, dy));
-
+      dx = -hDiff * 3;
+      dy = pDiff * 3;
+      dx = Math.max(-MAX_OFFSET_PX, Math.min(MAX_OFFSET_PX, dx));
+      dy = Math.max(-MAX_OFFSET_PX, Math.min(MAX_OFFSET_PX, dy));
       reticle.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
       reticle.style.opacity = '1';
     } else {
-      // 对准后，强制回正到中心
       reticle.style.transform = `translate(-50%, -50%)`;
     }
 
-    // 更新颜色和状态
     if (isNear) {
       reticle.classList.add('aligned');
       targetRing.classList.add('aligned');
@@ -377,7 +344,6 @@
       targetRing.classList.remove('aligned');
       orientHint.classList.remove('aligned');
       
-      // 文字提示逻辑
       let tips = [];
       if (hDiff > NEAR_DEG) tips.push('向左转');
       else if (hDiff < -NEAR_DEG) tips.push('向右转');
@@ -385,9 +351,7 @@
       if (pDiff > NEAR_DEG) tips.push('低头');
       else if (pDiff < -NEAR_DEG) tips.push('抬头');
 
-      if (tips.length === 0) {
-        tips.push('微调至中心');
-      }
+      if (tips.length === 0) tips.push('微调');
 
       orientHint.textContent = `请${tips.join('并')} (剩 ${guideTargets.length - guideIndex})`;
     }
@@ -403,10 +367,9 @@
   function skipGuide() {
     if (guideIndex >= guideTargets.length) return;
     advanceGuide();
-    showToast(`已跳过，进度 ${guideIndex}/${guideTargets.length}`);
+    showToast(`已跳过`);
   }
 
-  // ---------- 拍摄 ----------
   async function capture(isAuto = false) {
     if (!stream) return;
     flash();
@@ -432,27 +395,45 @@
       updateCount();
       btnSaveAll.disabled = shots.length === 0;
 
-      if (!modeBatch.checked) {
-        downloadBlob(blob, name);
-      }
-      
-      if (isAuto) {
-        advanceGuide();
-      }
+      if (isAuto) advanceGuide();
     }, 'image/jpeg', 0.92);
   }
 
-  // ---------- 保存与重置 ----------
-  function openSaveConfirm() {
-    if (shots.length === 0) { showToast('还没有拍摄照片'); return; }
-    downloadAll();
-  }
+  // ---------- 打包下载逻辑 ----------
+  async function downloadZip() {
+    if (shots.length === 0) return;
+    
+    // 检查 JSZip 是否加载成功
+    if (typeof JSZip === 'undefined') {
+      showToast('打包组件加载失败，请检查网络', 4000);
+      return;
+    }
 
-  async function downloadAll() {
-    showToast(`开始保存 ${shots.length} 张…`, 3000);
+    showToast(`正在打包 ${shots.length} 张照片…`, 10000);
+    const zip = new JSZip();
+    
+    // 按照顺序把图片添加到 zip 中
     for (let i = 0; i < shots.length; i++) {
-      downloadBlob(shots[i].blob, shots[i].name);
-      await new Promise(r => setTimeout(r, 350));
+      zip.file(shots[i].name, shots[i].blob);
+    }
+
+    try {
+      // 生成 zip 二进制数据
+      const content = await zip.generateAsync({ type: 'blob' });
+      const zipName = `Pano_${new Date().getTime()}.zip`;
+      
+      // 下载 zip
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(content);
+      a.download = zipName;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 5000);
+      
+      showToast('打包成功！请到“下载”中查看 ZIP 文件', 5000);
+    } catch (e) {
+      console.error(e);
+      showToast('打包失败，请重试');
     }
   }
 
@@ -469,9 +450,8 @@
     showToast('已重置');
   }
 
-  // ---------- 事件绑定 ----------
   btnShoot.addEventListener('click', () => capture(false));
-  btnSaveAll.addEventListener('click', openSaveConfirm);
+  btnSaveAll.addEventListener('click', downloadZip);
   btnSkip.addEventListener('click', skipGuide);
   btnReset.addEventListener('click', reset);
 
@@ -479,7 +459,6 @@
     if (!thumbsEl.contains(e.target)) e.preventDefault();
   }, { passive: false });
 
-  // ---------- 启动 ----------
   (async function start() {
     await initCamera();
     await requestOrientationPermission();
