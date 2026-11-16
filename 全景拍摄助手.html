@@ -154,7 +154,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '5.1.0';
+  const VERSION = '5.1.1';
 
   // ================= 核心配置 =================
   const HEADING_SIGN = -1; 
@@ -221,16 +221,13 @@
     return `pano_${pad(idx + 1)}_${ts}.jpg`;
   }
 
-  // 计算角度差，这里是解决“转270度”问题的核心
-  // 强制返回 -180 到 180 之间。比如 350 度相当于 -10 度（向左转10度）
+  // 计算角度差，强制返回 -180 到 180 之间（解决转270度问题）
   function angleDiff(a, b) { 
     let d = ((a - b + 540) % 360) - 180;
-    // 如果系统给出转 270 度，我们强制把它转为 -90 度（向左转 90 度）
-    // 避免让用户做毫无意义的270度大转身
     return d;
   }
 
-  // 平滑滤波（降低系数以减少抖动）
+  // 平滑滤波
   function smoothAngle(oldVal, newVal, k) { return oldVal + angleDiff(newVal, oldVal) * k; }
   function vibrate(ms) { if (navigator.vibrate) navigator.vibrate(ms); }
 
@@ -245,6 +242,7 @@
       await video.play();
       btnShoot.disabled = false;
     } catch (err) {
+      console.error('Camera error:', err);
       orientHint.textContent = '无法访问摄像头';
     }
   }
@@ -271,7 +269,6 @@
       smoothPitch = p;
       hasSmoothInit = true;
     } else {
-      // 超级平滑，防抖
       smoothHeading = smoothAngle(smoothHeading, h, 0.08);
       smoothPitch += (p - smoothPitch) * 0.08;
     }
@@ -303,8 +300,6 @@
     }
 
     const t = guideTargets[guideIndex];
-    
-    // 使用重写后的 angleDiff
     const hDiff = angleDiff(t.heading, smoothHeading); 
     const pDiff = t.pitch - smoothPitch;
     
@@ -349,24 +344,30 @@
       targetRing.classList.remove('aligned');
       orientHint.classList.remove('aligned');
       
-      // 智能寻路逻辑：如果抬头/低头，强制提示以最短路径旋转
       let tips = [];
       
-      // 判断旋转方向：无论是 270 还是 -90，我们只取最近的路径
+      // 判断水平旋转
       if (hDiff > NEAR_DEG) tips.push('向左转 ↺');
       else if (hDiff < -NEAR_DEG) tips.push('向右转 ↻');
       
-      if (pDiff > NEAR_DEG) tips.push('抬头 ↑');
-      else if (pDiff < -NEAR_DEG) tips.push('低头 ↓');
+      // 判断垂直俯仰
+      let pTip = '';
+      if (pDiff > NEAR_DEG) pTip = '抬头 ↑';
+      else if (pDiff < -NEAR_DEG) pTip = '低头 ↓';
 
-      if (tips.length === 0) tips.push('微调');
+      if (tips.length === 0 && !pTip) {
+        tips.push('微调');
+      } else {
+        if (pTip) tips.push(pTip);
+      }
 
-      // 特别处理：如果在拍头顶/脚底时，把“转270度”优化成“转90度”
-      // 如果水平偏差大于90度，强制改换提示词
-      let finalTip = tips.join('并');
+      // 智能路径纠正：如果水平偏差>90度，提示走反方向，避免原地转大半圈
+      let finalTip = '';
       if (Math.abs(hDiff) > 90) {
-        // 说明是走远路，其实可以反向走
-        finalTip = (hDiff > 0 ? '向右转 ↻' : '向左转 ↺') + (pT xt ? '并' + (pDiff > 0 ? '抬头' : '低头') : '');
+        let shortH = (hDiff > 0 ? '向右转 ↻' : '向左转 ↺');
+        finalTip = shortH + (pTip ? '并' + pTip : '');
+      } else {
+        finalTip = tips.join('并');
       }
 
       orientHint.textContent = `请${finalTip} (剩 ${guideTargets.length - guideIndex})`;
