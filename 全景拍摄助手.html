@@ -18,54 +18,68 @@
   #guide-cross {
     position: absolute; left: 50%; top: 50%;
     width: 40px; height: 40px; transform: translate(-50%, -50%);
-    pointer-events: none; transition: all 0.2s;
-    z-index: 10; opacity: 0.6;
+    pointer-events: none; z-index: 10;
+    transition: border-color 0.2s;
   }
   #guide-cross::before, #guide-cross::after {
     content: ""; position: absolute; background: #fff;
     box-shadow: 0 0 4px rgba(0,0,0,0.8);
+    transition: background 0.2s;
   }
   #guide-cross::before { left: 50%; top: 0; width: 2px; height: 100%; transform: translateX(-50%); }
   #guide-cross::after  { top: 50%; left: 0; height: 2px; width: 100%; transform: translateY(-50%); }
   #guide-cross.aligned::before, #guide-cross.aligned::after { background: #4caf50; }
 
-  /* 动态引导线（从目标点指向准星的尾巴，代表你需要转动的方向） */
-  #guide-line {
-    position: absolute; height: 4px; background: #fff;
-    transform-origin: 0 50%; border-radius: 2px;
-    pointer-events: none; z-index: 15;
-    box-shadow: 0 0 6px rgba(0,0,0,0.5); display: none;
-  }
-  #guide-line::after {
-    content: ""; position: absolute; right: -6px; top: -6px;
-    border-top: 8px solid transparent; border-bottom: 8px solid transparent;
-    border-left: 12px solid #fff;
-  }
-
-  /* 目标点及外圈 */
-  #target-dot {
+  /* 目标点及其外圈 */
+  #target-group {
     position: absolute; left: 50%; top: 50%;
-    width: 24px; height: 24px; border-radius: 50%;
-    background: rgba(33, 150, 243, 0.95);
-    transform: translate(-50%, -50%);
     pointer-events: none; z-index: 20;
-    transition: width 0.2s, height 0.2s, background 0.2s;
+    transform: translate(-50%, -50%);
+  }
+  #target-dot {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(33, 150, 243, 0.9);
+    margin: 0 auto;
+    transform: translateY(-50%); /* 居中微调 */
+    position: absolute; top: 50%; left: 50%; margin-left: -10px; margin-top: -10px;
     box-shadow: 0 0 10px rgba(33, 150, 243, 0.6);
+    transition: width 0.2s, height 0.2s, margin 0.2s, background 0.2s;
   }
   #target-ring {
-    position: absolute; left: 50%; top: 50%;
     width: 80px; height: 80px; border-radius: 50%;
-    border: 2px solid rgba(255,255,255,0.7);
-    transform: translate(-50%, -50%);
-    pointer-events: none; z-index: 19;
-    transition: width 0.2s, height 0.2s, border-color 0.2s;
+    border: 2px solid rgba(255,255,255,0.6);
+    position: absolute; top: 50%; left: 50%; margin-left: -40px; margin-top: -40px;
+    transition: width 0.2s, height 0.2s, margin 0.2s, border-color 0.2s;
   }
-  #target-dot.near {
-    width: 16px; height: 16px; background: #4caf50;
+  
+  /* 当靠近目标时的绿色状态 */
+  #target-group.near #target-dot {
+    width: 16px; height: 16px; margin-left: -8px; margin-top: -8px;
+    background: #4caf50;
     box-shadow: 0 0 15px rgba(76,175,80,0.8);
   }
-  #target-ring.near { width: 40px; height: 40px; border-color: #4caf50; }
-  #target-ring.hidden { display: none; }
+  #target-group.near #target-ring {
+    width: 44px; height: 44px; margin-left: -22px; margin-top: -22px;
+    border-color: #4caf50;
+  }
+  #target-group.hidden { display: none; }
+
+  /* 动态引导箭头 (从中心指向目标点) */
+  #guide-arrow {
+    position: absolute; left: 50%; top: 50%;
+    height: 2px; background: rgba(255, 212, 0, 0.85);
+    transform-origin: 0 50%;
+    pointer-events: none; z-index: 5;
+    box-shadow: 0 0 4px rgba(0,0,0,0.6);
+    display: none;
+  }
+  /* 箭头尖端 */
+  #guide-arrow::after {
+    content: ""; position: absolute; right: -2px; top: 50%;
+    transform: translateY(-50%);
+    border-top: 6px solid transparent; border-bottom: 6px solid transparent;
+    border-left: 10px solid rgba(255, 212, 0, 0.85);
+  }
 
   /* 顶部状态栏 */
   #status {
@@ -169,10 +183,13 @@
   <!-- 中央准星 -->
   <div id="guide-cross"></div>
 
-  <!-- 引导线与目标点 -->
-  <div id="guide-line"></div>
-  <div id="target-ring" class="hidden"></div>
-  <div id="target-dot" class="hidden"></div>
+  <!-- 引导箭头与目标点 -->
+  <div id="guide-arrow"></div>
+  
+  <div id="target-group" class="hidden">
+    <div id="target-ring"></div>
+    <div id="target-dot"></div>
+  </div>
 
   <div id="status">
     <span class="count">已拍 <b id="shot-count">0</b> 张</span>
@@ -220,23 +237,22 @@
 (function () {
   'use strict';
 
-  const VERSION = '2.1.0';
+  const VERSION = '2.2.0';
   const DEBUG = /[?&]debug=1/.test(location.search);
   if (DEBUG) document.body.classList.add('debug');
 
-  function log(...a) { if (DEBUG) console.log(`[pano v${VERSION}]`, ...a); }
-
   // ================= 核心配置 =================
-  // 如果发现水平转动的方向相反，把这里改成 1
+  // 如果发现方向还是反的，把这里改成 1
   const HEADING_SIGN = -1; 
   const PITCH_SIGN = 1;
   
-  const NEAR_DEG = 15;          // 误差在 15 度以内算对准（进入吸附区）
-  const AUTO_SHOOT_DELAY = 600; // 吸附后停留 600ms 自动拍摄
-  const AUTO_SHOOT = true;      // 是否开启自动拍摄
-
-  // 引导球面半径（屏幕上像素距离，决定了视觉上的远近）
-  const SPHERE_RADIUS = 220; 
+  // 真正的对准判定：中心5度以内（这个值越小越难套准，5度大约是手机偏转一根手指的幅度）
+  const NEAR_DEG = 5;           
+  const AUTO_SHOOT_DELAY = 600; // 套准后保持多久自动拍
+  
+  // 水平/垂直视野角度，用于屏幕坐标映射，决定了圆圈移动的幅度
+  const FOV_H = 70;
+  const FOV_V = 50;
   // ============================================
 
   // ---------- DOM ----------
@@ -255,9 +271,8 @@
   const modalCancel = document.getElementById('modal-cancel');
   const modalConfirm= document.getElementById('modal-confirm');
   
-  const targetDot   = document.getElementById('target-dot');
-  const targetRing  = document.getElementById('target-ring');
-  const guideLine   = document.getElementById('guide-line');
+  const targetGroup = document.getElementById('target-group');
+  const guideArrow  = document.getElementById('guide-arrow');
   const crosshair   = document.getElementById('guide-cross');
   const orientHint  = document.getElementById('orient-hint');
   const debugInfo   = document.getElementById('debug-info');
@@ -278,13 +293,12 @@
   let lockStart = 0;
   let isAutoShooting = false;
 
-  // 目标点序列：更符合人操作直觉的顺序
-  // 先水平一圈(12个)，再低头一圈(4个)，再抬头一圈(4个)
+  // 目标点序列：水平12个(每30度)，低头4个(-45度)，抬头4个(45度)
   function buildGuideTargets() {
     const t = [];
     for (let i = 0; i < 12; i++) t.push({ heading: i * 30, pitch: 0 });
-    for (let i = 0; i < 4; i++) t.push({ heading: i * 90, pitch: -45 }); // 脚
-    for (let i = 0; i < 4; i++) t.push({ heading: i * 90, pitch: 45 });  // 天
+    for (let i = 0; i < 4; i++) t.push({ heading: i * 90, pitch: -45 }); 
+    for (let i = 0; i < 4; i++) t.push({ heading: i * 90, pitch: 45 });  
     return t;
   }
   const guideTargets = buildGuideTargets();
@@ -329,7 +343,6 @@
       video.srcObject = stream;
       await video.play();
       btnShoot.disabled = false;
-      orientHint.textContent = '请按提示寻找目标点';
     } catch (err) {
       console.error(err);
       orientHint.textContent = '无法访问摄像头';
@@ -373,9 +386,7 @@
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
       try {
         const res = await DeviceOrientationEvent.requestPermission();
-        if (res === 'granted') {
-          window.addEventListener('deviceorientation', onOrientation, true);
-        }
+        if (res === 'granted') window.addEventListener('deviceorientation', onOrientation, true);
       } catch (e) { console.warn(e); }
     } else {
       window.addEventListener('deviceorientation', onOrientation, true);
@@ -387,89 +398,66 @@
     if (!hasOrientation) return;
 
     if (guideIndex >= guideTargets.length) {
-      targetDot.classList.add('hidden');
-      targetRing.classList.add('hidden');
-      guideLine.style.display = 'none';
+      targetGroup.classList.add('hidden');
+      guideArrow.style.display = 'none';
       orientHint.textContent = '全部目标已拍完！';
       orientHint.classList.remove('aligned');
       return;
     }
 
     const t = guideTargets[guideIndex];
-    const hDiff = angleDiff(t.heading, smoothHeading);
+    
+    // 计算当前手机与目标的角差
+    const hDiff = angleDiff(t.heading, smoothHeading); 
     const pDiff = t.pitch - smoothPitch;
     
-    // 判断是否进入了微观的“吸附区”
-    const near = Math.abs(hDiff) < NEAR_DEG && Math.abs(pDiff) < NEAR_DEG;
+    // 判断是否真正对准（5度以内，此时圆环和准星视觉上重叠）
+    const isNear = Math.abs(hDiff) < NEAR_DEG && Math.abs(pDiff) < NEAR_DEG;
 
-    // 屏幕坐标系计算（球面投影）
-    // hDiff < 0 (目标在右侧)，点在屏幕右侧
-    // hDiff > 0 (目标在左侧)，点在屏幕左侧
-    // 视野角度设定为 FOV_H = 70度 (手机广角)，垂直 FOV_V = 50度
+    // 将角差映射为屏幕上的像素偏移
+    // 注意映射方向：如果 hDiff > 0 (目标在左侧)，目标点在屏幕中心左侧
+    // 所以 x 偏移为负。这里去掉了之前导致方向反转的错误正负号。
     const fovH = 70, fovV = 50;
+    const w = video.getBoundingClientRect().width || window.innerWidth;
+    const h = video.getBoundingClientRect().height || window.innerHeight;
+
+    // 计算在屏幕上的像素偏移量
+    const dx = -(hDiff / fovH) * w;
+    const dy = -(pDiff / fovV) * h;
+
+    // 屏幕中心坐标
+    const cx = w / 2;
+    const cy = h / 2;
     
-    // 计算目标点应当在屏幕上的坐标 (中心点为 50, 50)
-    // 注意这里加入了 SPHERE_RADIUS 的缩放，让转动的幅度看起来更自然
-    let cx = 50 - (hDiff / fovH) * 100;
-    let cy = 50 - (pDiff / fovV) * 100;
+    // 目标点绝对坐标（限制在屏幕边缘，防止飞出框外太远）
+    const targetX = Math.max(-20, Math.min(w + 20, cx + dx));
+    const targetY = Math.max(-20, Math.min(h + 20, cy + dy));
 
-    // 如果偏差极大，超出屏幕过多，限制在边缘
-    cx = Math.max(-20, Math.min(120, cx));
-    cy = Math.max(-20, Math.min(120, cy));
+    // 更新目标点位置 (top/left 直接用像素)
+    targetGroup.classList.remove('hidden');
+    targetGroup.style.left = targetX + 'px';
+    targetGroup.style.top  = targetY + 'px';
 
-    // 如果进入了吸附区，强制动画平移中心
-    if (near) {
-      cx = 50; 
-      cy = 50;
-    }
-
-    // 更新目标点位置
-    targetDot.classList.remove('hidden');
-    targetRing.classList.remove('hidden');
-    targetDot.style.left = cx + '%';
-    targetDot.style.top  = cy + '%';
-    targetRing.style.left = cx + '%';
-    targetRing.style.top  = cy + '%';
-
-    // 更新引导线（仅在未吸附且目标在视野内或边缘时显示）
-    if (!near) {
-      // 屏幕中心像素位置
-      const rect = video.getBoundingClientRect();
-      const centerX = rect.width / 2;
-      const centerY = rect.height / 2;
+    // --- 绘制引导箭头 ---
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist > 80 && !isNear) {
+      // 如果离得比较远，画一个从中心指向目标的线
+      guideArrow.style.display = 'block';
+      const angle = Math.atan2(dy, dx) * (180 / Math.PI); // 角度
       
-      // 目标点在屏幕上的像素位置
-      const tx = (cx / 100) * rect.width;
-      const ty = (cy / 100) * rect.height;
-
-      const dx = tx - centerX;
-      const dy = ty - centerY;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-
-      // 如果目标在屏幕内部（距离小于300px），画出指示线
-      if (dist < 300) {
-        const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-        guideLine.style.display = 'block';
-        // 线条从目标点出发，指向中心
-        // 为了不让线条盖住准星，计算线条长度
-        const len = Math.max(0, dist - 30); 
-        guideLine.style.left = tx + 'px';
-        guideLine.style.top  = ty + 'px';
-        guideLine.style.width = len + 'px';
-        guideLine.style.transform = `rotate(${angle + 180}deg)`; // 指向中心
-        guideLine.style.background = '#fff';
-        guideLine.style.height = '3px';
-      } else {
-        guideLine.style.display = 'none';
-      }
+      // 箭头长度：从中心减去准星半径，指向目标点，最多不超过目标点
+      const arrowLen = Math.min(dist, 150); 
+      
+      guideArrow.style.width = arrowLen + 'px';
+      guideArrow.style.transform = `rotate(${angle}deg)`;
     } else {
-      guideLine.style.display = 'none';
+      // 已经很近（小于80像素）或者已经在区域内，隐藏箭头，让用户专注看圆点
+      guideArrow.style.display = 'none';
     }
 
-    // 状态更新
-    if (near) {
-      targetDot.classList.add('near');
-      targetRing.classList.add('near');
+    // --- 状态更新 ---
+    if (isNear) {
+      targetGroup.classList.add('near');
       crosshair.classList.add('aligned');
       orientHint.classList.add('aligned');
       
@@ -478,13 +466,11 @@
         lockStart = now;
         vibrate(50);
         orientHint.textContent = '已对准，请保持…';
-      } else if (AUTO_SHOOT && !isAutoShooting && (now - lockStart >= AUTO_SHOOT_DELAY)) {
+      } else if (!isAutoShooting && (now - lockStart >= AUTO_SHOOT_DELAY)) {
         isAutoShooting = true;
         vibrate(100);
         orientHint.textContent = '自动拍摄！';
         capture(true);
-      } else if (!AUTO_SHOOT) {
-        orientHint.textContent = '已对准，点击拍摄';
       } else {
         const left = Math.max(0, AUTO_SHOOT_DELAY - (now - lockStart)) / 1000;
         orientHint.textContent = `保持不动… ${left.toFixed(1)}s`;
@@ -492,27 +478,27 @@
     } else {
       lockStart = 0;
       isAutoShooting = false;
-      targetDot.classList.remove('near');
-      targetRing.classList.remove('near');
+      targetGroup.classList.remove('near');
       crosshair.classList.remove('aligned');
       orientHint.classList.remove('aligned');
       
-      // 生成直观的转动指引
+      // 根据距离和方向给出文字提示
       let hTxt = '';
       if (Math.abs(hDiff) > NEAR_DEG) {
-        hTxt = hDiff > 0 ? '向左转' : '向右转';
-      } else {
-        hTxt = '水平已对齐';
+        hTxt = hDiff > 0 ? '向左' : '向右';
       }
       
       let pTxt = '';
       if (Math.abs(pDiff) > NEAR_DEG) {
-        pTxt = pDiff > 0 ? '抬头' : '低头';
-      } else {
-        pTxt = '';
+        pTxt = pDiff > 0 ? '向上' : '向下';
       }
 
-      orientHint.textContent = `${hTxt} ${pTxt} (剩 ${guideTargets.length - guideIndex})`;
+      // 如果水平/垂直都对齐了，说明可能是靠近但没达到5度，文字提示“微调”
+      if (!hTxt && !pTxt) {
+        orientHint.textContent = `微调至圆圈重合 (剩 ${guideTargets.length - guideIndex})`;
+      } else {
+        orientHint.textContent = `请${hTxt}${pTxt}转动 (剩 ${guideTargets.length - guideIndex})`;
+      }
     }
 
     if (DEBUG) {
@@ -521,8 +507,8 @@
         `rawH:${rawHeading.toFixed(1)} rawP:${rawPitch.toFixed(1)}\n` +
         `smH:${smoothHeading.toFixed(1)} smP:${smoothPitch.toFixed(1)}\n` +
         `hD:${hDiff.toFixed(1)} pD:${pDiff.toFixed(1)}\n` +
-        `idx:${guideIndex}/${guideTargets.length}\n` +
-        `near:${near} lock:${lockStart?'Y':'N'}`;
+        `isNear:${isNear}\n` +
+        `idx:${guideIndex}/${guideTargets.length}`;
     }
   }
 
@@ -567,11 +553,8 @@
 
       if (!modeBatch.checked) {
         downloadBlob(blob, name);
-        if (!isAuto) showToast(`第 ${shots.length} 张已保存`);
-      } else if (isAuto) {
-        showToast(`自动拍摄：第 ${shots.length} 张`, 1000);
       }
-
+      
       if (isAuto) {
         advanceGuide();
       }
