@@ -22,14 +22,18 @@
     transform: translate(-50%, -50%); transition: left .15s, top .15s;
     box-shadow: 0 0 0 2px rgba(0,0,0,.3);
   }
-  #guide-dot {
-    position: absolute; width: 22px; height: 22px;
-    background: #ffd400; border-radius: 50%;
-    transform: translate(-50%, -50%); transition: left .15s, top .15s;
-    box-shadow: 0 0 8px rgba(255,212,0,.8);
-  }
+#guide-cross {
+  position: absolute; left: 50%; top: 50%;
+  width: 28px; height: 28px; transform: translate(-50%, -50%);
+  pointer-events: none; opacity: .5;
+}
+#guide-cross::before, #guide-cross::after {
+  content: ""; position: absolute; background: #fff;
+}
+#guide-cross::before { left: 50%; top: 0; width: 2px; height: 100%; transform: translateX(-50%); }
+#guide-cross::after  { top: 50%; left: 0; height: 2px; width: 100%; transform: translateY(-50%); }
   #guide-ring.done { border-color: #4caf50; }
-  #guide-dot.done { background: #4caf50; box-shadow: 0 0 8px rgba(76,175,80,.8); }
+  #guide-dot.done { background: #4caf50; box-shadow: 0 0 10px rgba(76,175,80,.8); }
 
   /* 顶部状态 */
   #status {
@@ -113,10 +117,10 @@
 
 <div id="camera-wrap">
   <video id="video" autoplay playsinline muted></video>
-  <div id="guide">
-    <div id="guide-ring"></div>
-    <div id="guide-dot"></div>
-  </div>
+<div id="guide">
+  <div id="guide-cross"></div>
+  <div id="guide-ring"></div>
+</div>
   <div id="status">
     <span class="count">已拍 <b id="shot-count">0</b> 张</span>
     <span class="hint" id="orient-hint">转动手机，对准目标点</span>
@@ -316,60 +320,100 @@
     return d;
   }
 
-  // ---------- 引导 UI ----------
-  function updateGuideUI() {
-    if (!hasOrientation) {
-      // 没有传感器：把引导点固定在屏幕中心偏上，提示用户手动对准
-      guideRing.style.left = '50%';
-      guideRing.style.top = '40%';
-      guideDot.style.left = '50%';
-      guideDot.style.top = '40%';
-      guideRing.classList.add('done');
-      guideDot.classList.add('done');
-      orientHint.textContent = '无方向传感器，请手动把目标点对准中心后拍摄';
-      return;
-    }
+// ---------- 引导：球面目标点 + 角差投影 ----------
+// 目标点序列：水平一圈 12 个，上仰 4 个，下俯 4 个
+function buildGuideTargets() {
+  const targets = [];
+  for (let i = 0; i < 12; i++) targets.push({ heading: i * 30, pitch: 0 });
+  for (let i = 0; i < 4; i++) targets.push({ heading: i * 90, pitch: 45 });
+  for (let i = 0; i < 4; i++) targets.push({ heading: i * 90, pitch: -45 });
+  return targets;
+}
+const guideTargets = buildGuideTargets();
+let guideIndex = 0;
 
-    if (guideIndex >= guideTargets.length) {
-      guideRing.style.opacity = '0';
-      guideDot.style.opacity = '0';
-      orientHint.textContent = '引导点已全部完成，可继续自由拍摄或保存';
-      return;
-    }
-    guideRing.style.opacity = '1';
-    guideDot.style.opacity = '1';
+// 设备朝向（度）
+let deviceHeading = 0;
+let devicePitch = 0;
+let hasOrientation = false;
 
-    const t = guideTargets[guideIndex];
-    targetHeading = t.heading;
-    targetPitch = t.pitch;
+function onOrientation(e) {
+  hasOrientation = true;
 
-    const hDiff = angleDiff(targetHeading, deviceHeading); // -180~180
-    const pDiff = targetPitch - devicePitch;               // 俯仰差
-
-    // 映射到屏幕位置：水平差 → 横向偏移；俯仰差 → 纵向偏移
-    const cx = 50 + hDiff * 0.5;      // 每度 0.5% 屏宽
-    const cy = 50 - pDiff * 0.8;      // 每度 0.8% 屏高（俯仰更敏感）
-
-    const left = Math.max(8, Math.min(92, cx));
-    const top  = Math.max(15, Math.min(85, cy));
-
-    guideRing.style.left = left + '%';
-    guideRing.style.top  = top + '%';
-    guideDot.style.left  = '50%';
-    guideDot.style.top   = '50%';
-
-    const near = Math.abs(hDiff) < 8 && Math.abs(pDiff) < 8;
-    if (near) {
-      guideRing.classList.add('done');
-      guideDot.classList.add('done');
-      orientHint.textContent = '已对准，可以拍摄';
-    } else {
-      guideRing.classList.remove('done');
-      guideDot.classList.remove('done');
-      orientHint.textContent = `转动手机，把黄点对准白圈（剩余 ${guideTargets.length - guideIndex} 个点）`;
-    }
+  // heading：磁北朝向 0~360
+  if (typeof e.webkitCompassHeading === 'number') {
+    deviceHeading = e.webkitCompassHeading;
+  } else if (typeof e.alpha === 'number') {
+    // alpha 是绕 z 轴旋转，竖屏下近似为朝向；不同平台方向可能相反
+    deviceHeading = (360 - e.alpha) % 360;
   }
 
+  // pitch：俯仰角，-90(向下) ~ +90(向上)
+  if (typeof e.beta === 'number') {
+    // beta: 竖屏垂直拿时约 90；上仰减小、下俯增大
+    devicePitch = 90 - e.beta;   // 范围约 -90 ~ 90
+    if (devicePitch > 90)  devicePitch = 90;
+    if (devicePitch < -90) devicePitch = -90;
+  }
+
+  updateGuideUI();
+}
+
+// 角度差 -180~180
+function angleDiff(a, b) {
+  return ((a - b + 540) % 360) - 180;
+}
+
+function updateGuideUI() {
+  if (!hasOrientation) {
+    guideRing.style.opacity = '0';
+    orientHint.textContent = '无方向传感器，请手动把目标点对准中心后拍摄';
+    return;
+  }
+
+  if (guideIndex >= guideTargets.length) {
+    guideRing.style.opacity = '0';
+    orientHint.textContent = '引导点已全部完成，可继续自由拍摄或保存';
+    return;
+  }
+
+  const t = guideTargets[guideIndex];
+  const hDiff = angleDiff(t.heading, deviceHeading); // -180~180
+  const pDiff = t.pitch - devicePitch;               // 俯仰差
+
+  // 目标在背后（|hDiff| > 110°）时隐藏圈，提示转过去
+  if (Math.abs(hDiff) > 110) {
+    guideRing.style.opacity = '0';
+    const dir = hDiff > 0 ? '右' : '左';
+    orientHint.textContent = `目标在你的${dir}后方，请转身`;
+    return;
+  }
+
+  guideRing.style.opacity = '1';
+
+  // 投影：hDiff 映射到屏幕横向，pDiff 映射到纵向
+  // 视野假设水平约 70°，垂直约 50°，据此换算百分比
+  const fovH = 70, fovV = 50;
+  const cx = 50 + (hDiff / fovH) * 100;
+  const cy = 50 - (pDiff / fovV) * 100;
+
+  // 限制在屏幕内，并稍作边缘收缩
+  const left = Math.max(10, Math.min(90, cx));
+  const top  = Math.max(15, Math.min(85, cy));
+
+  guideRing.style.left = left + '%';
+  guideRing.style.top  = top + '%';
+
+  // 对准判断：角差都很小
+  const near = Math.abs(hDiff) < 10 && Math.abs(pDiff) < 10;
+  if (near) {
+    guideRing.classList.add('done');
+    orientHint.textContent = '已对准，可以拍摄';
+  } else {
+    guideRing.classList.remove('done');
+    orientHint.textContent = `转动手机，把目标圈移到画面中心（剩余 ${guideTargets.length - guideIndex} 个点）`;
+  }
+}
   // ---------- 拍摄 ----------
   async function capture() {
     if (!stream) return;
