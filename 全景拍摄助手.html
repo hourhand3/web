@@ -14,38 +14,47 @@
   #camera-wrap { position: relative; flex: 1; overflow: hidden; background: #000; }
   #video { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-  /* 引导层 */
   #guide { position: absolute; inset: 0; pointer-events: none; }
   #guide-ring {
-    position: absolute; width: 90px; height: 90px;
+    position: absolute; width: 110px; height: 110px;
     border: 3px solid rgba(255,255,255,.85); border-radius: 50%;
-    transform: translate(-50%, -50%); transition: left .15s, top .15s;
+    transform: translate(-50%, -50%);
+    transition: left .12s linear, top .12s linear, border-color .15s;
     box-shadow: 0 0 0 2px rgba(0,0,0,.3);
+    opacity: 0;
   }
-#guide-cross {
-  position: absolute; left: 50%; top: 50%;
-  width: 28px; height: 28px; transform: translate(-50%, -50%);
-  pointer-events: none; opacity: .5;
-}
-#guide-cross::before, #guide-cross::after {
-  content: ""; position: absolute; background: #fff;
-}
-#guide-cross::before { left: 50%; top: 0; width: 2px; height: 100%; transform: translateX(-50%); }
-#guide-cross::after  { top: 50%; left: 0; height: 2px; width: 100%; transform: translateY(-50%); }
-  #guide-ring.done { border-color: #4caf50; }
-  #guide-dot.done { background: #4caf50; box-shadow: 0 0 10px rgba(76,175,80,.8); }
+  #guide-ring.done {
+    border-color: #4caf50;
+    box-shadow: 0 0 12px rgba(76,175,80,.8);
+  }
+  #guide-cross {
+    position: absolute; left: 50%; top: 50%;
+    width: 28px; height: 28px; transform: translate(-50%, -50%);
+    pointer-events: none; opacity: .5;
+  }
+  #guide-cross::before, #guide-cross::after {
+    content: ""; position: absolute; background: #fff;
+  }
+  #guide-cross::before { left: 50%; top: 0; width: 2px; height: 100%; transform: translateX(-50%); }
+  #guide-cross::after  { top: 50%; left: 0; height: 2px; width: 100%; transform: translateY(-50%); }
 
-  /* 顶部状态 */
   #status {
     position: absolute; top: 0; left: 0; right: 0;
     padding: 10px 14px; display: flex; justify-content: space-between;
     align-items: center; font-size: 14px;
-    background: linear-gradient(to bottom, rgba(0,0,0,.6), transparent);
+    background: linear-gradient(to bottom, rgba(0,0,0,.65), transparent);
   }
   #status .count { font-weight: 600; }
-  #status .hint { font-size: 12px; opacity: .8; }
+  #status .hint { font-size: 12px; opacity: .85; text-align: right; max-width: 62%; }
 
-  /* 底部控制 */
+  #debug-info {
+    position: absolute; left: 8px; bottom: 8px;
+    font: 11px/1.4 monospace; color: #9f9;
+    background: rgba(0,0,0,.55); padding: 4px 6px; border-radius: 4px;
+    white-space: pre; display: none; pointer-events: none;
+  }
+  body.debug #debug-info { display: block; }
+
   #controls {
     padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
     background: #1a1a1a; display: flex; flex-direction: column; gap: 10px;
@@ -63,7 +72,8 @@
   button:disabled { opacity: .35; cursor: not-allowed; }
   #btn-shoot { background: #ffd400; color: #111; }
   #btn-save-all { background: #4caf50; color: #fff; }
-  #btn-reset { background: #333; color: #eee; flex: 0 0 auto; padding: 14px 18px; }
+  #btn-skip { background: #555; color: #eee; flex: 0 0 auto; padding: 14px 14px; }
+  #btn-reset { background: #333; color: #eee; flex: 0 0 auto; padding: 14px 14px; }
 
   #thumbs {
     display: flex; gap: 6px; overflow-x: auto; padding: 4px 0;
@@ -77,16 +87,14 @@
     flex: 0 0 auto; border: 1px solid #333;
   }
 
-  /* Toast */
   #toast {
-    position: fixed; left: 50%; bottom: 120px; transform: translateX(-50%);
+    position: fixed; left: 50%; bottom: 130px; transform: translateX(-50%);
     background: rgba(0,0,0,.85); color: #fff; padding: 10px 18px;
     border-radius: 20px; font-size: 13px; max-width: 85vw; text-align: center;
     opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 100;
   }
   #toast.show { opacity: 1; }
 
-  /* 弹窗 */
   #modal {
     position: fixed; inset: 0; background: rgba(0,0,0,.7);
     display: none; align-items: center; justify-content: center;
@@ -105,7 +113,6 @@
   #modal .cancel { background: #444; color: #eee; }
   #modal .confirm { background: #4caf50; color: #fff; }
 
-  /* 播放音效的隐藏元素占位 */
   #shutter-flash {
     position: fixed; inset: 0; background: #fff; opacity: 0;
     pointer-events: none; transition: opacity .08s; z-index: 50;
@@ -117,14 +124,15 @@
 
 <div id="camera-wrap">
   <video id="video" autoplay playsinline muted></video>
-<div id="guide">
-  <div id="guide-cross"></div>
-  <div id="guide-ring"></div>
-</div>
+  <div id="guide">
+    <div id="guide-cross"></div>
+    <div id="guide-ring"></div>
+  </div>
   <div id="status">
     <span class="count">已拍 <b id="shot-count">0</b> 张</span>
-    <span class="hint" id="orient-hint">转动手机，对准目标点</span>
+    <span class="hint" id="orient-hint">初始化中…</span>
   </div>
+  <div id="debug-info"></div>
 </div>
 
 <div id="controls">
@@ -141,6 +149,7 @@
   <div class="btn-row">
     <button id="btn-shoot" disabled>拍摄</button>
     <button id="btn-save-all" disabled>保存全部</button>
+    <button id="btn-skip">跳过</button>
     <button id="btn-reset">重置</button>
   </div>
 </div>
@@ -164,15 +173,12 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.1.0';
+  const VERSION = '1.2.0';
   const DEBUG = /[?&]debug=1/.test(location.search);
+  if (DEBUG) document.body.classList.add('debug');
 
-  function log(...args) {
-    if (DEBUG) console.log(`[pano v${VERSION}]`, ...args);
-  }
-  function logWarn(...args) {
-    if (DEBUG) console.warn(`[pano v${VERSION}]`, ...args);
-  }
+  function log(...a) { if (DEBUG) console.log(`[pano v${VERSION}]`, ...a); }
+  function logWarn(...a) { if (DEBUG) console.warn(`[pano v${VERSION}]`, ...a); }
 
   log('启动', { ua: navigator.userAgent });
 
@@ -182,6 +188,7 @@
   const thumbsEl    = document.getElementById('thumbs');
   const btnShoot    = document.getElementById('btn-shoot');
   const btnSaveAll  = document.getElementById('btn-save-all');
+  const btnSkip     = document.getElementById('btn-skip');
   const btnReset    = document.getElementById('btn-reset');
   const modeBatch   = document.getElementById('mode-batch');
   const toastEl     = document.getElementById('toast');
@@ -192,9 +199,9 @@
   const modalConfirm= document.getElementById('modal-confirm');
   const guideRing   = document.getElementById('guide-ring');
   const orientHint  = document.getElementById('orient-hint');
+  const debugInfo   = document.getElementById('debug-info');
   const flashEl     = document.getElementById('shutter-flash');
 
-  // 顶部显示版本号，便于确认加载的是哪一版
   document.title = `全景拍摄助手 v${VERSION}`;
   orientHint.textContent = `v${VERSION} 初始化中…`;
 
@@ -203,19 +210,30 @@
   let stream = null;
 
   let hasOrientation = false;
-  let deviceHeading = 0;
-  let devicePitch = 0;
+  let rawHeading = 0;
+  let rawPitch = 0;
+  let smoothHeading = 0;
+  let smoothPitch = 0;
+  let hasSmoothInit = false;
+  let orientEventCount = 0;
   let guideIndex = 0;
-  let orientEventCount = 0;   // 用于日志
+
+  // 符号开关：方向反了就改成 -1
+  const HEADING_SIGN = 1;
+  const PITCH_SIGN = 1;
+
+  // 对准与锁定
+  const NEAR_DEG = 25;
+  const LOCK_HOLD_MS = 600;
+  let lockStart = 0;
 
   // ---------- 引导目标 ----------
-  // 水平一圈 12 个（每 30°），上仰 4 个（45°），下俯 4 个（-45°）
   function buildGuideTargets() {
-    const targets = [];
-    for (let i = 0; i < 12; i++) targets.push({ heading: i * 30, pitch: 0 });
-    for (let i = 0; i < 4; i++) targets.push({ heading: i * 90, pitch: 45 });
-    for (let i = 0; i < 4; i++) targets.push({ heading: i * 90, pitch: -45 });
-    return targets;
+    const t = [];
+    for (let i = 0; i < 12; i++) t.push({ heading: i * 30, pitch: 0 });
+    for (let i = 0; i < 4; i++) t.push({ heading: i * 90, pitch: 45 });
+    for (let i = 0; i < 4; i++) t.push({ heading: i * 90, pitch: -45 });
+    return t;
   }
   const guideTargets = buildGuideTargets();
   log('引导目标数量', guideTargets.length);
@@ -227,23 +245,16 @@
     clearTimeout(showToast._t);
     showToast._t = setTimeout(() => toastEl.classList.remove('show'), duration);
   }
-
   function flash() {
     flashEl.classList.add('flash');
     setTimeout(() => flashEl.classList.remove('flash'), 90);
   }
-
-  function updateCount() {
-    shotCountEl.textContent = shots.length;
-  }
-
+  function updateCount() { shotCountEl.textContent = shots.length; }
   function pad(n) { return String(n).padStart(3, '0'); }
-
   function makeFileName(idx) {
     const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     return `pano_${pad(idx + 1)}_${ts}.jpg`;
   }
-
   function downloadBlob(blob, filename) {
     log('下载', filename, blob.size, 'bytes');
     const a = document.createElement('a');
@@ -251,14 +262,11 @@
     a.download = filename;
     document.body.appendChild(a);
     a.click();
-    setTimeout(() => {
-      URL.revokeObjectURL(a.href);
-      a.remove();
-    }, 4000);
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
   }
-
-  function angleDiff(a, b) {
-    return ((a - b + 540) % 360) - 180;
+  function angleDiff(a, b) { return ((a - b + 540) % 360) - 180; }
+  function smoothAngle(oldVal, newVal, k) {
+    return oldVal + angleDiff(newVal, oldVal) * k;
   }
 
   // ---------- 摄像头 ----------
@@ -273,21 +281,13 @@
     try {
       log('请求摄像头…');
       stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        },
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
         audio: false
       });
       video.srcObject = stream;
       await video.play();
       btnShoot.disabled = false;
-      log('摄像头就绪', {
-        w: video.videoWidth,
-        h: video.videoHeight,
-        track: stream.getVideoTracks()[0]?.label
-      });
+      log('摄像头就绪', { w: video.videoWidth, h: video.videoHeight });
       orientHint.textContent = '摄像头就绪，等待方向传感器…';
     } catch (err) {
       console.error(err);
@@ -303,30 +303,35 @@
     orientEventCount++;
 
     if (typeof e.webkitCompassHeading === 'number') {
-      deviceHeading = e.webkitCompassHeading;
+      rawHeading = e.webkitCompassHeading;
     } else if (typeof e.alpha === 'number') {
-      deviceHeading = (360 - e.alpha) % 360;
+      rawHeading = (360 - e.alpha) % 360;
     }
-
     if (typeof e.beta === 'number') {
-      devicePitch = 90 - e.beta;
-      if (devicePitch > 90)  devicePitch = 90;
-      if (devicePitch < -90) devicePitch = -90;
+      rawPitch = 90 - e.beta;
+      if (rawPitch > 90) rawPitch = 90;
+      if (rawPitch < -90) rawPitch = -90;
     }
 
-    // 每 30 个事件打一条日志，避免刷屏
+    const h = (rawHeading * HEADING_SIGN + 360) % 360;
+    const p = rawPitch * PITCH_SIGN;
+
+    if (!hasSmoothInit) {
+      smoothHeading = h;
+      smoothPitch = p;
+      hasSmoothInit = true;
+    } else {
+      smoothHeading = smoothAngle(smoothHeading, h, 0.18);
+      smoothPitch += (p - smoothPitch) * 0.18;
+    }
+
     if (orientEventCount % 30 === 1) {
       log('方向事件', {
-        n: orientEventCount,
-        alpha: e.alpha,
-        beta: e.beta,
-        gamma: e.gamma,
+        n: orientEventCount, alpha: e.alpha, beta: e.beta,
         webkitCompassHeading: e.webkitCompassHeading,
-        heading: deviceHeading,
-        pitch: devicePitch
+        rawHeading, rawPitch, smoothHeading, smoothPitch
       });
     }
-
     updateGuideUI();
   }
 
@@ -361,7 +366,6 @@
       guideRing.style.opacity = '0';
       return;
     }
-
     if (guideIndex >= guideTargets.length) {
       guideRing.style.opacity = '0';
       orientHint.textContent = '引导点已全部完成，可继续自由拍摄或保存';
@@ -369,35 +373,65 @@
     }
 
     const t = guideTargets[guideIndex];
-    const hDiff = angleDiff(t.heading, deviceHeading);
-    const pDiff = t.pitch - devicePitch;
+    const hDiff = angleDiff(t.heading, smoothHeading);
+    const pDiff = t.pitch - smoothPitch;
 
     if (Math.abs(hDiff) > 110) {
       guideRing.style.opacity = '0';
-      const dir = hDiff > 0 ? '右' : '左';
-      orientHint.textContent = `目标在你的${dir}后方，请转身`;
-      return;
-    }
-
-    guideRing.style.opacity = '1';
-
-    const fovH = 70, fovV = 50;
-    const cx = 50 + (hDiff / fovH) * 100;
-    const cy = 50 - (pDiff / fovV) * 100;
-    const left = Math.max(10, Math.min(90, cx));
-    const top  = Math.max(15, Math.min(85, cy));
-
-    guideRing.style.left = left + '%';
-    guideRing.style.top  = top + '%';
-
-    const near = Math.abs(hDiff) < 10 && Math.abs(pDiff) < 10;
-    if (near) {
-      guideRing.classList.add('done');
-      orientHint.textContent = '已对准，可以拍摄';
+      orientHint.textContent = `目标在你的${hDiff > 0 ? '右' : '左'}后方，请转身`;
+      lockStart = 0;
     } else {
-      guideRing.classList.remove('done');
-      orientHint.textContent = `转动手机，把目标圈移到画面中心（剩余 ${guideTargets.length - guideIndex} 个点）`;
+      guideRing.style.opacity = '1';
+      const fovH = 70, fovV = 50;
+      const cx = 50 + (hDiff / fovH) * 100;
+      const cy = 50 - (pDiff / fovV) * 100;
+      guideRing.style.left = Math.max(10, Math.min(90, cx)) + '%';
+      guideRing.style.top  = Math.max(15, Math.min(85, cy)) + '%';
+
+      const near = Math.abs(hDiff) < NEAR_DEG && Math.abs(pDiff) < NEAR_DEG;
+      if (near) {
+        guideRing.classList.add('done');
+        const now = performance.now();
+        if (!lockStart) {
+          lockStart = now;
+          orientHint.textContent = '已进入对准区，保持不动…';
+        } else if (now - lockStart >= LOCK_HOLD_MS) {
+          log('锁定目标', guideIndex, { hDiff: +hDiff.toFixed(1), pDiff: +pDiff.toFixed(1) });
+          advanceGuide();
+          return;
+        } else {
+          const leftMs = LOCK_HOLD_MS - (now - lockStart);
+          orientHint.textContent = `保持不动… ${(leftMs / 1000).toFixed(1)}s`;
+        }
+      } else {
+        lockStart = 0;
+        guideRing.classList.remove('done');
+        orientHint.textContent = `转动手机，把目标圈移到中心（剩余 ${guideTargets.length - guideIndex} 个点）`;
+      }
     }
+
+    if (DEBUG) {
+      debugInfo.textContent =
+        `v${VERSION}  ev:${orientEventCount}\n` +
+        `rawH:${rawHeading.toFixed(1)} rawP:${rawPitch.toFixed(1)}\n` +
+        `smH:${smoothHeading.toFixed(1)} smP:${smoothPitch.toFixed(1)}\n` +
+        `hD:${hDiff.toFixed(1)} pD:${pDiff.toFixed(1)}\n` +
+        `idx:${guideIndex}/${guideTargets.length} lock:${lockStart ? 'Y' : 'N'}`;
+    }
+  }
+
+  function advanceGuide() {
+    if (guideIndex < guideTargets.length) guideIndex++;
+    lockStart = 0;
+    guideRing.classList.remove('done');
+    updateGuideUI();
+    showToast(`已完成 ${guideIndex}/${guideTargets.length} 个引导点`);
+  }
+
+  function skipGuide() {
+    if (guideIndex >= guideTargets.length) { showToast('已无引导点'); return; }
+    log('手动跳过', guideIndex);
+    advanceGuide();
   }
 
   // ---------- 拍摄 ----------
@@ -405,17 +439,11 @@
     if (!stream) return;
     flash();
 
-    const vw = video.videoWidth;
-    const vh = video.videoHeight;
-    if (!vw || !vh) {
-      showToast('摄像头尚未就绪');
-      logWarn('videoWidth/Height 为 0');
-      return;
-    }
+    const vw = video.videoWidth, vh = video.videoHeight;
+    if (!vw || !vh) { showToast('摄像头尚未就绪'); logWarn('videoWidth/Height 为 0'); return; }
 
     const canvas = document.createElement('canvas');
-    canvas.width = vw;
-    canvas.height = vh;
+    canvas.width = vw; canvas.height = vh;
     canvas.getContext('2d').drawImage(video, 0, 0, vw, vh);
 
     canvas.toBlob((blob) => {
@@ -426,19 +454,12 @@
       log('拍摄', name, blob.size, 'bytes', '共', shots.length, '张');
 
       const img = document.createElement('img');
-      img.src = url;
-      img.alt = name;
+      img.src = url; img.alt = name;
       thumbsEl.appendChild(img);
       thumbsEl.scrollLeft = thumbsEl.scrollWidth;
 
       updateCount();
       btnSaveAll.disabled = shots.length === 0;
-
-      if (guideIndex < guideTargets.length) {
-        guideIndex++;
-        log('引导推进到', guideIndex);
-        updateGuideUI();
-      }
 
       if (!modeBatch.checked) {
         downloadBlob(blob, name);
@@ -447,12 +468,9 @@
     }, 'image/jpeg', 0.92);
   }
 
-  // ---------- 保存全部 ----------
+  // ---------- 保存 ----------
   function openSaveConfirm() {
-    if (shots.length === 0) {
-      showToast('还没有拍摄照片');
-      return;
-    }
+    if (shots.length === 0) { showToast('还没有拍摄照片'); return; }
     modalTitle.textContent = `即将保存 ${shots.length} 张照片`;
     modalBody.innerHTML =
       `<p>照片将保存到浏览器的下载目录。如果你的浏览器支持选择位置，请留意弹出的保存对话框；如果不支持，请到手机的“下载”文件夹中查找。</p>` +
@@ -479,6 +497,8 @@
     shots.length = 0;
     thumbsEl.innerHTML = '';
     guideIndex = 0;
+    lockStart = 0;
+    guideRing.classList.remove('done');
     updateCount();
     btnSaveAll.disabled = true;
     updateGuideUI();
@@ -489,9 +509,10 @@
   // ---------- 事件 ----------
   btnShoot.addEventListener('click', capture);
   btnSaveAll.addEventListener('click', openSaveConfirm);
+  btnSkip.addEventListener('click', skipGuide);
+  btnReset.addEventListener('click', reset);
   modalConfirm.addEventListener('click', saveAll);
   modalCancel.addEventListener('click', () => modal.classList.remove('show'));
-  btnReset.addEventListener('click', reset);
 
   modeBatch.addEventListener('change', () => {
     showToast(modeBatch.checked
@@ -509,10 +530,7 @@
     await initCamera();
     await requestOrientationPermission();
     updateGuideUI();
-    // 传感器事件频率不足时兜底刷新
-    setInterval(() => {
-      if (hasOrientation) updateGuideUI();
-    }, 120);
+    setInterval(() => { if (hasOrientation) updateGuideUI(); }, 120);
   })();
 
 })();
